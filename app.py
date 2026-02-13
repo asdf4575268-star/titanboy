@@ -32,6 +32,7 @@ def load_custom_font(font_type, size):
 
 def get_circle_logo(img_file, size=(130, 130)):
     img = Image.open(img_file).convert("RGBA")
+    # 가로/세로 상관없이 원형에 맞게 fit 조절
     img = ImageOps.fit(img, size, centering=(0.5, 0.5))
     mask = Image.new('L', size, 0)
     draw = ImageDraw.Draw(mask)
@@ -40,6 +41,7 @@ def get_circle_logo(img_file, size=(130, 130)):
     return img
 
 def create_collage(image_files, target_size=(1080, 1350)):
+    # 모든 사진을 회전 보정 후 로드
     imgs = [ImageOps.exif_transpose(Image.open(f).convert("RGB")) for f in image_files]
     if not imgs: return None
     count = len(imgs)
@@ -50,6 +52,7 @@ def create_collage(image_files, target_size=(1080, 1350)):
     for i, img in enumerate(imgs):
         is_last = (i == count - 1)
         draw_w = cell_w * (cols - (count % cols) + 1) if is_last and (count % cols != 0) else cell_w
+        # 가로 사진도 해당 칸에 꽉 차게 조절
         img_fitted = ImageOps.fit(img, (draw_w, cell_h), centering=(0.5, 0.5))
         collage.paste(img_fitted, ((i % cols) * cell_w, (i // cols) * cell_h))
     return collage
@@ -77,7 +80,7 @@ if not st.session_state['access_token']:
 with st.sidebar:
     app_mode = st.radio("🚀 작업 모드", ["DAILY", "WEEKLY"])
     st.markdown("---")
-    st.header("⚙️ 디자인 설정")
+    st.header("⚙️ OCR / 디자인 설정")
     selected_font = st.selectbox("폰트 선택", ["BlackHanSans", "NanumBrush", "Jua", "Pretendard(Bold)"])
     main_color = st.color_picker("활동명 색상", "#FFD700")
     num_color = st.color_picker("날짜/정보 색상", "#FFFFFF")
@@ -102,7 +105,6 @@ if app_mode == "DAILY":
         sel = st.selectbox("기록 선택", [f"{a['start_date_local']} - {a['name']}" for a in acts])
         a = acts[[f"{x['start_date_local']} - {x['name']}" for x in acts].index(sel)]
         
-        # 데이터 파싱
         date_def = a.get('start_date_local', "2026-02-14T00:00").replace("T", " ")[:16]
         dist_km = a.get('distance', 0) / 1000
         pace_v = f"{int((a.get('moving_time',0)/dist_km)//60)}:{int((a.get('moving_time',0)/dist_km)%60):02d}" if dist_km > 0 else "0:00"
@@ -120,16 +122,24 @@ if app_mode == "DAILY":
             v_hr = st.text_input("심박수 수정", hr_v)
 
         if bg_file:
-            canvas = ImageOps.fit(Image.open(bg_file).convert("RGBA"), (1080, 1920))
+            # 배경 사진 로드 시 가로 사진도 1080x1920에 맞게 자동 조절
+            orig_bg = ImageOps.exif_transpose(Image.open(bg_file))
+            canvas = ImageOps.fit(orig_bg.convert("RGBA"), (1080, 1920), centering=(0.5, 0.5))
             overlay = Image.new('RGBA', canvas.size, (0, 0, 0, 0))
             draw = ImageDraw.Draw(overlay)
             f_t, f_d, f_n, f_l = load_custom_font(selected_font, t_sz), load_custom_font(selected_font, d_sz), load_custom_font(selected_font, n_sz), load_custom_font(selected_font, l_sz)
 
+            # 로그박스
             draw.rectangle([rx, ry, rx + 450, ry + 560], fill=(0, 0, 0, alpha))
-            draw.text((rx + 50, ry + 40), v_date, font=f_d, fill=num_color)
-            draw.text((rx + 50, ry + 40 + d_sz + 10), v_act, font=f_t, fill=main_color)
             
-            line_y = ry + d_sz + t_sz + 80
+            # 🌟 활동명 상단 배치
+            draw.text((rx + 50, ry + 40), v_act, font=f_t, fill=main_color)
+            
+            # 🌟 날짜: 활동명 아래 오른쪽에 배치 (오른쪽 정렬)
+            draw.text((rx + 400, ry + 40 + t_sz + 5), v_date, font=f_d, fill=num_color, anchor="ra")
+            
+            # 구분선 및 데이터
+            line_y = ry + t_sz + d_sz + 80
             items = [("DISTANCE", f"{v_dist} km"), ("AVG PACE", f"{v_pace} /km"), ("AVG HR", f"{v_hr} bpm")]
             for i, (lab, val) in enumerate(items):
                 py = line_y + (i * 125)
@@ -175,15 +185,12 @@ elif app_mode == "WEEKLY":
             total_time = sum(a.get('moving_time', 0) for a in w_acts)
             avg_hr = sum(a.get('average_heartrate', 0) for a in w_acts if a.get('average_heartrate')) / len([a for a in w_acts if a.get('average_heartrate')]) if any(a.get('average_heartrate') for a in w_acts) else 0
             
-            # 평균 페이스 계산
             if total_dist > 0:
                 avg_pace_sec = total_time / total_dist
                 pace_m, pace_s = int(avg_pace_sec // 60), int(avg_pace_sec % 60)
                 avg_pace_str = f"{pace_m}:{pace_s:02d}"
-            else:
-                avg_pace_str = "0:00"
+            else: avg_pace_str = "0:00"
 
-            # 🌟 수치 표시 레이아웃
             m1, m2, m3 = st.columns(3)
             m1.metric("이번 주 총 거리", f"{total_dist:.2f} km")
             m2.metric("평균 페이스", f"{avg_pace_str} /km")
@@ -197,5 +204,3 @@ elif app_mode == "WEEKLY":
                     st.image(collage, use_container_width=True)
                     buf = io.BytesIO(); collage.save(buf, format="JPEG", quality=95)
                     st.download_button("📸 콜라주 저장", buf.getvalue(), "weekly_collage.jpg")
-        else:
-            st.info("최근 7일간 기록된 활동이 없습니다.")
