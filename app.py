@@ -39,21 +39,6 @@ def get_circle_logo(img_file, size=(130, 130)):
     img.putalpha(mask)
     return img
 
-def create_collage(image_files, target_size=(1080, 1350)):
-    imgs = [ImageOps.exif_transpose(Image.open(f).convert("RGB")) for f in image_files]
-    if not imgs: return None
-    count = len(imgs)
-    cols = 1 if count == 1 else (2 if count <= 4 else 3)
-    rows = (count + cols - 1) // cols
-    cell_w, cell_h = target_size[0] // cols, target_size[1] // rows
-    collage = Image.new("RGB", target_size, (0, 0, 0))
-    for i, img in enumerate(imgs):
-        is_last = (i == count - 1)
-        draw_w = cell_w * (cols - (count % cols) + 1) if is_last and (count % cols != 0) else cell_w
-        img_fitted = ImageOps.fit(img, (draw_w, cell_h), centering=(0.5, 0.5))
-        collage.paste(img_fitted, ((i % cols) * cell_w, (i // cols) * cell_h))
-    return collage
-
 # --- [3. 스트라바 연동] ---
 if 'access_token' not in st.session_state:
     st.session_state['access_token'] = None
@@ -73,26 +58,32 @@ if not st.session_state['access_token']:
     st.link_button("🚀 Strava 연동하기", auth_url)
     st.stop()
 
-# --- [4. 사이드바] ---
+# --- [4. 사이드바 (크기/위치 조절 추가)] ---
 with st.sidebar:
     app_mode = st.radio("🚀 작업 모드", ["DAILY", "WEEKLY"])
     st.markdown("---")
-    st.header("⚙️ 디자인 설정")
+    st.header("⚙️ 디자인/크기 설정")
     selected_font = st.selectbox("폰트 선택", ["BlackHanSans", "NanumBrush", "Jua", "Pretendard(Bold)"])
     main_color = st.color_picker("활동명 색상", "#FFD700")
     num_color = st.color_picker("날짜/정보 색상", "#FFFFFF")
     route_color = st.selectbox("지도 경로 색상", ["Yellow", "Black", "White"])
     
     st.markdown("---")
+    st.subheader("텍스트 크기")
     t_sz = st.slider("활동명 크기", 10, 200, 90)
     d_sz = st.slider("날짜 크기", 10, 100, 30)
     n_sz = st.slider("숫자 크기", 10, 150, 60)
     l_sz = st.slider("라벨 크기", 10, 80, 25)
-    rx = st.slider("박스 좌측 위치", 0, 1080, 70)
-    ry = st.slider("박스 상단 위치", 0, 1920, 1250)
-    alpha = st.slider("박스 투명도", 0, 255, 50)
+    
+    st.markdown("---")
+    st.subheader("로그 박스 설정")
+    rx = st.slider("박스 좌측 위치(X)", 0, 1080, 70)
+    ry = st.slider("박스 상단 위치(Y)", 0, 1920, 1150)
+    rw = st.slider("박스 너비(Width)", 300, 1000, 500)  # 너비 조절 추가
+    rh = st.slider("박스 높이(Height)", 300, 1200, 720) # 높이 조절 추가
+    alpha = st.slider("박스 투명도", 0, 255, 60)
 
-# --- [5. 실행 로직] ---
+# --- [5. DAILY 실행] ---
 headers = {'Authorization': f"Bearer {st.session_state['access_token']}"}
 
 if app_mode == "DAILY":
@@ -102,27 +93,23 @@ if app_mode == "DAILY":
         sel = st.selectbox("기록 선택", [f"{a['start_date_local']} - {a['name']}" for a in acts])
         a = acts[[f"{x['start_date_local']} - {x['name']}" for x in acts].index(sel)]
         
-        # 시간 데이터 처리
         m_time = a.get('moving_time', 0)
         time_v = f"{m_time//3600:02d}:{ (m_time%3600)//60 :02d}:{m_time%60:02d}" if m_time >= 3600 else f"{m_time//60:02d}:{m_time%60:02d}"
-        
-        date_def = a.get('start_date_local', "2026-02-14T00:00").replace("T", " ")[:16]
         dist_km = a.get('distance', 0) / 1000
         pace_v = f"{int((m_time/dist_km)//60)}:{int((m_time/dist_km)%60):02d}" if dist_km > 0 else "0:00"
-        hr_v = str(int(a.get('average_heartrate', 0))) if a.get('average_heartrate') else "0"
-
+        
         col_files, col_inputs = st.columns([1, 1])
         with col_files:
             bg_file = st.file_uploader("1. 배경 사진 선택", type=['jpg', 'jpeg', 'png'])
             log_file = st.file_uploader("2. 로고 아이콘 선택", type=['jpg', 'jpeg', 'png'])
         with col_inputs:
-            v_act = st.text_input("활동명 수정", a['name'])
-            v_date = st.text_input("날짜 수정", date_def)
-            v_dist = st.text_input("거리(km) 수정", f"{dist_km:.2f}")
-            v_time = st.text_input("시간 수정", time_v)
-            v_pace = st.text_input("페이스 수정", pace_v)
-            v_hr = st.text_input("심박수 수정", hr_v)
-            v_weather = st.text_input("날씨/기온 입력 (예: ☀️ 15°C)", "")
+            v_act = st.text_input("활동명", a['name'])
+            v_date = st.text_input("날짜", a.get('start_date_local', "")[:16].replace("T", " "))
+            v_dist = st.text_input("거리(km)", f"{dist_km:.2f}")
+            v_time = st.text_input("시간", time_v)
+            v_pace = st.text_input("페이스", pace_v)
+            v_hr = st.text_input("심박수(bpm)", str(int(a.get('average_heartrate', 0))))
+            v_weather = st.text_input("날씨(예: ☀️ 15°C)", "")
 
         if bg_file:
             orig_bg = ImageOps.exif_transpose(Image.open(bg_file))
@@ -131,21 +118,16 @@ if app_mode == "DAILY":
             draw = ImageDraw.Draw(overlay)
             f_t, f_d, f_n, f_l = load_custom_font(selected_font, t_sz), load_custom_font(selected_font, d_sz), load_custom_font(selected_font, n_sz), load_custom_font(selected_font, l_sz)
 
-            # 로그박스 (운동시간 추가로 인해 높이 약간 조정)
-            draw.rectangle([rx, ry, rx + 450, ry + 680], fill=(0, 0, 0, alpha))
+            # 🌟 로그박스 배경 (rw, rh 슬라이더 값 적용)
+            draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0, 0, 0, alpha))
             
-            # 활동명 & 날짜
+            # 텍스트 배치
             draw.text((rx + 50, ry + 40), v_act, font=f_t, fill=main_color)
-            draw.text((rx + 400, ry + 40 + t_sz + 5), v_date, font=f_d, fill=num_color, anchor="ra")
+            # 날짜를 박스 너비(rw)에 맞춰 우측 정렬
+            draw.text((rx + rw - 50, ry + 40 + t_sz + 5), v_date, font=f_d, fill=num_color, anchor="ra")
             
-            # 상세 데이터 (DISTANCE, TIME, PACE, HR, WEATHER 순)
-            line_y = ry + t_sz + d_sz + 80
-            items = [
-                ("DISTANCE", f"{v_dist} km"), 
-                ("TIME", v_time), 
-                ("AVG PACE", f"{v_pace} /km"), 
-                ("AVG HR", f"{v_hr} bpm")
-            ]
+            line_y = ry + t_sz + d_sz + 100
+            items = [("DISTANCE", f"{v_dist} km"), ("TIME", v_time), ("AVG PACE", f"{v_pace} /km"), ("AVG HR", f"{v_hr} bpm")]
             if v_weather: items.append(("WEATHER", v_weather))
 
             for i, (lab, val) in enumerate(items):
@@ -153,7 +135,7 @@ if app_mode == "DAILY":
                 draw.text((rx + 60, py), lab, font=f_l, fill="#AAAAAA")
                 draw.text((rx + 60, py + l_sz + 5), val, font=f_n, fill=num_color)
 
-            # 지도 및 로고
+            # 지도 (박스 위쪽 배치 유지)
             poly = a.get('map', {}).get('summary_polyline', "")
             if poly:
                 try:
@@ -179,4 +161,3 @@ if app_mode == "DAILY":
             st.image(final, use_container_width=True)
             buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
             st.download_button("📸 DOWNLOAD", buf.getvalue(), "garmin_final.jpg")
-# (이하 WEEKLY 모드는 이전과 동일)
