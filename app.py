@@ -149,7 +149,7 @@ if app_mode == "DAILY":
 
 # --- [6. WEEKLY 모드] ---
 elif app_mode == "WEEKLY":
-    st.title("📅 Weekly Collage (No Margin)")
+    st.title("📅 Weekly Collage")
     after_ts = int((datetime.now() - timedelta(days=7)).timestamp())
     act_res = requests.get(f"https://www.strava.com/api/v3/athlete/activities?after={after_ts}", headers=headers)
     
@@ -165,3 +165,4 @@ elif app_mode == "WEEKLY":
                 st.image(collage, use_container_width=True)
                 buf = io.BytesIO(); collage.save(buf, format="JPEG", quality=95)
                 st.download_button("📸 콜라주 저장", buf.getvalue(), "weekly_no_margin.jpg")
+
