@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 # --- [1. 기본 설정] ---
 CLIENT_ID = '202275'
 CLIENT_SECRET = '41f311299a14de733155c6c6e71505d3063fc31c'
+# 🌟 슬래시(/) 없는 순수 도메인 주소
 ACTUAL_URL = "https://titanboy-5fxenvcchdubwx3swjh8ut.streamlit.app"
 
 st.set_page_config(page_title="Garmin Photo Dashboard", layout="wide")
@@ -51,6 +52,7 @@ def create_collage(image_files, target_size=(1080, 1080)):
 if 'access_token' not in st.session_state:
     st.session_state['access_token'] = None
 
+# URL 파라미터에서 인증 코드 추출
 if "code" in st.query_params and not st.session_state['access_token']:
     res = requests.post("https://www.strava.com/oauth/token", data={
         "client_id": CLIENT_ID, "client_secret": CLIENT_SECRET,
@@ -62,26 +64,34 @@ if "code" in st.query_params and not st.session_state['access_token']:
 
 if not st.session_state['access_token']:
     st.title("🏃 Garmin Photo Dashboard")
-    auth_url = f"https://www.strava.com/oauth/authorize?client_id={CLIENT_ID}&response_type=code&redirect_uri={ACTUAL_URL}/&scope=activity:read_all&approval_prompt=force"
+    # 🌟 redirect_uri 끝에 슬래시를 제거하여 API 설정과 일치시킴
+    auth_url = (
+        f"https://www.strava.com/oauth/authorize?"
+        f"client_id={CLIENT_ID}&response_type=code&"
+        f"redirect_uri={ACTUAL_URL}&scope=activity:read_all&approval_prompt=force"
+    )
     st.link_button("🚀 Strava 연동하기", auth_url)
     st.stop()
 
-# --- [4. 공통 사이드바] ---
+# --- [4. 공통 사이드바 (사용자 지침 반영)] ---
 with st.sidebar:
     app_mode = st.radio("🚀 작업 모드", ["DAILY", "WEEKLY"])
     st.markdown("---")
     st.header("📸 사진 확인 (상시)")
     check_img = st.file_uploader("참고용 사진 업로드", type=['jpg', 'png'], key="side_check")
     if check_img:
-        st.image(check_img, use_container_width=True)
+        st.image(check_img, use_container_width=True, caption="상시 확인창")
     
     st.markdown("---")
     st.header("⚙️ 커스텀 설정")
     selected_font = st.selectbox("폰트 선택", ["Impact(BlackHan)", "Gothic(DoHyeon)", "Stylish(Jua)", "Clean(Noto)"])
+    
+    # [지침] 활동명 90, 날짜 30, 숫자 60
     t_sz = st.slider("활동명 크기", 10, 200, 90)
     d_sz = st.slider("날짜 크기", 10, 100, 30)
     n_sz = st.slider("숫자 크기", 10, 150, 60)
     l_sz = st.slider("라벨 크기", 10, 80, 25)
+    
     rx = st.slider("박스 좌우", 0, 1080, 70)
     ry = st.slider("박스 상하", 0, 1920, 1250)
     alpha = st.slider("투명도", 0, 255, 50)
@@ -95,7 +105,7 @@ if app_mode == "DAILY":
         sel = st.selectbox("기록 선택", [f"{a['start_date_local']} - {a['name']}" for a in acts])
         a = acts[[f"{x['start_date_local']} - {x['name']}" for x in acts].index(sel)]
         
-        # 날짜 파싱 (SyntaxError 방지를 위해 안전하게 처리)
+        # 날짜 안전하게 처리
         raw_date = a.get('start_date_local', "2026-01-01T00:00:00Z")
         date_v = raw_date.replace("T", " ").replace("Z", "")[:16]
         
@@ -130,6 +140,7 @@ if app_mode == "DAILY":
             line_y = ry + t_sz + 80
             draw.text((rx + 400, line_y - d_sz - 10), v_date, font=f_d, fill="white", anchor="ra")
             
+            # [지침] km, bpm 소문자 고정
             items = [("DISTANCE", f"{v_dist} km"), ("AVG PACE", f"{v_pace} /km"), ("AVG HR", f"{v_hr} bpm")]
             for i, (lab, val) in enumerate(items):
                 py = line_y + 30 + (i * 125)
