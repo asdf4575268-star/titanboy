@@ -14,20 +14,19 @@ st.set_page_config(page_title="Garmin Photo Dashboard", layout="wide")
 @st.cache_resource
 def load_custom_font(font_type, size):
     fonts = {
-        "Impact(BlackHan)": "https://github.com/google/fonts/raw/main/ofl/blackhansans/BlackHanSans-Regular.ttf",
-        "Gothic(DoHyeon)": "https://github.com/google/fonts/raw/main/ofl/dohyeon/DoHyeon-Regular.ttf",
-        "Stylish(Jua)": "https://github.com/google/fonts/raw/main/ofl/jua/Jua-Regular.ttf",
-        "Clean(Noto)": "https://github.com/google/fonts/raw/main/ofl/notosanskr/NotoSansKR%5Bwght%5D.ttf"
+        "Pretendard(Bold)": "https://github.com/orioncactus/pretendard/raw/main/packages/pretendard/dist/public/static/Alternative/Pretendard-Bold.ttf",
+        "BlackHanSans": "https://github.com/google/fonts/raw/main/ofl/blackhansans/BlackHanSans-Regular.ttf",
+        "NanumBrush": "https://github.com/google/fonts/raw/main/ofl/nanumbrushscript/NanumBrushScript-Regular.ttf",
+        "Jua": "https://github.com/google/fonts/raw/main/ofl/jua/Jua-Regular.ttf"
     }
-    font_url = fonts.get(font_type, fonts["Clean(Noto)"])
-    font_path = f"{font_type.split('(')[0]}.ttf"
+    font_url = fonts.get(font_type, fonts["Pretendard(Bold)"])
+    font_path = f"{font_type}.ttf"
     if not os.path.exists(font_path):
         res = requests.get(font_url)
         with open(font_path, "wb") as f: f.write(res.content)
     return ImageFont.truetype(font_path, int(size))
 
 def get_circle_logo(img_file, size=(130, 130)):
-    """로고를 동그랗게 깎는 함수"""
     img = Image.open(img_file).convert("RGBA")
     img = ImageOps.fit(img, size, centering=(0.5, 0.5))
     mask = Image.new('L', size, 0)
@@ -37,7 +36,6 @@ def get_circle_logo(img_file, size=(130, 130)):
     return img
 
 def create_collage(image_files, target_size=(1080, 1350)):
-    """여백 없는 인스타용 콜라주"""
     imgs = [ImageOps.exif_transpose(Image.open(f).convert("RGB")) for f in image_files]
     if not imgs: return None
     count = len(imgs)
@@ -80,16 +78,21 @@ with st.sidebar:
     if check_img: st.image(check_img, use_container_width=True)
     
     st.markdown("---")
-    st.header("⚙️ 커스텀 설정")
-    selected_font = st.selectbox("폰트 선택", ["Impact(BlackHan)", "Gothic(DoHyeon)", "Stylish(Jua)", "Clean(Noto)"])
-    # [지침 반영] 활동명 90, 날짜 30, 숫자 60 고정
-    t_sz = st.slider("활동명 크기", 10, 200, 70)
-    d_sz = st.slider("날짜 크기", 10, 100, 20)
-    n_sz = st.slider("숫자 크기", 10, 150, 40)
-    l_sz = st.slider("라벨 크기", 10, 80, 20)
-    rx = st.slider("박스 좌우", 0, 1080, 70)
-    ry = st.slider("박스 상하", 0, 1920, 1250)
-    alpha = st.slider("투명도", 0, 255, 50)
+    st.header("🎨 디자인 설정")
+    selected_font = st.selectbox("폰트 선택", ["Pretendard(Bold)", "BlackHanSans", "NanumBrush", "Jua"])
+    font_color = st.color_picker("메인 텍스트 색상", "#FFD700") # 활동명 색상
+    sub_font_color = st.color_picker("숫자/정보 색상", "#FFFFFF") # 숫자 색상
+    route_color = st.selectbox("지도(경로) 색상", ["Yellow", "Black"])
+    
+    st.markdown("---")
+    st.header("⚙️ 크기/위치 조절")
+    t_sz = st.slider("활동명 크기", 10, 200, 90)
+    d_sz = st.slider("날짜 크기", 10, 100, 30)
+    n_sz = st.slider("숫자 크기", 10, 150, 60)
+    l_sz = st.slider("라벨 크기", 10, 80, 25)
+    rx = st.slider("박스 좌측 위치", 0, 1080, 70)
+    ry = st.slider("박스 상단 위치", 0, 1920, 1250)
+    alpha = st.slider("박스 투명도", 0, 255, 50)
 
 # --- [5. DAILY 모드] ---
 headers = {'Authorization': f"Bearer {st.session_state['access_token']}"}
@@ -105,9 +108,10 @@ if app_mode == "DAILY":
         dist_v = f"{dist_raw / 1000:.2f}"
         pace_v = f"{int((sec/(dist_raw/1000))//60)}:{int((sec/(dist_raw/1000))%60):02d}" if dist_raw > 0 else "0:00"
         hr_v = str(int(a.get('average_heartrate', 0))) if a.get('average_heartrate') else "0"
+        poly = a.get('map', {}).get('summary_polyline', "")
 
         bg_file = st.file_uploader("1. 배경 사진 선택", type=['jpg', 'jpeg', 'png'])
-        log_file = st.file_uploader("2. 로고 아이콘 선택 (옵션)", type=['jpg', 'jpeg', 'png'])
+        log_file = st.file_uploader("2. 로고 아이콘 선택", type=['jpg', 'jpeg', 'png'])
 
         if bg_file:
             col_img, col_info = st.columns([2, 1])
@@ -121,16 +125,37 @@ if app_mode == "DAILY":
             draw = ImageDraw.Draw(overlay)
             f_t, f_d, f_n, f_l = load_custom_font(selected_font, t_sz), load_custom_font(selected_font, d_sz), load_custom_font(selected_font, n_sz), load_custom_font(selected_font, l_sz)
 
+            # 로그박스 배경
             draw.rectangle([rx, ry, rx + 450, ry + 560], fill=(0, 0, 0, alpha))
-            draw.text((rx + 50, ry + 40), v_act, font=f_t, fill="#FFD700")
+            
+            # 텍스트 그리기 (색상 커스텀 반영)
+            draw.text((rx + 50, ry + 40), v_act, font=f_t, fill=font_color)
             line_y = ry + t_sz + 80
-            draw.text((rx + 400, line_y - d_sz - 10), v_date, font=f_d, fill="white", anchor="ra")
-            # [지침] km, bpm 소문자
+            draw.text((rx + 400, line_y - d_sz - 10), v_date, font=f_d, fill=sub_font_color, anchor="ra")
+            
             items = [("DISTANCE", f"{v_dist} km"), ("AVG PACE", f"{v_pace} /km"), ("AVG HR", f"{v_hr} bpm")]
             for i, (lab, val) in enumerate(items):
                 py = line_y + 30 + (i * 125)
                 draw.text((rx + 60, py), lab, font=f_l, fill="#AAAAAA")
-                draw.text((rx + 60, py + l_sz + 5), val, font=f_n, fill="white")
+                draw.text((rx + 60, py + l_sz + 5), val, font=f_n, fill=sub_font_color)
+
+            # 지도 경로 그리기 (로그박스 왼쪽 위 고정)
+            if poly:
+                try:
+                    pts = polyline.decode(poly)
+                    lats, lons = [p[0] for p in pts], [p[1] for p in pts]
+                    mi_la, ma_la, mi_lo, ma_lo = min(lats), max(lats), min(lons), max(lons)
+                    r_img = Image.new("RGBA", (350, 350), (0, 0, 0, 0))
+                    dr_r = ImageDraw.Draw(r_img)
+                    def sc(p):
+                        x = (p[1] - mi_lo) / (ma_lo - mi_lo + 1e-9) * 300 + 25
+                        y = 300 - ((p[0] - mi_la) / (ma_la - mi_la + 1e-9) * 300) + 25
+                        return (x, y)
+                    r_fill = "#FFD700" if route_color == "Yellow" else "#000000"
+                    dr_r.line([sc(p) for p in pts], fill=r_fill, width=8)
+                    # 🌟 위치: 로그박스(rx, ry)의 왼쪽 상단 위로 배치
+                    canvas.paste(r_img, (rx - 50, ry - 380), r_img)
+                except: pass
 
             if log_file:
                 logo = get_circle_logo(log_file)
@@ -142,13 +167,12 @@ if app_mode == "DAILY":
                 buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
                 st.download_button("📸 DOWNLOAD", buf.getvalue(), "garmin_final.jpg")
 
-# --- [6. WEEKLY 모드] ---
 elif app_mode == "WEEKLY":
-    st.title("📅 Weekly Collage (1080x1350)")
+    st.title("📅 Weekly Collage (No Margin)")
     after_ts = int((datetime.now() - timedelta(days=7)).timestamp())
     act_res = requests.get(f"https://www.strava.com/api/v3/athlete/activities?after={after_ts}", headers=headers)
     if act_res.status_code == 200:
-        st.metric("이번 주 거리", f"{sum(a.get('distance', 0) for a in act_res.json()) / 1000:.2f} km")
+        st.metric("이번 주 총 거리", f"{sum(a.get('distance', 0) for a in act_res.json()) / 1000:.2f} km")
         files = st.file_uploader("콜라주 사진 선택", type=['jpg', 'jpeg', 'png'], accept_multiple_files=True)
         if files:
             collage = create_collage(files)
@@ -156,4 +180,3 @@ elif app_mode == "WEEKLY":
                 st.image(collage, use_container_width=True)
                 buf = io.BytesIO(); collage.save(buf, format="JPEG", quality=95)
                 st.download_button("📸 저장", buf.getvalue(), "weekly_insta.jpg")
-
