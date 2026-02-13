@@ -30,6 +30,15 @@ def load_custom_font(font_type, size):
     try: return ImageFont.truetype(font_path, int(size))
     except: return ImageFont.load_default()
 
+def get_circle_logo(img_file, size=(130, 130)):
+    img = Image.open(img_file).convert("RGBA")
+    img = ImageOps.fit(img, size, centering=(0.5, 0.5))
+    mask = Image.new('L', size, 0)
+    draw = ImageDraw.Draw(mask)
+    draw.ellipse((0, 0) + size, fill=255)
+    img.putalpha(mask)
+    return img
+
 def create_collage(image_files, target_size=(1080, 1350)):
     imgs = [ImageOps.exif_transpose(Image.open(f).convert("RGB")) for f in image_files]
     if not imgs: return None
@@ -60,23 +69,26 @@ if "code" in st.query_params and not st.session_state['access_token']:
 
 if not st.session_state['access_token']:
     st.title("🏃 Garmin Photo Dashboard")
-    # 권한 설정에 activity:read_all 포함 확인
-    auth_url = f"https://www.strava.com/oauth/authorize?client_id={CLIENT_ID}&response_type=code&redirect_uri={ACTUAL_URL}&scope=activity:read_all,profile:read_all&approval_prompt=force"
-    st.link_button("🚀 Strava 연동하기 (권한 모두 체크 필수)", auth_url)
+    auth_url = f"https://www.strava.com/oauth/authorize?client_id={CLIENT_ID}&response_type=code&redirect_uri={ACTUAL_URL}&scope=activity:read_all&approval_prompt=force"
+    st.link_button("🚀 Strava 연동하기", auth_url)
     st.stop()
 
-# --- [4. 사이드바 설정] ---
+# --- [4. 사이드바 (커스텀 설정 몰아넣기)] ---
 with st.sidebar:
     app_mode = st.radio("🚀 작업 모드", ["DAILY", "WEEKLY"])
     st.markdown("---")
-    st.header("🎨 디자인/폰트")
+    st.header("📸 사진 확인 (상시)")
+    check_img = st.file_uploader("참고용 사진 확인", type=['jpg', 'png'], key="side_check")
+    if check_img: st.image(check_img, use_container_width=True)
+    
+    st.markdown("---")
+    st.header("⚙️ OCR / 커스텀 설정")
     selected_font = st.selectbox("폰트 선택", ["BlackHanSans", "NanumBrush", "Jua", "Pretendard(Bold)"])
     main_color = st.color_picker("활동명 색상", "#FFD700")
     num_color = st.color_picker("숫자/정보 색상", "#FFFFFF")
     route_color = st.selectbox("지도 경로 색상", ["Yellow", "Black", "White"])
     
-    st.markdown("---")
-    st.header("⚙️ 크기/위치 조절")
+    # [지침] 90, 30, 60 고정
     t_sz = st.slider("활동명 크기", 10, 200, 90)
     d_sz = st.slider("날짜 크기", 10, 100, 30)
     n_sz = st.slider("숫자 크기", 10, 150, 60)
@@ -94,58 +106,27 @@ if app_mode == "DAILY":
         sel = st.selectbox("기록 선택", [f"{a['start_date_local']} - {a['name']}" for a in acts])
         a = acts[[f"{x['start_date_local']} - {x['name']}" for x in acts].index(sel)]
         
-        # 지도 데이터 추출 (summary_polyline)
-        poly = a.get('map', {}).get('summary_polyline', "")
-        if not poly:
-            st.warning("⚠️ 선택한 활동에 지도 경로 데이터가 없습니다. (야외 GPS 활동인지 확인해 주세요)")
+        # 기본 정보 파싱
+        date_def = a.get('start_date_local', "2026-01-01T00:00").replace("T", " ")[:16]
+        dist_km = a.get('distance', 0) / 1000
+        pace_v = f"{int((a.get('moving_time',0)/dist_km)//60)}:{int((a.get('moving_time',0)/dist_km)%60):02d}" if dist_km > 0 else "0:00"
+        hr_v = str(int(a.get('average_heartrate', 0)))
 
-        bg_file = st.file_uploader("1. 배경 사진 선택", type=['jpg', 'jpeg', 'png'])
+        # 🌟 메인 영역: 입력 칸 & 파일 업로드
+        col_files, col_inputs = st.columns([1, 1])
+        with col_files:
+            bg_file = st.file_uploader("1. 배경 사진 선택", type=['jpg', 'jpeg', 'png'])
+            log_file = st.file_uploader("2. 로고 아이콘 선택", type=['jpg', 'jpeg', 'png'])
+        
+        with col_inputs:
+            # 🌟 직접 입력 칸 복구!
+            v_act = st.text_input("활동명 수정", a['name'])
+            v_date = st.text_input("날짜 수정", date_def)
+            v_dist = st.text_input("거리(km) 수정", f"{dist_km:.2f}")
+            v_pace = st.text_input("페이스 수정", pace_v)
+            v_hr = st.text_input("심박수 수정", hr_v)
+
         if bg_file:
             canvas = ImageOps.fit(Image.open(bg_file).convert("RGBA"), (1080, 1920))
             overlay = Image.new('RGBA', canvas.size, (0, 0, 0, 0))
-            draw = ImageDraw.Draw(overlay)
-            f_t, f_d, f_n, f_l = load_custom_font(selected_font, t_sz), load_custom_font(selected_font, d_sz), load_custom_font(selected_font, n_sz), load_custom_font(selected_font, l_sz)
-
-            # 로그박스 배경 및 텍스트
-            draw.rectangle([rx, ry, rx + 450, ry + 560], fill=(0, 0, 0, alpha))
-            draw.text((rx + 50, ry + 40), a['name'], font=f_t, fill=main_color)
-            line_y = ry + t_sz + 80
-            draw.text((rx + 400, line_y - d_sz - 10), a['start_date_local'][:16].replace("T", " "), font=f_d, fill=num_color, anchor="ra")
-            
-            dist_km = a.get('distance', 0) / 1000
-            pace_min = int((a.get('moving_time', 0) / dist_km) // 60) if dist_km > 0 else 0
-            pace_sec = int((a.get('moving_time', 0) / dist_km) % 60) if dist_km > 0 else 0
-            
-            items = [("DISTANCE", f"{dist_km:.2f} km"), ("AVG PACE", f"{pace_min}:{pace_sec:02d} /km"), ("AVG HR", f"{int(a.get('average_heartrate', 0))} bpm")]
-            for i, (lab, val) in enumerate(items):
-                py = line_y + 30 + (i * 125)
-                draw.text((rx + 60, py), lab, font=f_l, fill="#AAAAAA")
-                draw.text((rx + 60, py + l_sz + 5), val, font=f_n, fill=num_color)
-
-            # 지도 그리기 (로그박스 왼쪽 위)
-            if poly:
-                try:
-                    pts = polyline.decode(poly)
-                    lats, lons = [p[0] for p in pts], [p[1] for p in pts]
-                    mi_la, ma_la, mi_lo, ma_lo = min(lats), max(lats), min(lons), max(lons)
-                    
-                    # 지도 전용 캔버스
-                    r_img = Image.new("RGBA", (400, 400), (0, 0, 0, 0))
-                    dr_r = ImageDraw.Draw(r_img)
-                    def sc(p):
-                        x = (p[1] - mi_lo) / (ma_lo - mi_lo + 1e-9) * 320 + 40
-                        y = 320 - ((p[0] - mi_la) / (ma_la - mi_la + 1e-9) * 320) + 40
-                        return (x, y)
-                    
-                    r_f = {"Yellow": "#FFD700", "Black": "#000000", "White": "#FFFFFF"}.get(route_color, "#FFD700")
-                    dr_r.line([sc(p) for p in pts], fill=r_f, width=12)
-                    
-                    # 🌟 지도 위치: 로그박스(rx, ry)를 기준으로 왼쪽 위에 배치
-                    canvas.paste(r_img, (rx - 40, ry - 420), r_img)
-                except Exception as e:
-                    st.error(f"지도 생성 중 오류: {e}")
-
-            final = Image.alpha_composite(canvas, overlay).convert("RGB")
-            st.image(final, use_container_width=True)
-            buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
-            st.download_button("📸 DOWNLOAD", buf.getvalue(), "garmin_final.jpg")
+            draw =
