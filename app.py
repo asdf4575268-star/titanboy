@@ -26,38 +26,30 @@ def load_custom_font(font_type, size):
         with open(font_path, "wb") as f: f.write(res.content)
     return ImageFont.truetype(font_path, int(size))
 
+def get_circle_logo(img_file, size=(130, 130)):
+    """로고를 동그랗게 깎는 함수"""
+    img = Image.open(img_file).convert("RGBA")
+    img = ImageOps.fit(img, size, centering=(0.5, 0.5))
+    mask = Image.new('L', size, 0)
+    draw = ImageDraw.Draw(mask)
+    draw.ellipse((0, 0) + size, fill=255)
+    img.putalpha(mask)
+    return img
+
 def create_collage(image_files, target_size=(1080, 1350)):
-    """인스타그램용 4:5 비율, 여백 없는 콜라주"""
+    """여백 없는 인스타용 콜라주"""
     imgs = [ImageOps.exif_transpose(Image.open(f).convert("RGB")) for f in image_files]
     if not imgs: return None
-    
     count = len(imgs)
-    # 사진 수에 따른 최적 열 배치
-    if count == 1: cols = 1
-    elif count <= 4: cols = 2
-    else: cols = 3
-    
+    cols = 1 if count == 1 else (2 if count <= 4 else 3)
     rows = (count + cols - 1) // cols
-    cell_w = target_size[0] // cols
-    cell_h = target_size[1] // rows
-    
+    cell_w, cell_h = target_size[0] // cols, target_size[1] // rows
     collage = Image.new("RGB", target_size, (0, 0, 0))
-    
     for i, img in enumerate(imgs):
-        # 마지막 사진이 줄을 꽉 채우지 못할 때 가로 확장 (여백 방지)
         is_last = (i == count - 1)
-        current_row_count = count % cols if count % cols != 0 else cols
-        
-        if is_last and (count % cols != 0):
-            draw_w = cell_w * (cols - (count % cols) + 1)
-        else:
-            draw_w = cell_w
-            
+        draw_w = cell_w * (cols - (count % cols) + 1) if is_last and (count % cols != 0) else cell_w
         img_fitted = ImageOps.fit(img, (draw_w, cell_h), centering=(0.5, 0.5))
-        x = (i % cols) * cell_w
-        y = (i // cols) * cell_h
-        collage.paste(img_fitted, (x, y))
-        
+        collage.paste(img_fitted, ((i % cols) * cell_w, (i // cols) * cell_h))
     return collage
 
 # --- [3. 스트라바 연동] ---
@@ -85,16 +77,16 @@ with st.sidebar:
     st.markdown("---")
     st.header("📸 사진 확인 (상시)")
     check_img = st.file_uploader("참고용 사진 업로드", type=['jpg', 'png'], key="side_check")
-    if check_img:
-        st.image(check_img, use_container_width=True)
+    if check_img: st.image(check_img, use_container_width=True)
     
     st.markdown("---")
     st.header("⚙️ 커스텀 설정")
     selected_font = st.selectbox("폰트 선택", ["Impact(BlackHan)", "Gothic(DoHyeon)", "Stylish(Jua)", "Clean(Noto)"])
-    t_sz = st.slider("활동명 크기", 10, 200, 70)
-    d_sz = st.slider("날짜 크기", 10, 100, 20)
-    n_sz = st.slider("숫자 크기", 10, 150, 40)
-    l_sz = st.slider("라벨 크기", 10, 80, 20)
+    # [지침 반영] 활동명 90, 날짜 30, 숫자 60 고정
+    t_sz = st.slider("활동명 크기", 10, 200, 90)
+    d_sz = st.slider("날짜 크기", 10, 100, 30)
+    n_sz = st.slider("숫자 크기", 10, 150, 60)
+    l_sz = st.slider("라벨 크기", 10, 80, 25)
     rx = st.slider("박스 좌우", 0, 1080, 70)
     ry = st.slider("박스 상하", 0, 1920, 1250)
     alpha = st.slider("투명도", 0, 255, 50)
@@ -108,23 +100,15 @@ if app_mode == "DAILY":
         sel = st.selectbox("기록 선택", [f"{a['start_date_local']} - {a['name']}" for a in acts])
         a = acts[[f"{x['start_date_local']} - {x['name']}" for x in acts].index(sel)]
         
-        raw_date = a.get('start_date_local', "2026-01-01T00:00:00Z")
-        date_v = raw_date.replace("T", " ").replace("Z", "")[:16]
-        
-        # 🌟 ZeroDivisionError 방지 로직
-        dist_raw = a.get('distance', 0)
-        sec = a.get('moving_time', 0)
+        date_v = a.get('start_date_local', "2026-01-01T00:00:00Z").replace("T", " ").replace("Z", "")[:16]
+        dist_raw, sec = a.get('distance', 0), a.get('moving_time', 0)
         dist_v = f"{dist_raw / 1000:.2f}"
-        
-        if dist_raw > 0:
-            pace_raw = sec / (dist_raw / 1000)
-            pace_v = f"{int(pace_raw//60)}:{int(pace_raw%60):02d}"
-        else:
-            pace_v = "0:00"
-            
+        pace_v = f"{int((sec/(dist_raw/1000))//60)}:{int((sec/(dist_raw/1000))%60):02d}" if dist_raw > 0 else "0:00"
         hr_v = str(int(a.get('average_heartrate', 0))) if a.get('average_heartrate') else "0"
 
         bg_file = st.file_uploader("1. 배경 사진 선택", type=['jpg', 'jpeg', 'png'])
+        log_file = st.file_uploader("2. 로고 아이콘 선택 (옵션)", type=['jpg', 'jpeg', 'png'])
+
         if bg_file:
             col_img, col_info = st.columns([2, 1])
             with col_info:
@@ -141,13 +125,16 @@ if app_mode == "DAILY":
             draw.text((rx + 50, ry + 40), v_act, font=f_t, fill="#FFD700")
             line_y = ry + t_sz + 80
             draw.text((rx + 400, line_y - d_sz - 10), v_date, font=f_d, fill="white", anchor="ra")
-            
             # [지침] km, bpm 소문자
             items = [("DISTANCE", f"{v_dist} km"), ("AVG PACE", f"{v_pace} /km"), ("AVG HR", f"{v_hr} bpm")]
             for i, (lab, val) in enumerate(items):
                 py = line_y + 30 + (i * 125)
                 draw.text((rx + 60, py), lab, font=f_l, fill="#AAAAAA")
                 draw.text((rx + 60, py + l_sz + 5), val, font=f_n, fill="white")
+
+            if log_file:
+                logo = get_circle_logo(log_file)
+                canvas.paste(logo, (900, 60), logo)
 
             final = Image.alpha_composite(canvas, overlay).convert("RGB")
             with col_img:
@@ -157,19 +144,15 @@ if app_mode == "DAILY":
 
 # --- [6. WEEKLY 모드] ---
 elif app_mode == "WEEKLY":
-    st.title("📅 Weekly Collage (No Margin)")
+    st.title("📅 Weekly Collage (1080x1350)")
     after_ts = int((datetime.now() - timedelta(days=7)).timestamp())
     act_res = requests.get(f"https://www.strava.com/api/v3/athlete/activities?after={after_ts}", headers=headers)
-    
     if act_res.status_code == 200:
-        acts = act_res.json()
-        st.metric("이번 주 총 거리", f"{sum(a.get('distance', 0) for a in acts) / 1000:.2f} km")
-
-        files = st.file_uploader("콜라주용 사진 선택", type=['jpg', 'jpeg', 'png'], accept_multiple_files=True)
+        st.metric("이번 주 거리", f"{sum(a.get('distance', 0) for a in act_res.json()) / 1000:.2f} km")
+        files = st.file_uploader("콜라주 사진 선택", type=['jpg', 'jpeg', 'png'], accept_multiple_files=True)
         if files:
-            # 🌟 인스타그램 세로 규격 1080x1350, 여백 제거 로직 포함
-            collage = create_collage(files, target_size=(1080, 1350))
+            collage = create_collage(files)
             if collage:
                 st.image(collage, use_container_width=True)
                 buf = io.BytesIO(); collage.save(buf, format="JPEG", quality=95)
-                st.download_button("📸 콜라주 저장", buf.getvalue(), "weekly_instagram.jpg")
+                st.download_button("📸 저장", buf.getvalue(), "weekly_insta.jpg")
