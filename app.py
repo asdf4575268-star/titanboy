@@ -4,7 +4,7 @@ import io, os, requests, polyline
 from datetime import datetime, timedelta
 
 # --- [1. 기본 설정] ---
-CLIENT_ID = '202275'
+CLIENT_ID = '202274'
 CLIENT_SECRET = '41f311299a14de733155c6c6e71505d3063fc31c'
 # 🌟 슬래시(/) 없는 순수 도메인 주소
 ACTUAL_URL = "https://titanboy-5fxenvcchdubwx3swjh8ut.streamlit.app"
@@ -193,3 +193,4 @@ elif app_mode == "WEEKLY":
                 st.image(collage, use_container_width=True)
                 buf = io.BytesIO(); collage.save(buf, format="JPEG", quality=95)
                 st.download_button("📸 콜라주 저장", buf.getvalue(), "weekly_collage.jpg")
+
