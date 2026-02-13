@@ -58,7 +58,7 @@ if not st.session_state['access_token']:
     st.link_button("🚀 Strava 연동하기", auth_url)
     st.stop()
 
-# --- [4. 사이드바 (크기/위치 조절 추가)] ---
+# --- [4. 사이드바] ---
 with st.sidebar:
     app_mode = st.radio("🚀 작업 모드", ["DAILY", "WEEKLY"])
     st.markdown("---")
@@ -69,18 +69,17 @@ with st.sidebar:
     route_color = st.selectbox("지도 경로 색상", ["Yellow", "Black", "White"])
     
     st.markdown("---")
-    st.subheader("텍스트 크기")
     t_sz = st.slider("활동명 크기", 10, 200, 90)
     d_sz = st.slider("날짜 크기", 10, 100, 30)
     n_sz = st.slider("숫자 크기", 10, 150, 60)
     l_sz = st.slider("라벨 크기", 10, 80, 25)
     
     st.markdown("---")
-    st.subheader("로그 박스 설정")
-    rx = st.slider("박스 좌측 위치(X)", 0, 1080, 70)
-    ry = st.slider("박스 상단 위치(Y)", 0, 1920, 1150)
-    rw = st.slider("박스 너비(Width)", 300, 1000, 500)  # 너비 조절 추가
-    rh = st.slider("박스 높이(Height)", 300, 1200, 720) # 높이 조절 추가
+    st.subheader("로그 박스 커스텀")
+    rx = st.slider("좌측 위치(X)", 0, 1080, 70)
+    ry = st.slider("상단 위치(Y)", 0, 1920, 1150)
+    rw = st.slider("박스 너비(Width)", 300, 1000, 500)
+    rh = st.slider("박스 높이(Height)", 300, 1200, 720)
     alpha = st.slider("박스 투명도", 0, 255, 60)
 
 # --- [5. DAILY 실행] ---
@@ -93,11 +92,13 @@ if app_mode == "DAILY":
         sel = st.selectbox("기록 선택", [f"{a['start_date_local']} - {a['name']}" for a in acts])
         a = acts[[f"{x['start_date_local']} - {x['name']}" for x in acts].index(sel)]
         
+        # 데이터 파싱
         m_time = a.get('moving_time', 0)
         time_v = f"{m_time//3600:02d}:{ (m_time%3600)//60 :02d}:{m_time%60:02d}" if m_time >= 3600 else f"{m_time//60:02d}:{m_time%60:02d}"
         dist_km = a.get('distance', 0) / 1000
         pace_v = f"{int((m_time/dist_km)//60)}:{int((m_time/dist_km)%60):02d}" if dist_km > 0 else "0:00"
-        
+        hr_v = str(int(a.get('average_heartrate', 0))) if a.get('average_heartrate') else "0"
+
         col_files, col_inputs = st.columns([1, 1])
         with col_files:
             bg_file = st.file_uploader("1. 배경 사진 선택", type=['jpg', 'jpeg', 'png'])
@@ -108,8 +109,8 @@ if app_mode == "DAILY":
             v_dist = st.text_input("거리(km)", f"{dist_km:.2f}")
             v_time = st.text_input("시간", time_v)
             v_pace = st.text_input("페이스", pace_v)
-            v_hr = st.text_input("심박수(bpm)", str(int(a.get('average_heartrate', 0))))
-            v_weather = st.text_input("날씨(예: ☀️ 15°C)", "")
+            v_hr = st.text_input("심박수(bpm)", hr_v)
+            v_weather = st.text_input("날씨/기온(직접 입력)", "")
 
         if bg_file:
             orig_bg = ImageOps.exif_transpose(Image.open(bg_file))
@@ -118,24 +119,30 @@ if app_mode == "DAILY":
             draw = ImageDraw.Draw(overlay)
             f_t, f_d, f_n, f_l = load_custom_font(selected_font, t_sz), load_custom_font(selected_font, d_sz), load_custom_font(selected_font, n_sz), load_custom_font(selected_font, l_sz)
 
-            # 🌟 로그박스 배경 (rw, rh 슬라이더 값 적용)
+            # 1. 로그박스 그리기
             draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0, 0, 0, alpha))
             
-            # 텍스트 배치
+            # 2. 상단 헤더 (활동명 & 날짜)
             draw.text((rx + 50, ry + 40), v_act, font=f_t, fill=main_color)
-            # 날짜를 박스 너비(rw)에 맞춰 우측 정렬
             draw.text((rx + rw - 50, ry + 40 + t_sz + 5), v_date, font=f_d, fill=num_color, anchor="ra")
             
-            line_y = ry + t_sz + d_sz + 100
+            # 3. 🌟 데이터 항목 자동 간격 계산
             items = [("DISTANCE", f"{v_dist} km"), ("TIME", v_time), ("AVG PACE", f"{v_pace} /km"), ("AVG HR", f"{v_hr} bpm")]
             if v_weather: items.append(("WEATHER", v_weather))
 
+            # 텍스트가 시작될 Y축 시작점
+            line_y_start = ry + t_sz + d_sz + 100
+            # 박스 하단 여백(50)을 제외한 가용 높이
+            available_h = (ry + rh - 50) - line_y_start
+            # 항목 간 간격 계산 (가용 높이를 항목 수로 나눔)
+            spacing = available_h / len(items)
+
             for i, (lab, val) in enumerate(items):
-                py = line_y + (i * 115)
+                py = line_y_start + (i * spacing)
                 draw.text((rx + 60, py), lab, font=f_l, fill="#AAAAAA")
                 draw.text((rx + 60, py + l_sz + 5), val, font=f_n, fill=num_color)
 
-            # 지도 (박스 위쪽 배치 유지)
+            # 지도 & 로고
             poly = a.get('map', {}).get('summary_polyline', "")
             if poly:
                 try:
