@@ -83,10 +83,10 @@ with st.sidebar:
     st.header("⚙️ 커스텀 설정")
     selected_font = st.selectbox("폰트 선택", ["Impact(BlackHan)", "Gothic(DoHyeon)", "Stylish(Jua)", "Clean(Noto)"])
     # [지침 반영] 활동명 90, 날짜 30, 숫자 60 고정
-    t_sz = st.slider("활동명 크기", 10, 200, 90)
-    d_sz = st.slider("날짜 크기", 10, 100, 30)
-    n_sz = st.slider("숫자 크기", 10, 150, 60)
-    l_sz = st.slider("라벨 크기", 10, 80, 25)
+    t_sz = st.slider("활동명 크기", 10, 200, 70)
+    d_sz = st.slider("날짜 크기", 10, 100, 20)
+    n_sz = st.slider("숫자 크기", 10, 150, 40)
+    l_sz = st.slider("라벨 크기", 10, 80, 20)
     rx = st.slider("박스 좌우", 0, 1080, 70)
     ry = st.slider("박스 상하", 0, 1920, 1250)
     alpha = st.slider("투명도", 0, 255, 50)
@@ -156,3 +156,4 @@ elif app_mode == "WEEKLY":
                 st.image(collage, use_container_width=True)
                 buf = io.BytesIO(); collage.save(buf, format="JPEG", quality=95)
                 st.download_button("📸 저장", buf.getvalue(), "weekly_insta.jpg")
+
