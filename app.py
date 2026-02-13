@@ -73,7 +73,7 @@ if not st.session_state['access_token']:
     st.link_button("🚀 Strava 연동하기", auth_url)
     st.stop()
 
-# --- [4. 사이드바 (커스텀 설정 몰아넣기)] ---
+# --- [4. 사이드바 (사용자 설정)] ---
 with st.sidebar:
     app_mode = st.radio("🚀 작업 모드", ["DAILY", "WEEKLY"])
     st.markdown("---")
@@ -88,7 +88,7 @@ with st.sidebar:
     num_color = st.color_picker("숫자/정보 색상", "#FFFFFF")
     route_color = st.selectbox("지도 경로 색상", ["Yellow", "Black", "White"])
     
-    # [지침] 90, 30, 60 고정
+    # [지침] 활동명 90, 날짜 30, 숫자 60 고정
     t_sz = st.slider("활동명 크기", 10, 200, 90)
     d_sz = st.slider("날짜 크기", 10, 100, 30)
     n_sz = st.slider("숫자 크기", 10, 150, 60)
@@ -106,20 +106,19 @@ if app_mode == "DAILY":
         sel = st.selectbox("기록 선택", [f"{a['start_date_local']} - {a['name']}" for a in acts])
         a = acts[[f"{x['start_date_local']} - {x['name']}" for x in acts].index(sel)]
         
-        # 기본 정보 파싱
-        date_def = a.get('start_date_local', "2026-01-01T00:00").replace("T", " ")[:16]
+        # 기본 정보
+        date_def = a.get('start_date_local', "2026-02-14T00:00").replace("T", " ")[:16]
         dist_km = a.get('distance', 0) / 1000
         pace_v = f"{int((a.get('moving_time',0)/dist_km)//60)}:{int((a.get('moving_time',0)/dist_km)%60):02d}" if dist_km > 0 else "0:00"
-        hr_v = str(int(a.get('average_heartrate', 0)))
+        hr_v = str(int(a.get('average_heartrate', 0))) if a.get('average_heartrate') else "0"
 
-        # 🌟 메인 영역: 입력 칸 & 파일 업로드
+        # 메인 입력 레이아웃
         col_files, col_inputs = st.columns([1, 1])
         with col_files:
             bg_file = st.file_uploader("1. 배경 사진 선택", type=['jpg', 'jpeg', 'png'])
             log_file = st.file_uploader("2. 로고 아이콘 선택", type=['jpg', 'jpeg', 'png'])
         
         with col_inputs:
-            # 🌟 직접 입력 칸 복구!
             v_act = st.text_input("활동명 수정", a['name'])
             v_date = st.text_input("날짜 수정", date_def)
             v_dist = st.text_input("거리(km) 수정", f"{dist_km:.2f}")
@@ -129,4 +128,66 @@ if app_mode == "DAILY":
         if bg_file:
             canvas = ImageOps.fit(Image.open(bg_file).convert("RGBA"), (1080, 1920))
             overlay = Image.new('RGBA', canvas.size, (0, 0, 0, 0))
-            draw =
+            draw = ImageDraw.Draw(overlay) # 🌟 SyntaxError 해결 부분
+            
+            f_t = load_custom_font(selected_font, t_sz)
+            f_d = load_custom_font(selected_font, d_sz)
+            f_n = load_custom_font(selected_font, n_sz)
+            f_l = load_custom_font(selected_font, l_sz)
+
+            # 로그박스 배경
+            draw.rectangle([rx, ry, rx + 450, ry + 560], fill=(0, 0, 0, alpha))
+            
+            # 텍스트 배치
+            draw.text((rx + 50, ry + 40), v_act, font=f_t, fill=main_color)
+            line_y = ry + t_sz + 80
+            draw.text((rx + 400, line_y - d_sz - 10), v_date, font=f_d, fill=num_color, anchor="ra")
+            
+            # [지침] km, bpm 소문자
+            items = [("DISTANCE", f"{v_dist} km"), ("AVG PACE", f"{v_pace} /km"), ("AVG HR", f"{v_hr} bpm")]
+            for i, (lab, val) in enumerate(items):
+                py = line_y + 30 + (i * 125)
+                draw.text((rx + 60, py), lab, font=f_l, fill="#AAAAAA")
+                draw.text((rx + 60, py + l_sz + 5), val, font=f_n, fill=num_color)
+
+            # 지도 (로그박스 왼쪽 위)
+            poly = a.get('map', {}).get('summary_polyline', "")
+            if poly:
+                try:
+                    pts = polyline.decode(poly)
+                    lats, lons = [p[0] for p in pts], [p[1] for p in pts]
+                    mi_la, ma_la, mi_lo, ma_lo = min(lats), max(lats), min(lons), max(lons)
+                    r_img = Image.new("RGBA", (400, 400), (0, 0, 0, 0))
+                    dr_r = ImageDraw.Draw(r_img)
+                    def sc(p):
+                        x = (p[1] - mi_lo) / (ma_lo - mi_lo + 1e-9) * 320 + 40
+                        y = 320 - ((p[0] - mi_la) / (ma_la - mi_la + 1e-9) * 320) + 40
+                        return (x, y)
+                    r_f = {"Yellow": "#FFD700", "Black": "#000000", "White": "#FFFFFF"}.get(route_color, "#FFD700")
+                    dr_r.line([sc(p) for p in pts], fill=r_f, width=12)
+                    canvas.paste(r_img, (rx - 40, ry - 420), r_img)
+                except: pass
+
+            # 로고 배치
+            if log_file:
+                logo = get_circle_logo(log_file)
+                canvas.paste(logo, (900, 60), logo)
+
+            final = Image.alpha_composite(canvas, overlay).convert("RGB")
+            st.image(final, use_container_width=True)
+            buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
+            st.download_button("📸 DOWNLOAD", buf.getvalue(), "garmin_final.jpg")
+
+elif app_mode == "WEEKLY":
+    st.title("📅 Weekly Collage")
+    after_ts = int((datetime.now() - timedelta(days=7)).timestamp())
+    act_res = requests.get(f"https://www.strava.com/api/v3/athlete/activities?after={after_ts}", headers=headers)
+    if act_res.status_code == 200:
+        st.metric("이번 주 거리", f"{sum(a.get('distance', 0) for a in act_res.json()) / 1000:.2f} km")
+        files = st.file_uploader("콜라주 사진 선택", type=['jpg', 'jpeg', 'png'], accept_multiple_files=True)
+        if files:
+            collage = create_collage(files)
+            if collage:
+                st.image(collage, use_container_width=True)
+                buf = io.BytesIO(); collage.save(buf, format="JPEG", quality=95)
+                st.download_button("📸 저장", buf.getvalue(), "weekly.jpg")
