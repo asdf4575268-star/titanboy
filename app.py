@@ -10,6 +10,12 @@ ACTUAL_URL = "https://titanboy-5fxenvcchdubwx3swjh8ut.streamlit.app"
 
 st.set_page_config(page_title="Garmin Photo Dashboard", layout="wide")
 
+# 세션 초기화 함수
+def reset_session():
+    for key in list(st.session_state.keys()):
+        del st.session_state[key]
+    st.rerun()
+
 # --- [2. 유틸리티 함수] ---
 @st.cache_resource
 def load_custom_font(font_type, size):
@@ -58,55 +64,57 @@ def create_collage(image_files, target_size=(1080, 1350)):
         collage.paste(img_fitted, ((i % cols) * cell_w, (i // cols) * cell_h))
     return collage
 
-# --- [3. 스트라바 연동] ---
+# --- [3. 스트라바 인증] ---
 if 'access_token' not in st.session_state:
     st.session_state['access_token'] = None
 
-if "code" in st.query_params and not st.session_state['access_token']:
-    res = requests.post("https://www.strava.com/oauth/token", data={
-        "client_id": CLIENT_ID, "client_secret": CLIENT_SECRET,
-        "code": st.query_params["code"], "grant_type": "authorization_code"
-    })
-    if res.status_code == 200:
-        st.session_state['access_token'] = res.json()['access_token']
-        st.rerun()
+params = st.query_params
+if "code" in params and not st.session_state['access_token']:
+    try:
+        res = requests.post("https://www.strava.com/oauth/token", data={
+            "client_id": CLIENT_ID, "client_secret": CLIENT_SECRET,
+            "code": params["code"], "grant_type": "authorization_code"
+        })
+        if res.status_code == 200:
+            st.session_state['access_token'] = res.json()['access_token']
+            st.query_params.clear()
+            st.rerun()
+        else:
+            reset_session()
+    except:
+        reset_session()
 
 if not st.session_state['access_token']:
     st.title("🏃 Garmin Photo Dashboard")
     auth_url = f"https://www.strava.com/oauth/authorize?client_id={CLIENT_ID}&response_type=code&redirect_uri={ACTUAL_URL}&scope=activity:read_all&approval_prompt=force"
     st.link_button("🚀 Strava 연동하기", auth_url)
+    if st.button("🔌 세션 강제 초기화"):
+        reset_session()
     st.stop()
 
-# --- [4. 사이드바 (위치 고정 설정)] ---
+# --- [4. 사이드바 (기본 크기 변경 적용)] ---
 with st.sidebar:
     app_mode = st.radio("🚀 작업 모드", ["DAILY", "WEEKLY"])
     st.markdown("---")
-    st.header("⚙️ 디자인 설정")
-    box_mode = st.radio("📦 박스 모드", ["세로형(Portrait)", "가로형(Landscape)"])
+    st.header("⚙️ 디자인/크기 설정")
     selected_font = st.selectbox("폰트 선택", ["Jua", "BlackHanSans", "NanumBrush", "DoHyeon", "GothicA1", "SongMyung", "SingleDay", "Pretendard"])
     main_color = st.color_picker("활동명 색상", "#FFD700")
     num_color = st.color_picker("날짜/정보 색상", "#FFFFFF")
     route_color = st.selectbox("지도 경로 색상", ["Yellow", "Black", "White"])
     
     st.markdown("---")
-    st.subheader("크기 조절")
-    t_sz, d_sz, n_sz, l_sz = st.slider("활동명 크기", 10, 200, 90), st.slider("날짜 크기", 10, 100, 30), st.slider("숫자 크기", 10, 150, 60), st.slider("라벨 크기", 10, 80, 25)
+    # 🌟 요청하신 가이드로 기본값 수정 (80, 20, 50)
+    t_sz = st.slider("활동명", 10, 200, 80)
+    d_sz = st.slider("날짜", 5, 100, 20)
+    n_sz = st.slider("숫자", 10, 300, 50)
+    l_sz = st.slider("라벨", 10, 80, 25)
     
     st.markdown("---")
-    st.subheader("로그 박스 커스텀")
-    # 🌟 요청하신 대로 X=70, Y=1150 기본값 고정
-    rx = st.slider("X 위치", 0, 1080, 70)
-    ry = st.slider("Y 위치", 0, 1920, 1150)
+    rx, ry, rw, rh = st.slider("X", 0, 1080, 70), st.slider("Y", 0, 1920, 1150), st.slider("Width", 300, 1000, 500), st.slider("Height", 300, 1200, 720)
     alpha = st.slider("박스 투명도", 0, 255, 60)
     map_alpha = st.slider("지도 투명도", 0, 255, 100)
-    
-    # 세로모드일 때만 수동 크기 조절 활성화
-    rw, rh = 500, 720
-    if "세로형" in box_mode:
-        rw = st.slider("박스 너비", 300, 1000, 500)
-        rh = st.slider("박스 높이", 100, 1200, 720)
 
-# --- [5. 실행부] ---
+# --- [5. 실행 로직] ---
 headers = {'Authorization': f"Bearer {st.session_state['access_token']}"}
 
 if app_mode == "DAILY":
@@ -127,8 +135,7 @@ if app_mode == "DAILY":
             bg_file = st.file_uploader("배경 사진", type=['jpg', 'jpeg', 'png'])
             log_file = st.file_uploader("로고 아이콘", type=['jpg', 'jpeg', 'png'])
         with col_inputs:
-            v_act = st.text_input("활동명", a['name'])
-            v_date = st.text_input("날짜", a.get('start_date_local', "")[:16].replace("T", " "))
+            v_act, v_date = st.text_input("활동명", a['name']), st.text_input("날짜", a.get('start_date_local', "")[:16].replace("T", " "))
             v_dist, v_time = st.text_input("거리(km)", f"{dist_km:.2f}"), st.text_input("시간", time_v)
             v_pace, v_hr = st.text_input("페이스", pace_v), st.text_input("심박수(bpm)", hr_v)
             v_weather = st.text_input("날씨", "")
@@ -140,21 +147,7 @@ if app_mode == "DAILY":
             draw = ImageDraw.Draw(overlay)
             f_t, f_d, f_n, f_l = load_custom_font(selected_font, t_sz), load_custom_font(selected_font, d_sz), load_custom_font(selected_font, n_sz), load_custom_font(selected_font, l_sz)
 
-            items = [("DISTANCE", f"{v_dist} km"), ("TIME", v_time), ("AVG PACE", f"{v_pace} /km"), ("AVG HR", f"{v_hr} bpm")]
-            if v_weather: items.append(("WEATHER", v_weather))
-
-            # 가로모드 오토 레이아웃 너비 계산
-            if "가로형" in box_mode:
-                max_item_w = 0
-                for lab, val in items:
-                    w = max(draw.textbbox((0,0), lab, font=f_l)[2], draw.textbbox((0,0), val, font=f_n)[2])
-                    max_item_w = max(max_item_w, w)
-                header_w = max(draw.textbbox((0,0), v_act, font=f_t)[2], draw.textbbox((0,0), v_date, font=f_d)[2]) + 100
-                total_items_w = (max_item_w + 60) * len(items) + 40
-                rw = max(header_w, total_items_w)
-                rh = t_sz + d_sz + n_sz + l_sz + 180
-
-            # 1. 로그박스 배경 (rx=70, ry=1150 고정값 사용)
+            # 1. 로그박스
             draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0, 0, 0, alpha))
             
             # 2. 지도 배경 오버레이
@@ -175,28 +168,23 @@ if app_mode == "DAILY":
                     canvas.paste(r_img, (rx, ry), r_img)
                 except: pass
 
-            # 3. 텍스트 그리기
-            draw.text((rx + 30, ry + 20), v_act, font=f_t, fill=main_color)
-            draw.text((rx + rw - 30, ry + 20 + t_sz + 5), v_date, font=f_d, fill=num_color, anchor="ra")
+            # 3. 텍스트
+            draw.text((rx + 50, ry + 40), v_act, font=f_t, fill=main_color)
+            draw.text((rx + rw - 50, ry + 40 + t_sz + 5), v_date, font=f_d, fill=num_color, anchor="ra")
             
-            if "세로형" in box_mode:
-                line_y_start = ry + t_sz + d_sz + 80
-                spacing = ((ry + rh - 40) - line_y_start) / len(items)
-                for i, (lab, val) in enumerate(items):
-                    py = line_y_start + (i * spacing)
-                    draw.text((rx + 40, py), lab, font=f_l, fill="#AAAAAA")
-                    draw.text((rx + 40, py + l_sz + 5), val, font=f_n, fill=num_color)
-            else:
-                spacing = (rw - 60) / len(items)
-                item_y = ry + t_sz + d_sz + 80
-                for i, (lab, val) in enumerate(items):
-                    px = rx + 30 + (i * spacing)
-                    draw.text((px, item_y), lab, font=f_l, fill="#AAAAAA")
-                    draw.text((px, item_y + l_sz + 5), val, font=f_n, fill=num_color)
+            items = [("DISTANCE", f"{v_dist} km"), ("TIME", v_time), ("AVG PACE", f"{v_pace} /km"), ("AVG HR", f"{v_hr} bpm")]
+            if v_weather: items.append(("WEATHER", v_weather))
+            
+            line_y_start = ry + t_sz + d_sz + 60
+            spacing = ((ry + rh - 40) - line_y_start) / len(items)
+            for i, (lab, val) in enumerate(items):
+                py = line_y_start + (i * spacing)
+                draw.text((rx + 60, py), lab, font=f_l, fill="#AAAAAA")
+                draw.text((rx + 60, py + l_sz + 2), val, font=f_n, fill=num_color)
 
             if log_file:
                 logo = get_circle_logo(log_file)
-                canvas.paste(logo, (900, 60), logo)
+                canvas.paste(logo, (910, 60), logo)
 
             final = Image.alpha_composite(canvas, overlay).convert("RGB")
             st.image(final, use_container_width=True)
@@ -204,7 +192,6 @@ if app_mode == "DAILY":
             st.download_button("📸 DOWNLOAD", buf.getvalue(), "garmin_final.jpg")
 
 elif app_mode == "WEEKLY":
-    # (WEEKLY 모드 동일하게 유지)
     st.title("📅 Weekly Recap")
     after_ts = int((datetime.now() - timedelta(days=7)).timestamp())
     act_res = requests.get(f"https://www.strava.com/api/v3/athlete/activities?after={after_ts}", headers=headers)
@@ -214,14 +201,16 @@ elif app_mode == "WEEKLY":
             total_dist = sum(a.get('distance', 0) for a in w_acts) / 1000
             total_time = sum(a.get('moving_time', 0) for a in w_acts)
             avg_hr = sum(a.get('average_heartrate', 0) for a in w_acts if a.get('average_heartrate')) / len([a for a in w_acts if a.get('average_heartrate')]) if any(a.get('average_heartrate') for a in w_acts) else 0
+            
             m1, m2, m3 = st.columns(3)
             m1.metric("이번 주 총 거리", f"{total_dist:.2f} km")
             if total_dist > 0:
                 p_sec = total_time / total_dist
                 m2.metric("평균 페이스", f"{int(p_sec//60)}:{int(p_sec%60):02d} /km")
             m3.metric("평균 심박수", f"{int(avg_hr)} bpm")
+            
             st.markdown("---")
-            w_files = st.file_uploader("콜라주 사진 선택", type=['jpg', 'jpeg', 'png'], accept_multiple_files=True, key="weekly_upload")
+            w_files = st.file_uploader("콜라주 사진 선택 (여러 장)", type=['jpg', 'jpeg', 'png'], accept_multiple_files=True)
             if w_files:
                 collage = create_collage(w_files)
                 if collage:
