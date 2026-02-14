@@ -2,14 +2,13 @@ import streamlit as st
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 import io, os, requests, polyline, math
 
-# --- [1. 기본 설정 및 로그아웃] ---
+# --- [1. 기본 설정 및 인증] ---
 CLIENT_ID = '202274'
 CLIENT_SECRET = 'cf2ab22bb9995254e6ea68ac3c942572f7114c9a'
 ACTUAL_URL = "https://titanboy-5fxenvcchdubwx3swjh8ut.streamlit.app"
 
 st.set_page_config(page_title="Garmin Photo Dashboard", layout="wide")
 
-# 로그아웃 로직
 if 'access_token' not in st.session_state:
     st.session_state['access_token'] = None
 
@@ -18,7 +17,7 @@ def logout():
     st.query_params.clear()
     st.rerun()
 
-# --- [2. 스포츠 폰트 5종 로드] ---
+# --- [2. 스포츠 폰트 로드] ---
 @st.cache_resource
 def load_font(font_type, size):
     fonts = {
@@ -43,7 +42,7 @@ def get_circle_logo(img_file, size=(130, 130)):
     img.putalpha(mask)
     return img
 
-# --- [3. 인증 로직] ---
+# 인증 처리
 params = st.query_params
 if "code" in params and st.session_state['access_token'] is None:
     try:
@@ -63,10 +62,7 @@ if not st.session_state['access_token']:
     st.link_button("🚀 Strava 연동하기", auth_url)
     st.stop()
 
-# 상단 로그아웃 버튼
-st.sidebar.button("🔓 로그아웃(세션 종료)", on_click=logout)
-
-# --- [4. 데이터 로드 및 3분할] ---
+# --- [3. 데이터 로드 및 3분할 레이아웃] ---
 headers = {'Authorization': f"Bearer {st.session_state['access_token']}"}
 act_res = requests.get("https://www.strava.com/api/v3/athlete/activities?per_page=30", headers=headers)
 
@@ -106,10 +102,9 @@ if act_res.status_code == 200:
     with col3:
         st.header("🎨 DESIGN")
         sel_font = st.selectbox("폰트 선택", ["BlackHanSans", "Jua", "DoHyeon", "NanumBrush", "Sunflower"])
-        
-        # 색상 선택 기능 강화
-        m_color_pick = st.color_picker("포인트 색상(활동명/지도)", "#FFD700")
-        sub_color_pick = st.color_picker("데이터 텍스트 색상", "#FFFFFF")
+        m_color_pick = st.color_picker("활동명 색상", "#FFD700")
+        sub_color_pick = st.color_picker("기타 텍스트 색상", "#FFFFFF")
+        map_color_pick = st.color_picker("지도 색상 (별도 조절)", "#666666") # 지도 색상 독립
         
         t_sz = st.slider("활동명 크기", 10, 200, 70)
         d_sz = st.slider("날짜 크기", 5, 100, 20)
@@ -121,35 +116,41 @@ if act_res.status_code == 200:
         rx = st.slider("X 위치", 0, 1080, 70)
         ry = st.slider("Y 위치", 0, 1920, 1150)
         box_alpha = st.slider("박스 투명도", 0, 255, 110)
-        map_alpha = st.slider("지도 투명도(흐릿하게)", 0, 255, 25) # 기본 투명도 대폭 낮춤
+        map_alpha = st.slider("지도 투명도(연하게)", 0, 255, 15) # 지도 투명도 기본값 더 하향
+        
+        st.markdown("<br><br>", unsafe_allow_html=True)
+        if st.button("🔓 로그아웃", use_container_width=True):
+            logout()
 
-    # --- [5. 이미지 렌더링] ---
+    # --- [4. 이미지 렌더링 엔진] ---
     if bg_files:
+        # 캔버스 생성 (DAILY/WEEKLY 분기)
         if mode == "DAILY":
             img = ImageOps.exif_transpose(Image.open(bg_files[0]))
             canvas = ImageOps.fit(img.convert("RGBA"), (1080, 1920), centering=(0.5, 0.5))
         else:
             canvas = Image.new("RGBA", (1080, 1920), (0,0,0,255))
-            n = len(bg_files)
-            rows = math.ceil(n / 2) if n > 1 else 1
+            rows = math.ceil(len(bg_files) / 2) if len(bg_files) > 1 else 1
             h_p = 1920 // rows
             for i, f in enumerate(bg_files):
-                w_p = 1080 // (2 if n > 1 else 1)
-                canvas.paste(ImageOps.fit(Image.open(f).convert("RGBA"), (w_p, h_p)), ((i % 2) * w_p if n > 1 else 0, (i // 2) * h_p))
+                w_p = 1080 // (2 if len(bg_files) > 1 else 1)
+                canvas.paste(ImageOps.fit(Image.open(f).convert("RGBA"), (w_p, h_p)), ((i % 2) * w_p if len(bg_files) > 1 else 0, (i // 2) * h_p))
 
         overlay = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
         draw = ImageDraw.Draw(overlay)
         f_t, f_d, f_n, f_l = load_font(sel_font, t_sz), load_font(sel_font, d_sz), load_font(sel_font, n_sz), load_font(sel_font, l_sz)
         items = [("DISTANCE", f"{v_dist} km"), ("TIME", t_val), ("AVG PACE", f"{v_pace} /km"), ("AVG HR", f"{v_hr} bpm")]
 
-        # 자동 박스 크기 계산
+        # 자동 박스 크기 연동
         if box_mode == "Vertical":
             rw, rh = 560, t_sz + d_sz + (len(items) * (n_sz + l_sz + 35)) + 120
         else:
             rw, rh = 1000, t_sz + d_sz + n_sz + l_sz + 180
 
-        # 박스 및 지도 (숫자 보호를 위해 지도부터 렌더링)
+        # 박스 그리기
         draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0, 0, 0, box_alpha))
+        
+        # 지도 오버레이 (독립된 색상과 초저투명도 적용)
         p_line = a['map']['summary_polyline'] if mode == "DAILY" and 'map' in a and a['map'].get('summary_polyline') else None
         if p_line:
             pts = polyline.decode(p_line)
@@ -161,7 +162,7 @@ if act_res.status_code == 200:
                     tx = 50 + (lo - min(lons)) / (max(lons) - min(lons) + 0.0001) * (rw - 100)
                     ty = (rh - 50) - (la - min(lats)) / (max(lats) - min(lats) + 0.0001) * (rh - 100)
                     return tx, ty
-                m_draw.line([trans(la, lo) for la, lo in pts], fill=m_color_pick + f"{map_alpha:02x}"[2:], width=8)
+                m_draw.line([trans(la, lo) for la, lo in pts], fill=map_color_pick + f"{map_alpha:02x}"[2:], width=6)
                 overlay.paste(map_layer, (rx, ry), map_layer)
 
         # 텍스트 렌더링
