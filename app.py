@@ -138,8 +138,43 @@ with col3:
     bw = st.number_input("박스 너비", 100, 1080, 940 if box_orient=="Horizontal" else 480)
     bh = st.number_input("박스 높이", 100, 1080, 260 if box_orient=="Horizontal" else 550)
     box_alpha = st.slider("박스 투명도", 0, 255, 130)
-    vis_sz = st.slider("지도/그래프 크기", 100, 1000, 250 if mode=="DAILY" else 850)
-    if mode == "WEEKLY": g_y_off = st.slider("그래프 높이 조절", 0, 1000, 150)
+    
+    # 지도/그래프 세부 설정 (작고 흐릿하게 조절 가능)
+    vis_sz = st.slider("지도/그래프 크기", 50, 800, 180 if mode=="DAILY" else 800)
+    vis_alpha = st.slider("지도/그래프 투명도", 0, 255, 80) # 기본값을 낮게 설정하여 흐릿하게 함
+    
+    if mode == "WEEKLY": 
+        g_y_off = st.slider("그래프 높이 조절", 0, 1000, 150)
+
+# --- [6. 렌더링 엔진] ---
+try:
+    f_t, f_d, f_n, f_l = load_font(sel_font, 90), load_font(sel_font, 30), load_font(sel_font, 60), load_font(sel_font, 20)
+    canvas = Image.new("RGBA", (CW, CH), (0, 0, 0, 255))
+    
+    # ... [배경 사진/콜라주 로직 생략] ...
+
+    overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
+    
+    # 1. 시각화 소스 생성 (투명도 반영)
+    vis_layer = None
+    if mode == "DAILY" and a and a.get('map', {}).get('summary_polyline'):
+        pts = polyline.decode(a['map']['summary_polyline']); lats, lons = zip(*pts)
+        vis_layer = Image.new("RGBA", (vis_sz, vis_sz), (0,0,0,0)); m_draw = ImageDraw.Draw(vis_layer)
+        def tr(la, lo): 
+            m = 20
+            return (lo-min(lons))/(max(lons)-min(lons)+1e-5)*(vis_sz-m*2)+m, (vis_sz-m)-(la-min(lats))/(la_max-la_min+1e-5)*(vis_sz-m*2)
+        
+        # 포인트 컬러에 투명도(vis_alpha) 적용
+        target_rgba = hex_to_rgba(m_color, vis_alpha)
+        m_draw.line([tr(la, lo) for la, lo in pts], fill=target_rgba, width=4) # 선 굵기를 4로 가늘게 변경
+        
+    elif mode == "WEEKLY" and weekly_data:
+        chart_img = create_bar_chart(weekly_data['dists'], m_color)
+        w_p = (vis_sz / float(chart_img.size[0]))
+        vis_layer = chart_img.resize((vis_sz, int(chart_img.size[1]*w_p)), Image.Resampling.LANCZOS)
+        # 그래프 이미지 전체에 투명도 적용
+        alpha_mask = vis_layer.getchannel('A').point(lambda x: x * (vis_alpha / 255))
+        vis_layer.putalpha(alpha_mask)
 
 # --- [6. 렌더링 엔진] ---
 try:
@@ -217,3 +252,4 @@ try:
         st.download_button(f"📸 {mode} DOWNLOAD", buf.getvalue(), f"{mode.lower()}_result.jpg", use_container_width=True)
         if st.session_state['access_token']: st.button("🔓 로그아웃", on_click=logout_and_clear)
 except Exception as e: st.error(f"Error: {e}")
+
