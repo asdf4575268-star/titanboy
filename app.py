@@ -145,6 +145,7 @@ with col3:
     vis_sz = st.slider("지도/그래프 크기", 50, 800, 180 if mode=="DAILY" else 800)
     vis_alpha = st.slider("지도/그래프 투명도", 0, 255, 80)
     if mode == "WEEKLY": g_y_off = st.slider("그래프 높이 조절", 0, 1000, 150)
+    
 
 # --- [6. 렌더링 엔진] ---
 try:
@@ -210,5 +211,22 @@ try:
         buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
         st.download_button(f"📸 {mode} DOWNLOAD", buf.getvalue(), f"{mode.lower()}_result.jpg", use_container_width=True)
         if st.session_state['access_token']: st.button("🔓 로그아웃", on_click=logout_and_clear)
+    # [3] 로고 배치 (여기에 이 코드를 붙여넣으세요!)
+    if log_file:
+        ls = 100 
+        l_img = ImageOps.fit(Image.open(log_file).convert("RGBA"), (ls, ls))
+        mask = Image.new('L', (ls, ls), 0)
+        ImageDraw.Draw(mask).ellipse((0, 0, ls, ls), fill=255)
+        l_img.putalpha(mask)
+        
+        if box_orient == "Vertical":
+            # 세로 모드: 오른쪽 하단
+            log_pos = (bx + bw - ls - 25, by + bh - ls - 25)
+        else:
+            # 가로 모드: 오른쪽 상단
+            log_pos = (bx + bw - ls - 25, by + 25)
+            
+        overlay.paste(l_img, log_pos, l_img)
 except Exception as e:
     st.error(f"Error: {e}")
+
