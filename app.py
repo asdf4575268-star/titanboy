@@ -9,12 +9,12 @@ ACTUAL_URL = "https://titanboy-5fxenvcchdubwx3swjh8ut.streamlit.app"
 
 st.set_page_config(page_title="Garmin Photo Dashboard", layout="wide")
 
+# 콜라백 내 st.rerun() 제거하여 오류 해결
 def logout_and_clear():
     st.cache_data.clear()
     st.cache_resource.clear()
     st.session_state.clear()
     st.query_params.clear()
-    st.rerun()
 
 if 'access_token' not in st.session_state:
     st.session_state['access_token'] = None
@@ -54,7 +54,6 @@ def load_font(font_type, size):
         "Jua": "https://github.com/google/fonts/raw/main/ofl/jua/Jua-Regular.ttf"
     }
     f_url = fonts.get(font_type, fonts["GmarketSans"])
-    # 파일 확장자에 따른 처리
     ext = ".otf" if "Pretendard" in font_type else ".ttf"
     f_path = f"font_{font_type}_{int(size)}{ext}"
     
@@ -76,7 +75,7 @@ headers = {'Authorization': f"Bearer {st.session_state['access_token']}"}
 try:
     act_res = requests.get("https://www.strava.com/api/v3/athlete/activities?per_page=30", headers=headers, timeout=15)
     if act_res.status_code == 200: acts = act_res.json()
-    elif act_res.status_code == 401: logout_and_clear()
+    elif act_res.status_code == 401: logout_and_clear(); st.rerun()
 except: pass
 
 # --- [5. UI 레이아웃] ---
@@ -126,7 +125,7 @@ with col3:
     m_color = COLOR_OPTIONS[st.selectbox("포인트 컬러", list(COLOR_OPTIONS.keys()))]
     sub_color = COLOR_OPTIONS[st.selectbox("서브 컬러", list(COLOR_OPTIONS.keys()), index=1)]
     
-    # 크기 고정 (사용자 요청)
+    # 폰트 크기 고정 (70, 20, 40, 20)
     t_sz, d_sz, n_sz, l_sz = 70, 20, 40, 20
     
     if mode == "DAILY":
@@ -161,6 +160,7 @@ if bg_files:
                         m_draw.line([trans(la, lo) for la, lo in pts], fill=hex_to_rgba(m_color, 255), width=4)
                         overlay.paste(m_layer, (rx + rw - map_size - 20, ry + 20), m_layer)
                 
+                # 단위 소문자 km, bpm 유지
                 items = [("distance", f"{v_dist} km"), ("time", t_val), ("pace", v_pace), ("avg bpm", f"{v_hr} bpm")]
                 draw.text((rx+40, ry+30), v_act, font=f_t, fill=m_color)
                 draw.text((rx+40, ry+30+t_sz+5), v_date, font=f_d, fill=sub_color)
@@ -201,6 +201,3 @@ if bg_files:
             st.download_button("📸 DOWNLOAD", buf.getvalue(), "result.jpg", use_container_width=True)
     except Exception as e:
         st.error(f"Error: {e}")
-
-
-
