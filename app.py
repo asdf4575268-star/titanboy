@@ -208,6 +208,25 @@ try:
             item_x = bx + text_x_off + (i * sec_w)
             draw.text((item_x, by + 175), lab.lower(), font=f_l, fill="#AAAAAA")
             draw.text((item_x, by + 205), val.lower() if "bpm" in val or "km" in val else val, font=f_n, fill=sub_color)
+    else:
+        # 가로모드: 데이터 간격 겹침 수정
+        # 지도가 있을 경우 왼쪽 여백을 확보하고, 없으면 기본 여백(40) 사용
+        text_x_off = (vis_layer.width + 60) if (mode == "DAILY" and vis_layer) else 60
+        
+        # 활동명 및 날짜 렌더링
+        draw.text((bx + text_x_off, by + 40), v_act, font=f_t, fill=m_color)
+        draw.text((bx + text_x_off, by + 130), v_date, font=f_d, fill="#AAAAAA")
+        
+        # 데이터 항목들을 겹치지 않게 분산 배치 (박스 가용 너비 활용)
+        # 로고가 들어갈 오른쪽 공간(약 150px)을 제외한 나머지 공간을 4등분
+        usable_w = bw - text_x_off - 150 
+        sec_w = usable_w // 4 
+        
+        for i, (lab, val) in enumerate(items):
+            item_x = bx + text_x_off + (i * sec_w)
+            # 라벨(km, bpm 등)과 숫자 간의 세로 간격 미세 조정
+            draw.text((item_x, by + 175), lab.lower(), font=f_l, fill="#AAAAAA")
+            draw.text((item_x, by + 205), val.lower() if "bpm" in val or "km" in val else val, font=f_n, fill=sub_color)
 
     final = Image.alpha_composite(canvas, overlay).convert("RGB")
     with col2:
@@ -217,3 +236,4 @@ try:
         if st.session_state['access_token']: st.button("🔓 로그아웃", on_click=logout_and_clear)
 except Exception as e:
     st.error(f"Error: {e}")
+
