@@ -1,6 +1,7 @@
 import streamlit as st
 from PIL import Image, ImageDraw, ImageFont, ImageOps
-import io, os, requests, polyline, math
+import io, os, requests, polyline, time
+from datetime import datetime, timedelta
 
 # --- [1. 기본 설정] ---
 CLIENT_ID = '202274'
@@ -9,139 +10,211 @@ ACTUAL_URL = "https://titanboy-5fxenvcchdubwx3swjh8ut.streamlit.app"
 
 st.set_page_config(page_title="Garmin Photo Dashboard", layout="wide")
 
-def logout_and_clear():
-    st.cache_data.clear()
-    st.cache_resource.clear()
-    st.session_state.clear()
-    st.query_params.clear()
+# 세션 초기화 함수
+def reset_session():
+    for key in list(st.session_state.keys()):
+        del st.session_state[key]
+    st.rerun()
 
+# --- [2. 유틸리티 함수] ---
+@st.cache_resource
+def load_custom_font(font_type, size):
+    fonts = {
+        "BlackHanSans": "https://github.com/google/fonts/raw/main/ofl/blackhansans/BlackHanSans-Regular.ttf",
+        "NanumBrush": "https://github.com/google/fonts/raw/main/ofl/nanumbrushscript/NanumBrushScript-Regular.ttf",
+        "Jua": "https://github.com/google/fonts/raw/main/ofl/jua/Jua-Regular.ttf",
+        "DoHyeon": "https://github.com/google/fonts/raw/main/ofl/dohyeon/DoHyeon-Regular.ttf",
+        "GothicA1": "https://github.com/google/fonts/raw/main/ofl/gothica1/GothicA1-Black.ttf",
+        "SongMyung": "https://github.com/google/fonts/raw/main/ofl/songmyung/SongMyung-Regular.ttf",
+        "SingleDay": "https://github.com/google/fonts/raw/main/ofl/singleday/SingleDay-Regular.ttf",
+        "Pretendard": "https://github.com/google/fonts/raw/main/ofl/notosanskr/NotoSansKR%5Bwght%5D.ttf"
+    }
+    font_url = fonts.get(font_type, fonts["Jua"])
+    font_path = f"font_{font_type}.ttf"
+    if not os.path.exists(font_path):
+        try:
+            r = requests.get(font_url, timeout=10)
+            with open(font_path, "wb") as f: f.write(r.content)
+            time.sleep(0.5)
+        except: return ImageFont.load_default()
+    try: return ImageFont.truetype(font_path, int(size))
+    except: return ImageFont.load_default()
+
+def get_circle_logo(img_file, size=(130, 130)):
+    img = Image.open(img_file).convert("RGBA")
+    img = ImageOps.fit(img, size, centering=(0.5, 0.5))
+    mask = Image.new('L', size, 0)
+    draw = ImageDraw.Draw(mask)
+    draw.ellipse((0, 0) + size, fill=255)
+    img.putalpha(mask)
+    return img
+
+def create_collage(image_files, target_size=(1080, 1350)):
+    imgs = [ImageOps.exif_transpose(Image.open(f).convert("RGB")) for f in image_files]
+    if not imgs: return None
+    count = len(imgs)
+    cols = 1 if count == 1 else (2 if count <= 4 else 3)
+    rows = (count + cols - 1) // cols
+    cell_w, cell_h = target_size[0] // cols, target_size[1] // rows
+    collage = Image.new("RGB", target_size, (0, 0, 0))
+    for i, img in enumerate(imgs):
+        is_last = (i == count - 1)
+        draw_w = cell_w * (cols - (count % cols) + 1) if is_last and (count % cols != 0) else cell_w
+        img_fitted = ImageOps.fit(img, (draw_w, cell_h), centering=(0.5, 0.5))
+        collage.paste(img_fitted, ((i % cols) * cell_w, (i // cols) * cell_h))
+    return collage
+
+# --- [3. 스트라바 인증] ---
 if 'access_token' not in st.session_state:
     st.session_state['access_token'] = None
 
-# --- [2. 인증 로직] ---
-query_params = st.query_params
-if "code" in query_params and st.session_state['access_token'] is None:
+params = st.query_params
+if "code" in params and not st.session_state['access_token']:
     try:
         res = requests.post("https://www.strava.com/oauth/token", data={
             "client_id": CLIENT_ID, "client_secret": CLIENT_SECRET,
-            "code": query_params["code"], "grant_type": "authorization_code"
-        }, timeout=15)
+            "code": params["code"], "grant_type": "authorization_code"
+        })
         if res.status_code == 200:
             st.session_state['access_token'] = res.json()['access_token']
             st.query_params.clear()
             st.rerun()
-    except: pass
+        else:
+            reset_session()
+    except:
+        reset_session()
 
-if st.session_state['access_token'] is None:
+if not st.session_state['access_token']:
     st.title("🏃 Garmin Photo Dashboard")
-    auth_url = (f"https://www.strava.com/oauth/authorize?client_id={CLIENT_ID}"
-                f"&response_type=code&redirect_uri={ACTUAL_URL}"
-                f"&scope=read,activity:read_all&approval_prompt=force")
+    auth_url = f"https://www.strava.com/oauth/authorize?client_id={CLIENT_ID}&response_type=code&redirect_uri={ACTUAL_URL}&scope=activity:read_all&approval_prompt=force"
     st.link_button("🚀 Strava 연동하기", auth_url)
+    if st.button("🔌 세션 강제 초기화"):
+        reset_session()
     st.stop()
 
-# --- [3. 유틸리티 함수 - 요청하신 구글 스포츠 폰트 7종 추가] ---
-@st.cache_resource
-def load_font(font_type, size):
-    fonts = {
-        "Tourney": "https://fonts.gstatic.com/s/tourney/v20/rax_Hi1k7QO8wH_j.ttf",
-        "Racing Sans One": "https://fonts.gstatic.com/s/racingsansone/v11/sy0e75S_P8qS5YfN08Wv7HqlY7S_.ttf",
-        "Playball": "https://fonts.gstatic.com/s/playball/v18/p9X9badmBD_9ioRkae_6.ttf",
-        "Audiowide": "https://fonts.gstatic.com/s/audiowide/v16/skcB5BR_3iof8f0BkPh7.ttf",
-        "Oswald": "https://fonts.gstatic.com/s/oswald/v49/TK3iW63_YCWgaMoNgxwp.ttf",
-        "Montserrat": "https://fonts.gstatic.com/s/montserrat/v25/JTUHjIg1_i6t8kCHKm4532VJOt5-Qfcn9R_c8dT.ttf",
-        "League Spartan": "https://fonts.gstatic.com/s/leaguespartan/v11/kJEnBuEW6A7V3W56_f_Xpbe789u27A.ttf"
-    }
+# --- [4. 사이드바 (기본 크기 변경 적용)] ---
+with st.sidebar:
+    app_mode = st.radio("🚀 작업 모드", ["DAILY", "WEEKLY"])
+    st.markdown("---")
+    st.header("⚙️ 디자인/크기 설정")
+    selected_font = st.selectbox("폰트 선택", ["Jua", "BlackHanSans", "NanumBrush", "DoHyeon", "GothicA1", "SongMyung", "SingleDay", "Pretendard"])
+    main_color = st.color_picker("활동명 색상", "#FFD700")
+    num_color = st.color_picker("날짜/정보 색상", "#FFFFFF")
+    route_color = st.selectbox("지도 경로 색상", ["Yellow", "Black", "White"])
     
-    url = fonts.get(font_type, fonts["Oswald"])
-    f_path = f"{font_type}_{int(size)}.ttf"
+    st.markdown("---")
+    # 🌟 요청하신 가이드로 기본값 수정 (80, 20, 50)
+    t_sz = st.slider("활동명", 10, 200, 80)
+    d_sz = st.slider("날짜", 5, 100, 20)
+    n_sz = st.slider("숫자", 10, 300, 50)
+    l_sz = st.slider("라벨", 10, 80, 25)
     
-    try:
-        if not os.path.exists(f_path):
-            r = requests.get(url, timeout=10)
-            with open(f_path, "wb") as f: f.write(r.content)
-        return ImageFont.truetype(f_path, int(size))
-    except:
-        return ImageFont.load_default()
+    st.markdown("---")
+    rx, ry, rw, rh = st.slider("X", 0, 1080, 70), st.slider("Y", 0, 1920, 1150), st.slider("Width", 300, 1000, 500), st.slider("Height", 300, 1200, 720)
+    alpha = st.slider("박스 투명도", 0, 255, 60)
+    map_alpha = st.slider("지도 투명도", 0, 255, 100)
 
-def hex_to_rgba(hex_color, alpha):
-    hex_color = hex_color.lstrip('#')
-    rgb = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
-    return rgb + (alpha,)
-
-# --- [4. 데이터 로드] ---
-acts = []
+# --- [5. 실행 로직] ---
 headers = {'Authorization': f"Bearer {st.session_state['access_token']}"}
-try:
-    act_res = requests.get("https://www.strava.com/api/v3/athlete/activities?per_page=30", headers=headers, timeout=15)
-    if act_res.status_code == 200: acts = act_res.json()
-except: pass
 
-# --- [5. UI 레이아웃] ---
-col1, col2, col3 = st.columns([1.2, 2, 1], gap="medium")
-COLOR_OPTIONS = {"Garmin Yellow": "#FFD700", "Pure White": "#FFFFFF", "Neon Orange": "#FF4500", "Electric Blue": "#00BFFF", "Soft Grey": "#AAAAAA"}
+if app_mode == "DAILY":
+    act_res = requests.get("https://www.strava.com/api/v3/athlete/activities?per_page=10", headers=headers)
+    if act_res.status_code == 200:
+        acts = act_res.json()
+        sel = st.selectbox("기록 선택", [f"{a['start_date_local']} - {a['name']}" for a in acts])
+        a = acts[[f"{x['start_date_local']} - {x['name']}" for x in acts].index(sel)]
+        
+        m_time = a.get('moving_time', 0)
+        time_v = f"{m_time//3600:02d}:{ (m_time%3600)//60 :02d}:{m_time%60:02d}" if m_time >= 3600 else f"{m_time//60:02d}:{m_time%60:02d}"
+        dist_km = a.get('distance', 0) / 1000
+        pace_v = f"{int((m_time/dist_km)//60)}:{int((m_time/dist_km)%60):02d}" if dist_km > 0 else "0:00"
+        hr_v = str(int(a.get('average_heartrate', 0))) if a.get('average_heartrate') else "0"
 
-with col2:
-    mode = st.radio("모드", ["DAILY", "WEEKLY"], horizontal=True, label_visibility="collapsed")
-    if mode == "DAILY" and acts:
-        act_options = [f"{a['start_date_local'][:10]} - {a['name']}" for a in acts]
-        sel_str = st.selectbox("기록 선택", act_options)
-        a = acts[act_options.index(sel_str)]
-        d_km, m_sec = a.get('distance', 0)/1000, a.get('moving_time', 0)
-        p_val = f"{int((m_sec/d_km)//60)}'{int((m_sec/d_km)%60):02d}\"" if d_km > 0 else "0'00\""
-        h_val = str(int(a.get('average_heartrate', 0))) if a.get('average_heartrate') else "0"
-        t_val = f"{m_sec//3600:02d}:{(m_sec%3600)//60:02d}:{m_sec%60:02d}" if m_sec >= 3600 else f"{m_sec//60:02d}:{m_sec%60:02d}"
+        col_files, col_inputs = st.columns([1, 1])
+        with col_files:
+            bg_file = st.file_uploader("배경 사진", type=['jpg', 'jpeg', 'png'])
+            log_file = st.file_uploader("로고 아이콘", type=['jpg', 'jpeg', 'png'])
+        with col_inputs:
+            v_act, v_date = st.text_input("활동명", a['name']), st.text_input("날짜", a.get('start_date_local', "")[:16].replace("T", " "))
+            v_dist, v_time = st.text_input("거리(km)", f"{dist_km:.2f}"), st.text_input("시간", time_v)
+            v_pace, v_hr = st.text_input("페이스", pace_v), st.text_input("심박수(bpm)", hr_v)
+            v_weather = st.text_input("날씨", "")
 
-with col1:
-    st.header("📸 DATA")
-    bg_files = st.file_uploader("배경 사진", type=['jpg','jpeg','png'], accept_multiple_files=True)
-    log_file = st.file_uploader("원형 로고", type=['jpg','jpeg','png'])
-    if mode == "DAILY" and acts:
-        v_act, v_date = st.text_input("활동명", a['name']), st.text_input("날짜", a['start_date_local'][:10])
-        v_dist, v_pace, v_hr = st.text_input("거리(km)", f"{d_km:.2f}"), st.text_input("페이스(분/km)", p_val), st.text_input("심박(bpm)", h_val)
-    elif mode == "WEEKLY" and acts:
-        v_act_w = st.text_input("제목", "WEEKLY RECAP")
-        # 위클리 데이터 로직은 생략 (기존과 동일)
+        if bg_file:
+            orig_bg = ImageOps.exif_transpose(Image.open(bg_file))
+            canvas = ImageOps.fit(orig_bg.convert("RGBA"), (1080, 1920), centering=(0.5, 0.5))
+            overlay = Image.new('RGBA', canvas.size, (0, 0, 0, 0))
+            draw = ImageDraw.Draw(overlay)
+            f_t, f_d, f_n, f_l = load_custom_font(selected_font, t_sz), load_custom_font(selected_font, d_sz), load_custom_font(selected_font, n_sz), load_custom_font(selected_font, l_sz)
 
-with col3:
-    st.header("🎨 DESIGN")
-    show_box = st.checkbox("로그 박스 표시", value=True)
-    # 구글 스포츠 폰트 목록으로 교체
-    sel_font = st.selectbox("폰트 선택", ["Tourney", "Racing Sans One", "Playball", "Audiowide", "Oswald", "Montserrat", "League Spartan"])
-    m_color = COLOR_OPTIONS[st.selectbox("포인트 컬러", list(COLOR_OPTIONS.keys()))]
-    sub_color = COLOR_OPTIONS[st.selectbox("서브 컬러", list(COLOR_OPTIONS.keys()), index=1)]
-    
-    # 요청하신 고정 크기 (90, 30, 60)
-    t_sz, d_sz, n_sz, l_sz = 90, 30, 60, 20
-    
-    if mode == "DAILY":
-        rx, ry = st.number_input("X 위치", 0, 1080, 70), st.number_input("Y 위치", 0, 1920, 1350)
-        rw, rh = st.number_input("박스 너비", 100, 1080, 500), st.number_input("박스 높이", 100, 1920, 500)
-        box_alpha, map_size = st.slider("박스 투명도", 0, 255, 100), st.slider("지도 크기", 50, 400, 160)
-
-# --- [6. 렌더링 엔진] ---
-if bg_files:
-    try:
-        f_t, f_d, f_n, f_l = load_font(sel_font, t_sz), load_font(sel_font, d_sz), load_font(sel_font, n_sz), load_font(sel_font, l_sz)
-        if mode == "DAILY":
-            img = ImageOps.exif_transpose(Image.open(bg_files[0]))
-            canvas = ImageOps.fit(img.convert("RGBA"), (1080, 1920))
-            overlay = Image.new("RGBA", (1080, 1920), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
-            if show_box:
-                draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0,0,0,box_alpha))
-                # 지도 및 텍스트 렌더링 (소문자 km, bpm 적용)
-                items = [("distance", f"{v_dist} km"), ("time", t_val), ("pace", v_pace), ("avg bpm", f"{v_hr} bpm")]
-                draw.text((rx+40, ry+30), v_act, font=f_t, fill=m_color)
-                draw.text((rx+40, ry+30+t_sz+10), v_date, font=f_d, fill=sub_color)
-                y_c = ry + t_sz + d_sz + 80
-                for lab, val in items:
-                    draw.text((rx+40, y_c), lab, font=f_l, fill="#AAAAAA")
-                    draw.text((rx+40, y_c+l_sz+5), val, font=f_n, fill=sub_color); y_c += (n_sz + l_sz + 35)
-            final = Image.alpha_composite(canvas, overlay).convert("RGB")
+            # 1. 로그박스
+            draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0, 0, 0, alpha))
             
-        with col2:
+            # 2. 지도 배경 오버레이
+            poly = a.get('map', {}).get('summary_polyline', "")
+            if poly:
+                try:
+                    pts = polyline.decode(poly)
+                    lats, lons = [p[0] for p in pts], [p[1] for p in pts]
+                    mi_la, ma_la, mi_lo, ma_lo = min(lats), max(lats), min(lons), max(lons)
+                    r_img = Image.new("RGBA", (rw, rh), (0, 0, 0, 0))
+                    dr_r = ImageDraw.Draw(r_img)
+                    def sc(p):
+                        x = (p[1] - mi_lo) / (ma_lo - mi_lo + 1e-9) * (rw * 0.7) + (rw * 0.15)
+                        y = (rh * 0.7) - ((p[0] - mi_la) / (ma_la - mi_la + 1e-9) * (rh * 0.7)) + (rh * 0.15)
+                        return (x, y)
+                    r_f = {"Yellow": (255, 215, 0, map_alpha), "Black": (0, 0, 0, map_alpha), "White": (255, 255, 255, map_alpha)}.get(route_color, (255, 215, 0, map_alpha))
+                    dr_r.line([sc(p) for p in pts], fill=r_f, width=8)
+                    canvas.paste(r_img, (rx, ry), r_img)
+                except: pass
+
+            # 3. 텍스트
+            draw.text((rx + 50, ry + 40), v_act, font=f_t, fill=main_color)
+            draw.text((rx + rw - 50, ry + 40 + t_sz + 5), v_date, font=f_d, fill=num_color, anchor="ra")
+            
+            items = [("DISTANCE", f"{v_dist} km"), ("TIME", v_time), ("AVG PACE", f"{v_pace} /km"), ("AVG HR", f"{v_hr} bpm")]
+            if v_weather: items.append(("WEATHER", v_weather))
+            
+            line_y_start = ry + t_sz + d_sz + 60
+            spacing = ((ry + rh - 40) - line_y_start) / len(items)
+            for i, (lab, val) in enumerate(items):
+                py = line_y_start + (i * spacing)
+                draw.text((rx + 60, py), lab, font=f_l, fill="#AAAAAA")
+                draw.text((rx + 60, py + l_sz + 2), val, font=f_n, fill=num_color)
+
+            if log_file:
+                logo = get_circle_logo(log_file)
+                canvas.paste(logo, (910, 60), logo)
+
+            final = Image.alpha_composite(canvas, overlay).convert("RGB")
             st.image(final, use_container_width=True)
             buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
-            st.download_button("📸 DOWNLOAD", buf.getvalue(), "result.jpg", use_container_width=True)
-    except Exception as e:
-        st.error(f"Error: {e}")
+            st.download_button("📸 DOWNLOAD", buf.getvalue(), "garmin_final.jpg")
+
+elif app_mode == "WEEKLY":
+    st.title("📅 Weekly Recap")
+    after_ts = int((datetime.now() - timedelta(days=7)).timestamp())
+    act_res = requests.get(f"https://www.strava.com/api/v3/athlete/activities?after={after_ts}", headers=headers)
+    if act_res.status_code == 200:
+        w_acts = act_res.json()
+        if w_acts:
+            total_dist = sum(a.get('distance', 0) for a in w_acts) / 1000
+            total_time = sum(a.get('moving_time', 0) for a in w_acts)
+            avg_hr = sum(a.get('average_heartrate', 0) for a in w_acts if a.get('average_heartrate')) / len([a for a in w_acts if a.get('average_heartrate')]) if any(a.get('average_heartrate') for a in w_acts) else 0
+            
+            m1, m2, m3 = st.columns(3)
+            m1.metric("이번 주 총 거리", f"{total_dist:.2f} km")
+            if total_dist > 0:
+                p_sec = total_time / total_dist
+                m2.metric("평균 페이스", f"{int(p_sec//60)}:{int(p_sec%60):02d} /km")
+            m3.metric("평균 심박수", f"{int(avg_hr)} bpm")
+            
+            st.markdown("---")
+            w_files = st.file_uploader("콜라주 사진 선택 (여러 장)", type=['jpg', 'jpeg', 'png'], accept_multiple_files=True)
+            if w_files:
+                collage = create_collage(w_files)
+                if collage:
+                    st.image(collage, use_container_width=True)
+                    buf = io.BytesIO(); collage.save(buf, format="JPEG", quality=95)
+                    st.download_button("📸 콜라주 저장", buf.getvalue(), "weekly_collage.jpg")
+
