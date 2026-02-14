@@ -14,14 +14,9 @@ st.set_page_config(page_title="Garmin Dashboard", layout="wide")
 mpl.use('Agg')
 
 def logout_and_clear():
-    st.cache_data.clear()
-    st.cache_resource.clear()
-    st.session_state.clear()
-    st.query_params.clear()
-    st.rerun()
+    st.cache_data.clear(); st.cache_resource.clear(); st.session_state.clear(); st.query_params.clear(); st.rerun()
 
-if 'access_token' not in st.session_state:
-    st.session_state['access_token'] = None
+if 'access_token' not in st.session_state: st.session_state['access_token'] = None
 
 # --- [2. Strava 인증] ---
 query_params = st.query_params
@@ -33,8 +28,7 @@ if "code" in query_params and st.session_state['access_token'] is None:
         }, timeout=15)
         if res.status_code == 200:
             st.session_state['access_token'] = res.json()['access_token']
-            st.query_params.clear()
-            st.rerun()
+            st.query_params.clear(); st.rerun()
     except: pass
 
 # --- [3. 유틸리티] ---
@@ -61,16 +55,13 @@ def get_weekly_stats(activities, target_date_str):
         weekly_dist = [0.0] * 7
         total_dist, total_time, hr_sum, hr_count = 0.0, 0, 0, 0
         for act in activities:
-            if act.get('type') == 'Run' and act.get('map', {}).get('summary_polyline'):
+            if act.get('type') == 'Run':
                 act_date = datetime.strptime(act['start_date_local'][:10], "%Y-%m-%d")
                 if start_of_week <= act_date <= end_of_week:
                     day_idx = act_date.weekday()
                     dist = act.get('distance', 0) / 1000
-                    weekly_dist[day_idx] += dist
-                    total_dist += dist
-                    total_time += act.get('moving_time', 0)
-                    if act.get('average_heartrate'):
-                        hr_sum += act.get('average_heartrate'); hr_count += 1
+                    weekly_dist[day_idx] += dist; total_dist += dist; total_time += act.get('moving_time', 0)
+                    if act.get('average_heartrate'): hr_sum += act.get('average_heartrate'); hr_count += 1
         avg_hr = int(hr_sum / hr_count) if hr_count > 0 else 0
         avg_pace_sec = (total_time / total_dist) if total_dist > 0 else 0
         avg_pace = f"{int(avg_pace_sec//60)}'{int(avg_pace_sec%60):02d}\""
@@ -84,13 +75,11 @@ def create_bar_chart(data, color_hex):
     fig.patch.set_alpha(0); ax.patch.set_alpha(0)
     bars = ax.bar(days, data, color=color_hex, width=0.6)
     for s in ['top', 'right', 'left']: ax.spines[s].set_visible(False)
-    ax.spines['bottom'].set_color('#AAAAAA')
     ax.tick_params(axis='x', colors='white', labelsize=12); ax.tick_params(axis='y', left=False, labelleft=False)
     for bar in bars:
         h = bar.get_height()
         if h > 0: ax.text(bar.get_x() + bar.get_width()/2., h + 0.1, f'{h:.1f}', ha='center', va='bottom', color='white', fontsize=11, fontweight='bold')
-    plt.tight_layout()
-    buf = io.BytesIO(); plt.savefig(buf, format='png', transparent=True); buf.seek(0); plt.close(fig)
+    plt.tight_layout(); buf = io.BytesIO(); plt.savefig(buf, format='png', transparent=True); buf.seek(0); plt.close(fig)
     return Image.open(buf)
 
 # --- [4. 데이터 로드] ---
@@ -107,8 +96,7 @@ col1, col2, col3 = st.columns([1.2, 2, 1], gap="medium")
 COLOR_OPTIONS = {"Garmin Yellow": "#FFD700", "Pure White": "#FFFFFF", "Pure Black": "#000000", "Neon Orange": "#FF4500", "Electric Blue": "#00BFFF", "Soft Grey": "#AAAAAA"}
 
 v_act, v_date, v_dist, v_time, v_pace, v_hr = "RUNNING", datetime.now().strftime("%Y-%m-%d"), "0.00", "00:00:00", "0'00\"", "0"
-weekly_data = None
-a = None
+weekly_data = None; a = None
 
 with col2:
     mode = st.radio("모드 선택", ["DAILY", "WEEKLY"], horizontal=True, label_visibility="collapsed")
@@ -124,8 +112,7 @@ with col2:
             v_hr = str(int(a.get('average_heartrate', 0))) if a.get('average_heartrate') else "0"
         else:
             weekly_data = get_weekly_stats(acts, v_date)
-            if weekly_data:
-                v_act, v_date, v_dist, v_time, v_pace, v_hr = "WEEKLY RUN", weekly_data['range'], weekly_data['total_dist'], weekly_data['total_time'], weekly_data['avg_pace'], weekly_data['avg_hr']
+            if weekly_data: v_act, v_date, v_dist, v_time, v_pace, v_hr = "WEEKLY RUN", weekly_data['range'], weekly_data['total_dist'], weekly_data['total_time'], weekly_data['avg_pace'], weekly_data['avg_hr']
 
 with col1:
     st.header("📸 DATA INPUT")
@@ -138,28 +125,25 @@ with col1:
 
 with col3:
     st.header("🎨 DESIGN")
-    box_orient = st.radio("레이아웃", ["Horizontal", "Vertical"], horizontal=True)
+    box_orient = st.radio("로그박스 형태", ["Horizontal", "Vertical"], horizontal=True)
     sel_font = st.selectbox("폰트", ["BlackHanSans", "Jua", "DoHyeon", "NanumBrush", "Sunflower"])
     m_color = COLOR_OPTIONS[st.selectbox("포인트 컬러", list(COLOR_OPTIONS.keys()), index=0)]
     sub_color = COLOR_OPTIONS[st.selectbox("서브 컬러", list(COLOR_OPTIONS.keys()), index=1)]
     
     CW, CH = (1080, 1920) if mode == "DAILY" else (1080, 1080)
     
-    st.subheader("📊 시각화 요소 (지도/그래프)")
-    vis_x = st.slider("가로 위치(X)", 0, 1080, 540)
-    vis_y = st.slider("세로 위치(Y)", 0, 1920, 400 if mode=="DAILY" else 300)
-    vis_sz = st.slider("크기", 200, 1000, 600 if mode=="DAILY" else 850)
-    
-    st.subheader("📦 로그박스")
+    st.subheader("📦 박스 및 요소 조절")
     bx = st.number_input("박스 X", 0, 1080, 70)
     by = st.number_input("박스 Y", 0, 1920, 1400 if mode=="DAILY" else 750)
     bw = st.number_input("박스 너비", 100, 1080, 940 if box_orient=="Horizontal" else 480)
-    bh = st.number_input("박스 높이", 100, 1080, 260 if box_orient=="Horizontal" else 480)
-    box_alpha = st.slider("투명도", 0, 255, 130)
+    bh = st.number_input("박스 높이", 100, 1080, 260 if box_orient=="Horizontal" else 550)
+    box_alpha = st.slider("박스 투명도", 0, 255, 130)
+    vis_sz = st.slider("지도/그래프 크기", 100, 1000, 250 if mode=="DAILY" else 850)
+    if mode == "WEEKLY": g_y_off = st.slider("그래프 높이 조절", 0, 1000, 150)
 
 # --- [6. 렌더링 엔진] ---
 try:
-    f_t, f_d, f_n, f_l = load_font(sel_font, 70), load_font(sel_font, 20), load_font(sel_font, 45), load_font(sel_font, 22)
+    f_t, f_d, f_n, f_l = load_font(sel_font, 90), load_font(sel_font, 30), load_font(sel_font, 60), load_font(sel_font, 20)
     canvas = Image.new("RGBA", (CW, CH), (0, 0, 0, 255))
     
     if bg_files:
@@ -175,44 +159,51 @@ try:
 
     overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
     
-    # --- 시각화 레이어 (지도/그래프) 처리 ---
+    # 1. 시각화 소스 생성
     vis_layer = None
     if mode == "DAILY" and a and a.get('map', {}).get('summary_polyline'):
         pts = polyline.decode(a['map']['summary_polyline']); lats, lons = zip(*pts)
         vis_layer = Image.new("RGBA", (vis_sz, vis_sz), (0,0,0,0)); m_draw = ImageDraw.Draw(vis_layer)
-        # 지도가 프레임 안에 꽉 차도록 여백 계산
-        def tr(la, lo): 
-            margin = 40
-            tx = (lo-min(lons))/(max(lons)-min(lons)+1e-5)*(vis_sz-margin*2)+margin
-            ty = (vis_sz-margin)-(la-min(lats))/(max(lats)-min(lats)+1e-5)*(vis_sz-margin*2)
-            return tx, ty
+        def tr(la, lo): return (lo-min(lons))/(max(lons)-min(lons)+1e-5)*(vis_sz-40)+20, (vis_sz-20)-(la-min(lats))/(max(lats)-min(lats)+1e-5)*(vis_sz-40)
         m_draw.line([tr(la, lo) for la, lo in pts], fill=m_color, width=8)
     elif mode == "WEEKLY" and weekly_data:
         chart_img = create_bar_chart(weekly_data['dists'], m_color)
         w_p = (vis_sz / float(chart_img.size[0])); vis_layer = chart_img.resize((vis_sz, int(chart_img.size[1]*w_p)), Image.Resampling.LANCZOS)
-    
-    if vis_layer:
-        # 설정한 X, Y가 이미지의 정중앙이 되도록 배치
-        overlay.paste(vis_layer, (vis_x - vis_layer.width//2, vis_y - vis_layer.height//2), vis_layer)
 
-    # --- 로그박스 처리 ---
+    # 2. 로그박스 및 텍스트 배치
     draw.rectangle([bx, by, bx + bw, by + bh], fill=(0,0,0,box_alpha))
     items = [("distance", f"{v_dist} km"), ("time", v_time), ("pace", v_pace), ("avg bpm", f"{v_hr} bpm")]
     
+    if mode == "DAILY" and vis_layer:
+        # [DAILY] 지도를 박스 내부 레이아웃에 맞춰 배치
+        if box_orient == "Vertical":
+            # 활동명 우측 상단 배치
+            overlay.paste(vis_layer, (bx + bw - vis_layer.width - 20, by + 20), vis_layer)
+        else:
+            # 활동명 좌측 배치
+            overlay.paste(vis_layer, (bx + 20, by + (bh - vis_layer.height)//2), vis_layer)
+    
+    if mode == "WEEKLY" and vis_layer:
+        # [WEEKLY] 그래프는 박스 외부 상단 중앙
+        overlay.paste(vis_layer, ((CW - vis_layer.width)//2, by - vis_layer.height - g_y_off), vis_layer)
+
+    # 텍스트 렌더링
     if box_orient == "Vertical":
         draw.text((bx+40, by+30), v_act, font=f_t, fill=m_color)
         draw.text((bx+40, by+130), v_date, font=f_d, fill="#AAAAAA")
-        y_c = by + 180
+        y_c = by + 200
         for lab, val in items:
             draw.text((bx+40, y_c), lab.lower(), font=f_l, fill="#AAAAAA")
-            draw.text((bx+40, y_c+25), val.lower() if "bpm" in val or "km" in val else val, font=f_n, fill=sub_color); y_c += 100
+            draw.text((bx+40, y_c+25), val.lower() if "bpm" in val or "km" in val else val, font=f_n, fill=sub_color); y_c += 110
     else:
-        draw.text((bx+(bw//2)-(draw.textlength(v_act, font=f_t)//2), by+25), v_act, font=f_t, fill=m_color)
-        draw.text((bx+(bw//2)-(draw.textlength(v_date, font=f_d)//2), by+115), v_date, font=f_d, fill="#AAAAAA")
-        sec_w = (bw - 80) // 4
+        # Horizontal 모드일 때 지도가 있으면 텍스트를 오른쪽으로 밀기
+        text_x_off = vis_layer.width + 40 if (mode == "DAILY" and vis_layer) else 40
+        draw.text((bx + text_x_off, by + 40), v_act, font=f_t, fill=m_color)
+        draw.text((bx + text_x_off, by + 130), v_date, font=f_d, fill="#AAAAAA")
+        sec_w = (bw - text_x_off - 40) // 4
         for i, (lab, val) in enumerate(items):
-            draw.text((bx+40+(i*sec_w), by+160), lab.lower(), font=f_l, fill="#AAAAAA")
-            draw.text((bx+40+(i*sec_w), by+185), val.lower() if "bpm" in val or "km" in val else val, font=f_n, fill=sub_color)
+            draw.text((bx + text_x_off + (i*sec_w), by + 175), lab.lower(), font=f_l, fill="#AAAAAA")
+            draw.text((bx + text_x_off + (i*sec_w), by + 200), val.lower() if "bpm" in val or "km" in val else val, font=f_n, fill=sub_color)
 
     if log_file:
         ls = 100; l_img = ImageOps.fit(Image.open(log_file).convert("RGBA"), (ls, ls))
@@ -226,4 +217,3 @@ try:
         st.download_button(f"📸 {mode} DOWNLOAD", buf.getvalue(), f"{mode.lower()}_result.jpg", use_container_width=True)
         if st.session_state['access_token']: st.button("🔓 로그아웃", on_click=logout_and_clear)
 except Exception as e: st.error(f"Error: {e}")
-
