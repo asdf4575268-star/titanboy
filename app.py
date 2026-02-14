@@ -115,15 +115,15 @@ if act_res.status_code == 200:
         m_color, sub_color = COLOR_OPTIONS[sel_m_color], COLOR_OPTIONS[sel_sub_color]
 
         st.markdown("---")
-        t_sz, d_sz, n_sz, l_sz = st.slider("활동명 크기", 10, 200, 90), st.slider("날짜 크기", 5, 100, 30), st.slider("숫자 크기", 10, 200, 60), st.slider("라벨 크기", 5, 80, 20)
+        t_sz, d_sz, n_sz, l_sz = st.slider("활동명 크기", 10, 200, 70), st.slider("날짜 크기", 5, 100, 25), st.slider("숫자 크기", 10, 200, 40), st.slider("라벨 크기", 5, 80, 20)
         
         if mode == "DAILY":
             st.markdown("---")
             box_mode = st.radio("박스 정렬", ["Vertical", "Horizontal"])
-            rx, ry = st.slider("X 위치", 0, 1080, 70), st.slider("Y 위치", 0, 1920, 1150)
+            rx, ry = st.slider("X 위치", 0, 1080, 70), st.slider("Y 위치", 0, 1920, 1250)
             auto_w = 600 if box_mode == "Vertical" else 1000
             auto_h = (t_sz + d_sz + 4 * (n_sz + l_sz + 35) + 120) if box_mode == "Vertical" else (t_sz + d_sz + n_sz + l_sz + 180)
-            rw, rh = st.slider("박스 가로 크기", 100, 1080, int(auto_w)), st.slider("박스 세로 크기", 100, 1500, int(auto_h))
+            rw, rh = st.slider("박스 가로 크기", 100, 450, int(auto_w)), st.slider("박스 세로 크기", 100, 550, int(auto_h))
             map_size, map_alpha = st.slider("지도 크기", 50, 400, 150), st.slider("지도 투명도", 0, 255, 255)
             box_alpha = st.slider("박스 투명도", 0, 255, 110)
 
@@ -194,3 +194,4 @@ if act_res.status_code == 200:
     # 우하단 로그아웃 버튼
     st.markdown("<br>", unsafe_allow_html=True)
     if st.button("🔓 로그아웃", use_container_width=False): logout()
+
