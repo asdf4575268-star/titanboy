@@ -128,9 +128,29 @@ with col3:
         st.subheader("Box Layout")
         # 모드별 디폴트 값 설정
         if box_orient == "Vertical":
-            d_rx, d_ry, d_rw, d_rh = 70, 1350, 450, 500
-        else: # Horizontal
-            d_rx, d_ry, d_rw, d_rh = 70, 1650, 940, 220
+                    # (세로 모드는 기존 유지)
+                    draw.text((rx+40, ry+30), v_act, font=f_t, fill=m_color)
+                    draw.text((rx+40, ry+30+t_sz+10), v_date, font=f_d, fill=sub_color)
+                    y_c = ry + t_sz + d_sz + 80
+                    for lab, val in items:
+                        draw.text((rx+40, y_c), lab, font=f_l, fill="#AAAAAA")
+                        draw.text((rx+40, y_c+l_sz+5), val, font=f_n, fill=sub_color); y_c += (n_sz + l_sz + 35)
+                
+                else: # Horizontal 모드: 제목/날짜 아래에 1열로 데이터 균형 배치
+                    # 1. 상단: 활동명 및 날짜 (중앙 정렬 느낌)
+                    draw.text((rx+40, ry+25), v_act, font=f_t, fill=m_color)
+                    draw.text((rx+40, ry+25+t_sz+5), v_date, font=f_d, fill="#AAAAAA")
+                    
+                    # 2. 하단: 기록 데이터 1열 배치 (4등분 균형 계산)
+                    y_data_top = ry + t_sz + d_sz + 45
+                    section_w = (rw - 80) // len(items) # 박스 너비를 아이템 수로 나눔
+                    
+                    for i, (lab, val) in enumerate(items):
+                        curr_x = rx + 40 + (i * section_w)
+                        # 라벨(distance 등) 소문자
+                        draw.text((curr_x, y_data_top), lab, font=f_l, fill="#AAAAAA")
+                        # 값(10.00 km 등)
+                        draw.text((curr_x, y_data_top + l_sz + 5), val, font=f_n, fill=sub_color)
             
         rx = st.number_input("X 위치", 0, 1080, d_rx)
         ry = st.number_input("Y 위치", 0, 1920, d_ry)
@@ -211,3 +231,4 @@ if bg_files:
             st.download_button("📸 DOWNLOAD", buf.getvalue(), "result.jpg", use_container_width=True)
     except Exception as e:
         st.error(f"Error: {e}")
+
