@@ -89,7 +89,6 @@ if act_res.status_code == 200:
             w_acts = acts[:7]
             t_dist = sum([x.get('distance', 0) for x in w_acts]) / 1000
             t_time = sum([x.get('moving_time', 0) for x in w_acts])
-            # 주간 평균 페이스 계산
             avg_p_val = f"{int((t_time/t_dist)//60)}'{int((t_time/t_dist)%60):02d}\"" if t_dist > 0 else "0'00\""
             t_hrs = [x.get('average_heartrate', 0) for x in w_acts if x.get('average_heartrate')]
             avg_hr = int(sum(t_hrs)/len(t_hrs)) if t_hrs else 0
@@ -115,15 +114,15 @@ if act_res.status_code == 200:
         m_color, sub_color = COLOR_OPTIONS[sel_m_color], COLOR_OPTIONS[sel_sub_color]
 
         st.markdown("---")
-        t_sz, d_sz, n_sz, l_sz = st.slider("활동명 크기", 10, 200, 70), st.slider("날짜 크기", 5, 100, 25), st.slider("숫자 크기", 10, 200, 40), st.slider("라벨 크기", 5, 80, 20)
+        t_sz, d_sz, n_sz, l_sz = st.slider("활동명 크기", 10, 200, 90), st.slider("날짜 크기", 5, 100, 30), st.slider("숫자 크기", 10, 200, 60), st.slider("라벨 크기", 5, 80, 20)
         
         if mode == "DAILY":
             st.markdown("---")
             box_mode = st.radio("박스 정렬", ["Vertical", "Horizontal"])
-            rx, ry = st.slider("X 위치", 0, 1080, 70), st.slider("Y 위치", 0, 1920, 1250)
+            rx, ry = st.slider("X 위치", 0, 1080, 70), st.slider("Y 위치", 0, 1920, 1150)
             auto_w = 600 if box_mode == "Vertical" else 1000
             auto_h = (t_sz + d_sz + 4 * (n_sz + l_sz + 35) + 120) if box_mode == "Vertical" else (t_sz + d_sz + n_sz + l_sz + 180)
-            rw, rh = st.slider("박스 가로 크기", 100, 450, int(auto_w)), st.slider("박스 세로 크기", 100, 550, int(auto_h))
+            rw, rh = st.slider("박스 가로 크기", 100, 1080, int(auto_w)), st.slider("박스 세로 크기", 100, 1500, int(auto_h))
             map_size, map_alpha = st.slider("지도 크기", 50, 400, 150), st.slider("지도 투명도", 0, 255, 255)
             box_alpha = st.slider("박스 투명도", 0, 255, 110)
 
@@ -148,7 +147,7 @@ if act_res.status_code == 200:
                     m_draw.line([trans_mini(la, lo) for la, lo in pts], fill=hex_to_rgba(m_color, map_alpha), width=5)
                     overlay.paste(map_layer, (rx + rw - map_size - 20, ry + 20), map_layer)
 
-                items = [("DISTANCE", f"{v_dist} km"), ("TIME", t_val), ("AVG PACE", f"{v_pace}"), ("AVG HR", f"{v_hr} bpm")]
+                items = [("DISTANCE", f"{v_dist} km"), ("TIME", t_val), ("PACE", f"{v_pace}"), ("HEART RATE", f"{v_hr} bpm")]
                 if box_mode == "Vertical":
                     draw.text((rx+45, ry+35), v_act, font=f_t, fill=m_color)
                     draw.text((rx+45, ry+35+t_sz+10), v_date, font=f_d, fill=sub_color)
@@ -168,11 +167,15 @@ if act_res.status_code == 200:
             # WEEKLY: 공백 없는 완벽 콜라주
             canvas = Image.new("RGBA", (1080, 1080), (0,0,0,255)); n = len(bg_files)
             cols = math.ceil(math.sqrt(n)); rows = math.ceil(n / cols)
-            img_w, img_h = 1080 // cols, (1080 if not show_box else 880) // rows
+            # 박스 유무에 따른 이미지 높이 결정
+            base_h = 880 if show_box else 1080
+            img_w, img_h = 1080 // cols, base_h // rows
             for i, f in enumerate(bg_files):
                 x, y = (i % cols) * img_w, (i // cols) * img_h
-                current_w = img_w if (i + 1) % cols != 0 else 1080 - x
-                canvas.paste(ImageOps.fit(Image.open(f).convert("RGBA"), (current_w, img_h)), (x, y))
+                # 픽셀 오차 보정 (우측 및 하단 끝 이미지 확장)
+                cw = img_w if (i+1)%cols != 0 else 1080 - x
+                ch = img_h if (i+cols) < n else base_h - y
+                canvas.paste(ImageOps.fit(Image.open(f).convert("RGBA"), (cw, ch)), (x, y))
             
             if show_box:
                 draw = ImageDraw.Draw(canvas); f_t, f_n, f_l = load_font(sel_font, 45), load_font(sel_font, 35), load_font(sel_font, 18)
@@ -191,7 +194,6 @@ if act_res.status_code == 200:
             buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
             st.download_button("📸 DOWNLOAD", buf.getvalue(), "garmin_final.jpg", use_container_width=True)
 
-    # 우하단 로그아웃 버튼
+    # 하단 버튼
     st.markdown("<br>", unsafe_allow_html=True)
     if st.button("🔓 로그아웃", use_container_width=False): logout()
-
