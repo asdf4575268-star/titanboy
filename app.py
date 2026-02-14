@@ -130,18 +130,16 @@ with col3:
     vis_alpha = st.slider("지도/그래프 투명도", 0, 255, 150 if mode=="DAILY" else 220)
     if mode == "WEEKLY": g_y_off = st.slider("그래프 상단 여백", 0, 500, 50)
 
-# --- [5. 렌더링 엔진] ---
-# 사진이 없어도 캔버스를 생성하도록 설정
+# --- [6. 렌더링 엔진] ---
 try:
-    f_t, f_d, f_n, f_l = load_font(sel_font, 70), load_font(sel_font, 20), load_font(sel_font, 45), load_font(sel_font, 23)
+    # 폰트 로드 (90/30/60 규칙)
+    f_t, f_d, f_n, f_l = load_font(sel_font, 90), load_font(sel_font, 30), load_font(sel_font, 60), load_font(sel_font, 20)
     
-    # 배경 생성: 사진이 있으면 사진으로, 없으면 검은색 배경으로 시작
+    # 배경 생성: 사진 유무와 관계없이 실행
     if bg_files:
-        img = ImageOps.exif_transpose(Image.open(bg_files[0]))
-        canvas = ImageOps.fit(img.convert("RGBA"), (CW, CH))
+        canvas = ImageOps.fit(ImageOps.exif_transpose(Image.open(bg_files[0])).convert("RGBA"), (CW, CH))
     else:
-        # 사진이 없을 때 기본 배경색 (검은색)
-        canvas = Image.new("RGBA", (CW, CH), (20, 20, 20, 255)) 
+        canvas = Image.new("RGBA", (CW, CH), (20, 20, 20, 255))
     
     overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
     
@@ -158,78 +156,58 @@ try:
         alpha_mask = vis_layer.getchannel('A').point(lambda x: x * (vis_alpha / 255)); vis_layer.putalpha(alpha_mask)
         overlay.paste(vis_layer, ((CW - vis_layer.width)//2, g_y_off), vis_layer)
 
-    # [로그박스 및 텍스트] - 이제 사진 유무와 관계없이 실행됩니다.
-    draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0,0,0,box_alpha))
+    # [로그박스 배치 로직]
     items = [("distance", f"{v_dist} km"), ("time", v_time), ("pace", v_pace), ("avg bpm", f"{v_hr} bpm")]
-    
+
     if box_orient == "Vertical":
-        if mode == "DAILY" and vis_layer: overlay.paste(vis_layer, (rx + rw - vis_layer.width - 20, ry + 20), vis_layer)
+        # 세로모드: 기존 로직 유지
+        draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0,0,0,box_alpha))
+        if mode == "DAILY" and vis_layer: 
+            overlay.paste(vis_layer, (rx + rw - vis_layer.width - 20, ry + 20), vis_layer)
         draw.text((rx+40, ry+30), v_act, font=f_t, fill=m_color)
         draw.text((rx+40, ry+130), v_date, font=f_d, fill="#AAAAAA")
         y_c = ry + 210
         for lab, val in items:
             draw.text((rx+40, y_c), lab.lower(), font=f_l, fill="#AAAAAA")
-            draw.text((rx+40, y_c+25), val.lower() if "bpm" in val or "km" in val else val, font=f_n, fill=sub_color); y_c += 110
+            draw.text((rx+40, y_c+25), val.lower() if "bpm" in val or "km" in val else val, font=f_n, fill=sub_color)
+            y_c += 110
     else:
-        t_x = (vis_layer.width + 40) if (mode=="DAILY" and vis_layer) else 40
-        if mode=="DAILY" and vis_layer: overlay.paste(vis_layer, (rx+20, ry+(rh-vis_layer.height)//2), vis_layer)
-        draw.text((rx+t_x, ry+40), v_act, font=f_t, fill=m_color)
-        draw.text((rx+t_x, ry+130), v_date, font=f_d, fill="#AAAAAA")
-        sec_w = (rw - t_x - 150) // 4
-        for i, (lab, val) in enumerate(items):
-            item_x = rx + t_x + (i * sec_w)
-            draw.text((item_x, ry+180), lab.lower(), font=f_l, fill="#AAAAAA")
-            draw.text((item_x, ry+205), val.lower() if "bpm" in val or "km" in val else val, font=f_n, fill=sub_color)
-    else:    
-        # 1. 가로모드 설정: 너비를 1080 전체로 고정
-        rw = 1080 
-        rx = 0  # 왼쪽 끝부터 시작
+        # 가로모드: 너비 1080 고정 및 가운데 정렬 최적화
+        cur_rw = 1080
+        cur_rx = 0
+        draw.rectangle([cur_rx, ry, cur_rx + cur_rw, ry + rh], fill=(0,0,0,box_alpha))
         
-        # 박스 배경 다시 그리기 (너비 1080 고정)
-        draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0,0,0,box_alpha))
-
-        # 2. 지도 배치 (가로모드일 때 왼쪽 정렬)
+        # 지도 (가로모드일 땐 왼쪽에 작게 배치)
         if mode == "DAILY" and vis_layer:
-            overlay.paste(vis_layer, (30, ry + (rh - vis_layer.height)//2), vis_layer)
+            overlay.paste(vis_layer, (20, ry + (rh - vis_layer.height)//2), vis_layer)
         
-        # 3. 활동명 및 날짜 가운데 정렬 계산
-        title_font = f_t
-        date_font = f_d
+        # 활동명 & 날짜 가운데 정렬
+        t_w = draw.textlength(v_act, font=f_t)
+        d_w = draw.textlength(v_date, font=f_d)
+        draw.text(((cur_rw - t_w) // 2, ry + 35), v_act, font=f_t, fill=m_color)
+        draw.text(((cur_rw - d_w) // 2, ry + 125), v_date, font=f_d, fill="#AAAAAA")
         
-        # 텍스트 길이 측정 후 중앙 위치 계산
-        t_w = draw.textlength(v_act, font=title_font)
-        d_w = draw.textlength(v_date, font=date_font)
-        
-        draw.text(((rw - t_w) // 2, ry + 35), v_act, font=title_font, fill=m_color)
-        draw.text(((rw - d_w) // 2, ry + 125), v_date, font=date_font, fill="#AAAAAA")
-        
-        # 4. 4개 정보 균등 분할 배치 (시인성 최적화)
-        # 박스 전체 너비 1080을 4등분하여 각 섹션의 중앙에 배치
-        sec_w = rw // 4
+        # 4개 정보 270px씩 균등 분할 (1080 / 4)
+        sec_w = cur_rw // 4
         for i, (lab, val) in enumerate(items):
-            # 각 섹션의 중앙 X 좌표 계산
             center_x = (i * sec_w) + (sec_w // 2)
-            
-            # 라벨 및 숫자 길이 측정하여 중앙 정렬
-            l_w = draw.textlength(lab.lower(), font=f_l)
             v_str = val.lower() if "bpm" in val or "km" in val else val
+            l_w = draw.textlength(lab.lower(), font=f_l)
             v_w = draw.textlength(v_str, font=f_n)
             
             draw.text((center_x - (l_w // 2), ry + 175), lab.lower(), font=f_l, fill="#AAAAAA")
             draw.text((center_x - (v_w // 2), ry + 205), v_str, font=f_n, fill=sub_color)
 
-        # 5. 로고 배치 (가로모드 우측 상단 고정)
-        if log_file:
-            ls = 100
-            l_pos = (rw - ls - 30, ry + 25)
-            overlay.paste(l_img, l_pos, l_img)
-    # [로고]
+    # [로고 배치]
     if log_file:
-        ls = 100; l_img = ImageOps.fit(Image.open(log_file).convert("RGBA"), (ls, ls))
+        ls = 100
+        l_img = ImageOps.fit(Image.open(log_file).convert("RGBA"), (ls, ls))
         mask = Image.new('L', (ls, ls), 0); ImageDraw.Draw(mask).ellipse((0, 0, ls, ls), fill=255); l_img.putalpha(mask)
-        l_pos = (rx + rw - ls - 25, ry + rh - ls - 25) if box_orient == "Vertical" else (rx + rw - ls - 25, ry + 25)
+        # 가로모드일 땐 우측 상단 고정
+        l_pos = (1080 - ls - 25, ry + 25) if box_orient == "Horizontal" else (rx + rw - ls - 25, ry + rh - ls - 25)
         overlay.paste(l_img, l_pos, l_img)
 
+    # 최종 합성
     final = Image.alpha_composite(canvas, overlay).convert("RGB")
     with col2:
         st.image(final, use_container_width=True)
@@ -240,6 +218,7 @@ except Exception as e:
     st.info("데이터를 불러오거나 사진을 업로드하면 대시보드가 생성됩니다.")
     # 개발용 에러 확인이 필요하면 아래 주석 해제
     # st.error(f"Error: {e}")
+
 
 
 
