@@ -175,9 +175,10 @@ with col_design:
 
 # --- [6. 렌더링 엔진] ---
 try:
-    # 폰트 설정 (기존 설정 유지)
+    # 활동명 70, 날짜 20, 숫자 40, 라벨 23 (폰트 크기 유지)
     f_t, f_d, f_n, f_l = load_font(sel_font, 70), load_font(sel_font, 20), load_font(sel_font, 40), load_font(sel_font, 23)
     
+    # [배경] 스마트 콜라주 적용
     if bg_files:
         canvas = make_smart_collage(bg_files, (CW, CH))
     else:
@@ -185,7 +186,7 @@ try:
     
     overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
     
-    # [데이터 박스 먼저 그리기]
+    # [1. 데이터 박스 그리기]
     if show_box:
         items = [("distance", f"{v_dist} km"), ("time", v_time), ("pace", v_pace), ("avg bpm", f"{v_hr} bpm")]
         if box_orient == "Vertical":
@@ -198,6 +199,7 @@ try:
                 draw.text((rx+40, y_c+25), val.lower() if any(x in val for x in ["km","bpm"]) else val, font=f_n, fill=sub_color)
                 y_c += 115
         else:
+            # Horizontal (가로형) 가운데 정렬
             draw.rectangle([0, ry, 1080, ry + rh], fill=(0,0,0,box_alpha))
             t_w = draw.textlength(v_act, font=f_t); d_w = draw.textlength(v_date, font=f_d)
             draw.text(((1080 - t_w)//2, ry + 35), v_act, font=f_t, fill=m_color)
@@ -210,7 +212,7 @@ try:
                 draw.text((cx - lw//2, ry + 175), lab.lower(), font=f_l, fill="#AAAAAA")
                 draw.text((cx - vw//2, ry + 205), v_s, font=f_n, fill=sub_color)
 
-    # [수정된 지도 배치: 활동명 오른쪽]
+    # [2. 시각화: 지도/그래프 (활동명 우측 배치)]
     if show_vis:
         if mode == "DAILY" and a and a.get('map', {}).get('summary_polyline'):
             pts = polyline.decode(a['map']['summary_polyline']); lats, lons = zip(*pts)
@@ -218,27 +220,36 @@ try:
             def tr(la, lo): return 15+(lo-min(lons))/(max(lons)-min(lons)+1e-5)*(vis_sz-30), (vis_sz-15)-(la-min(lats))/(max(lats)-min(lats)+1e-5)*(vis_sz-30)
             m_draw.line([tr(la, lo) for la, lo in pts], fill=hex_to_rgba(m_color, vis_alpha), width=5)
             
-            # 활동명 텍스트 길이를 계산하여 그 오른쪽에 배치
+            # 활동명 텍스트 길이에 따른 우측 좌표 계산
             act_w = draw.textlength(v_act, font=f_t)
-            
             if box_orient == "Vertical":
-                # 활동명(rx+40) 시작점 + 텍스트 길이 + 여백(20)
-                map_x = rx + 40 + act_w + 20
-                map_y = ry + 25 # 활동명과 높이를 맞춤
+                m_x, m_y = rx + 40 + act_w + 20, ry + 30
             else:
-                # 가로형일 때는 가운데 정렬된 활동명 오른쪽
-                map_x = (1080 + act_w)//2 + 20
-                map_y = ry + 35
-                
-            overlay.paste(vis_layer, (int(map_x), int(map_y)), vis_layer)
-                
+                m_x, m_y = (1080 + act_w)//2 + 20, ry + 35
+            overlay.paste(vis_layer, (int(m_x), int(m_y)), vis_layer)
+            
         elif mode == "WEEKLY" and weekly_data:
             chart_img = create_bar_chart(weekly_data['dists'], m_color)
             w_p = (vis_sz / float(chart_img.size[0])); vis_layer = chart_img.resize((vis_sz, int(chart_img.size[1]*w_p)), Image.Resampling.LANCZOS)
             alpha_mask = vis_layer.getchannel('A').point(lambda x: x * (vis_alpha / 255)); vis_layer.putalpha(alpha_mask)
             overlay.paste(vis_layer, ((CW - vis_layer.width)//2, CH - vis_layer.height - 20), vis_layer)
 
-    # ... (로그 및 하단 처리 동일)
+    # [3. 로고 및 최종 합성]
+    if log_file:
+        ls = 100; l_img = ImageOps.fit(Image.open(log_file).convert("RGBA"), (ls, ls))
+        mask = Image.new('L', (ls, ls), 0); ImageDraw.Draw(mask).ellipse((0, 0, ls, ls), fill=255); l_img.putalpha(mask)
+        l_pos = (1080 - ls - 30, ry + 30) if box_orient == "Horizontal" else (rx + rw - ls - 25, ry + rh - ls - 25)
+        overlay.paste(l_img, l_pos, l_img)
+
+    final = Image.alpha_composite(canvas, overlay).convert("RGB")
+    with col_main:
+        st.image(final, use_container_width=True)
+        buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
+        st.download_button(f"📸 {mode} DOWNLOAD", buf.getvalue(), f"{mode.lower()}.jpg", use_container_width=True)
+
+except Exception as e:
+    with col_main: st.info("활동을 선택하거나 사진을 업로드해 주세요.")
+
 
 
 
