@@ -179,56 +179,37 @@ try:
     # [로그박스]
     draw.rectangle([bx, by, bx + bw, by + bh], fill=(0,0,0,box_alpha))
     
-# [로그박스 그리기]
-    draw.rectangle([bx, by, bx + bw, by + bh], fill=(0,0,0,box_alpha))
-    
-    # [데이터 항목 정의]
-    items = [("distance", f"{v_dist} km"), ("time", v_time), ("pace", v_pace), ("avg bpm", f"{v_hr} bpm")]
+    # [로고] 위치 규칙 적용
+    if log_file:
+        ls = 100; l_img = ImageOps.fit(Image.open(log_file).convert("RGBA"), (ls, ls))
+        mask = Image.new('L', (ls, ls), 0); ImageDraw.Draw(mask).ellipse((0, 0, ls, ls), fill=255); l_img.putalpha(mask)
+        log_pos = (bx + bw - ls - 25, by + bh - ls - 25) if box_orient == "Vertical" else (bx + bw - ls - 25, by + 25)
+        overlay.paste(l_img, log_pos, l_img)
 
-    # [텍스트 및 지도 배치]
+    # [텍스트]
+    items = [("distance", f"{v_dist} km"), ("time", v_time), ("pace", v_pace), ("avg bpm", f"{v_hr} bpm")]
+    if mode == "DAILY" and vis_layer:
+        if box_orient == "Vertical": overlay.paste(vis_layer, (bx + bw - vis_layer.width - 20, by + 20), vis_layer)
+        else: overlay.paste(vis_layer, (bx + 20, by + (bh - vis_layer.height)//2), vis_layer)
+
     if box_orient == "Vertical":
-        # 세로 모드 배치
-        if mode == "DAILY" and vis_layer:
-            overlay.paste(vis_layer, (bx + bw - vis_layer.width - 20, by + 20), vis_layer)
-        
         draw.text((bx+40, by+30), v_act, font=f_t, fill=m_color)
         draw.text((bx+40, by+130), v_date, font=f_d, fill="#AAAAAA")
         y_c = by + 200
         for lab, val in items:
             draw.text((bx+40, y_c), lab.lower(), font=f_l, fill="#AAAAAA")
-            draw.text((bx+40, y_c+25), val.lower() if "bpm" in val or "km" in val else val, font=f_n, fill=sub_color)
-            y_c += 110
+            draw.text((bx+40, y_c+25), val.lower() if "bpm" in val or "km" in val else val, font=f_n, fill=sub_color); y_c += 110
     else:
-        # 가로 모드 배치 (데이터 겹침 해결 버전)
-        # 지도가 있을 때와 없을 때의 텍스트 시작 위치(X) 결정
-        text_x_off = (vis_layer.width + 60) if (mode == "DAILY" and vis_layer) else 60
-        
-        if mode == "DAILY" and vis_layer:
-            overlay.paste(vis_layer, (bx + 20, by + (bh - vis_layer.height)//2), vis_layer)
-        
-        # 활동명 및 날짜
+        text_x_off = (vis_layer.width + 40) if (mode == "DAILY" and vis_layer) else 40
         draw.text((bx + text_x_off, by + 40), v_act, font=f_t, fill=m_color)
         draw.text((bx + text_x_off, by + 130), v_date, font=f_d, fill="#AAAAAA")
-        
-        # 데이터 항목 4개를 겹치지 않게 분산 배치 (박스 너비를 활용)
-        usable_w = bw - text_x_off - 150 # 로고 영역 확보를 위해 여유공간 제외
-        sec_w = usable_w // 4 
-        
+        sec_w = (bw - text_x_off - 40) // 4
         for i, (lab, val) in enumerate(items):
             item_x = bx + text_x_off + (i * sec_w)
             draw.text((item_x, by + 175), lab.lower(), font=f_l, fill="#AAAAAA")
             draw.text((item_x, by + 205), val.lower() if "bpm" in val or "km" in val else val, font=f_n, fill=sub_color)
 
-    # [로고 배치] - 텍스트 배치가 끝난 후 가장 위에 덮어씌움
-    if log_file:
-        ls = 100
-        l_img = ImageOps.fit(Image.open(log_file).convert("RGBA"), (ls, ls))
-        mask = Image.new('L', (ls, ls), 0)
-        ImageDraw.Draw(mask).ellipse((0, 0, ls, ls), fill=255)
-        l_img.putalpha(mask)
-        # 위치: 세로모드(우하단), 가로모드(우상단)
-        log_pos = (bx + bw - ls - 25, by + bh - ls - 25) if box_orient == "Vertical" else (bx + bw - ls - 25, by + 25)
-        overlay.paste(l_img, log_pos, l_img)
+    final = Image.alpha_composite(canvas, overlay).convert("RGB")
     with col2:
         st.image(final, use_container_width=True)
         buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
@@ -236,5 +217,3 @@ try:
         if st.session_state['access_token']: st.button("🔓 로그아웃", on_click=logout_and_clear)
 except Exception as e:
     st.error(f"Error: {e}")
-
-
