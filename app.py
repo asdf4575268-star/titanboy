@@ -227,8 +227,85 @@ try:
             log_pos = (bx + bw - ls - 25, by + 25)
             
         overlay.paste(l_img, log_pos, l_img)
+    WEEKLY 모드의 완성도를 높이기 위해 두 가지 핵심 수정을 진행했습니다.
+
+1. 그래프의 압도적인 존재감: 투명도를 높여(불투명하게) 색감을 살리고, 캔버스 상단 좌우를 꽉 채우도록 크기와 여백을 조정했습니다.
+2. 로그박스의 가독성: WEEKLY 가로모드일 때 데이터 사이의 간격이 너무 촘촘하지 않도록 칸을 넓게 띄워 시원한 느낌을 주었습니다.
+
+💻 WEEKLY 집중 최적화 코드
+Python
+# --- [6. 렌더링 엔진 내 WEEKLY 특화 로직] ---
+try:
+    # 폰트 설정 (활동명 90, 날짜 30, 숫자 60)
+    f_t, f_d, f_n, f_l = load_font(sel_font, 90), load_font(sel_font, 30), load_font(sel_font, 60), load_font(sel_font, 20)
+    canvas = Image.new("RGBA", (CW, CH), (0, 0, 0, 255))
+    
+    # 배경 및 콜라주 로직 생략 (기존과 동일)
+    # ... 
+
+    overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
+    
+    # 1. WEEKLY 그래프 최적화 (상단 꽉 채우기)
+    vis_layer = None
+    if mode == "WEEKLY" and weekly_data:
+        # 그래프 생성 시 포인트 컬러 투명도 적용 (vis_alpha 반영)
+        chart_img = create_bar_chart(weekly_data['dists'], m_color)
+        
+        # 상단에 꽉 채우기 위해 너비를 CW(1080) 또는 vis_sz에 맞춤
+        target_w = vis_sz if vis_sz > 800 else 1000 
+        w_p = (target_w / float(chart_img.size[0]))
+        vis_layer = chart_img.resize((target_w, int(chart_img.size[1]*w_p)), Image.Resampling.LANCZOS)
+        
+        # 불투명도 적용 (사용자 설정 vis_alpha가 높을수록 진해짐)
+        alpha_mask = vis_layer.getchannel('A').point(lambda x: x * (vis_alpha / 255))
+        vis_layer.putalpha(alpha_mask)
+        
+        # 상단 중앙 배치
+        overlay.paste(vis_layer, ((CW - vis_layer.width)//2, g_y_off), vis_layer)
+
+    # 2. 로그박스 그리기
+    draw.rectangle([bx, by, bx + bw, by + bh], fill=(0,0,0,box_alpha))
+
+    # 3. 로고 배치 (요청하신 가변 위치)
+    if log_file:
+        ls = 100
+        l_img = ImageOps.fit(Image.open(log_file).convert("RGBA"), (ls, ls))
+        # ... (마스크 처리 생략)
+        log_pos = (bx + bw - ls - 25, by + bh - ls - 25) if box_orient == "Vertical" else (bx + bw - ls - 25, by + 25)
+        overlay.paste(l_img, log_pos, l_img)
+
+    # 4. WEEKLY 전용 로그박스 텍스트 배치 (칸 띄우기 적용)
+    items = [("distance", f"{v_dist} km"), ("time", v_time), ("pace", v_pace), ("avg bpm", f"{v_hr} bpm")]
+    
+    if box_orient == "Vertical":
+        draw.text((bx+40, by+30), v_act, font=f_t, fill=m_color)
+        draw.text((bx+40, by+130), v_date, font=f_d, fill="#AAAAAA")
+        y_c = by + 200
+        for lab, val in items:
+            draw.text((bx+40, y_c), lab.lower(), font=f_l, fill="#AAAAAA")
+            draw.text((bx+40, y_c+25), val.lower() if "bpm" in val or "km" in val else val, font=f_n, fill=sub_color)
+            y_c += 110
+    else:
+        # 가로모드: 데이터 간격을 더 넓게 띄움 (sec_w 계산 수정)
+        draw.text((bx + 40, by + 40), v_act, font=f_t, fill=m_color)
+        draw.text((bx + 40, by + 130), v_date, font=f_d, fill="#AAAAAA")
+        
+        # 아이템 시작 X 좌표를 활동명 아래가 아닌, 박스 전체 너비를 활용해 분산 배치
+        start_x = bx + 40
+        usable_w = bw - 80
+        sec_w = usable_w // 4 # 4개의 칸을 균등하게 분할
+        
+        for i, (lab, val) in enumerate(items):
+            item_x = start_x + (i * sec_w)
+            draw.text((item_x, by + 175), lab.lower(), font=f_l, fill="#AAAAAA")
+            draw.text((item_x, by + 205), val.lower() if "bpm" in val or "km" in val else val, font=f_n, fill=sub_color)
+
+    # 최종 합성
+    final = Image.alpha_composite(canvas, overlay).convert("RGB")
+    # ... (출력 로직)
 except Exception as e:
     st.error(f"Error: {e}")
+
 
 
 
