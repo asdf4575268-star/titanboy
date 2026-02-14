@@ -5,8 +5,8 @@ import io, os, requests, polyline, math
 # --- [1. 기본 설정 및 초기화] ---
 CLIENT_ID = '202274'
 CLIENT_SECRET = '63f6a7007ebe6b405763fc3104e17bb53b468ad0'
-# 실제 배포 주소 (끝에 /가 없어야 함)
-ACTUAL_URL = "https://titanboy-kgcnje3tg3hbfpfsp6uwzc.streamlit.app/"
+# 리다이렉트 시 발생할 수 있는 URL 불일치 방지 (끝 슬래시 제거 버전)
+ACTUAL_URL = "https://titanboy-kgcnje3tg3hbfpfsp6uwzc.streamlit.app"
 
 st.set_page_config(page_title="Garmin Photo Dashboard", layout="wide")
 
@@ -20,8 +20,7 @@ def logout_and_clear():
 if 'access_token' not in st.session_state:
     st.session_state['access_token'] = None
 
-# --- [2. 인증 로직: 주소창 code 처리 최우선 순위] ---
-# st.query_params는 딕셔너리처럼 작동하므로 직접 접근합니다.
+# --- [2. 인증 로직: 주소창 code 처리] ---
 current_params = st.query_params
 if "code" in current_params and st.session_state['access_token'] is None:
     try:
@@ -35,28 +34,27 @@ if "code" in current_params and st.session_state['access_token'] is None:
         
         if res.status_code == 200:
             st.session_state['access_token'] = res.json()['access_token']
-            # 중요: 코드를 사용했으므로 주소창에서 파라미터를 완전히 제거하고 새로고침
             st.query_params.clear()
             st.rerun()
         else:
-            st.error(f"Strava 인증 실패: {res.json().get('message')}. 다시 시도해주세요.")
+            st.error(f"Strava 인증 실패: {res.json().get('message')}")
             if st.button("인증 코드 초기화"):
                 st.query_params.clear()
                 st.rerun()
     except Exception as e:
         st.error(f"연결 오류: {e}")
 
-# 토큰이 없으면 로그인 화면만 출력
+# 토큰 없을 시 로그인 화면
 if st.session_state['access_token'] is None:
     st.title("🏃 Garmin Photo Dashboard")
+    # approval_prompt=force를 통해 좀비 계정 자동 연결 방지
     auth_url = (f"https://www.strava.com/oauth/authorize?client_id={CLIENT_ID}"
                 f"&response_type=code&redirect_uri={ACTUAL_URL}"
                 f"&scope=read,activity:read_all&approval_prompt=force")
     st.link_button("🚀 Strava 연동하기", auth_url, type="primary")
     
-    # 디버깅용 (주소창에 코드가 남았을 때 강제 청소)
     if "code" in current_params:
-        st.warning("주소창에 인증 코드가 남아있습니다. 자동으로 연동되지 않으면 아래 버튼을 눌러주세요.")
+        st.warning("주소창에 인증 코드가 남아있습니다.")
         if st.button("⚠️ 인증 세션 강제 리셋"):
             logout_and_clear()
     st.stop()
@@ -89,7 +87,7 @@ try:
     act_res = requests.get("https://www.strava.com/api/v3/athlete/activities?per_page=30", headers=headers, timeout=15)
     if act_res.status_code == 200: 
         acts = act_res.json()
-    elif act_res.status_code == 401: # 토큰 만료 시
+    elif act_res.status_code == 401:
         st.session_state['access_token'] = None
         st.rerun()
 except: pass
@@ -122,9 +120,9 @@ with col1:
     log_file = st.file_uploader("원형 로고", type=['jpg','jpeg','png'])
     v_act = st.text_input("활동명", v_act)
     v_date = st.text_input("날짜", v_date)
-    v_dist = st.text_input("거리(km)", v_dist) # km 소문자
+    v_dist = st.text_input("거리(km)", v_dist) 
     v_pace = st.text_input("페이스(분/km)", v_pace)
-    v_hr = st.text_input("심박(bpm)", v_hr) # bpm 소문자
+    v_hr = st.text_input("심박(bpm)", v_hr) 
 
 with col3:
     st.header("🎨 DESIGN")
@@ -134,7 +132,7 @@ with col3:
     m_color = COLOR_OPTIONS[st.selectbox("포인트 컬러", list(COLOR_OPTIONS.keys()))]
     sub_color = COLOR_OPTIONS[st.selectbox("서브 컬러", list(COLOR_OPTIONS.keys()), index=1)]
     
-    # [설정] 활동명 90, 날짜 30, 숫자 60
+    # [설정 고정] 활동명 90, 날짜 30, 숫자 60
     t_sz, d_sz, n_sz, l_sz = 90, 30, 60, 20
     
     if mode == "DAILY":
@@ -153,9 +151,11 @@ if bg_files:
         
         if show_box:
             draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0,0,0,box_alpha))
+            # km 및 bpm 소문자 준수
             items = [("distance", f"{v_dist} km"), ("time", t_val), ("pace", v_pace), ("avg bpm", f"{v_hr} bpm")]
             
             if box_orient == "Horizontal":
+                # 1. 지도 (왼쪽)
                 if a and a.get('map', {}).get('summary_polyline'):
                     pts = polyline.decode(a['map']['summary_polyline'])
                     lats, lons = zip(*pts)
@@ -167,36 +167,56 @@ if bg_files:
                     m_draw.line([trans(la, lo) for la, lo in pts], fill=hex_to_rgba(m_color, 255), width=4)
                     overlay.paste(m_layer, (rx + 30, ry + 20), m_layer)
 
+                # 2. 제목 & 날짜 (중앙 정렬)
                 title_w = draw.textlength(v_act, font=f_t)
                 draw.text((rx + (rw // 2) - (title_w // 2), ry + 25), v_act, font=f_t, fill=m_color)
                 date_w = draw.textlength(v_date, font=f_d)
                 draw.text((rx + (rw // 2) - (date_w // 2), ry + 25 + t_sz + 5), v_date, font=f_d, fill="#AAAAAA")
                 
+                # 3. 로고 (오른쪽 상단)
                 if log_file:
                     l_sz_h = 80
                     l_img = ImageOps.fit(Image.open(log_file).convert("RGBA"), (l_sz_h, l_sz_h))
                     mask = Image.new('L', (l_sz_h, l_sz_h), 0); ImageDraw.Draw(mask).ellipse((0, 0, l_sz_h, l_sz_h), fill=255); l_img.putalpha(mask)
                     overlay.paste(l_img, (rx + rw - l_sz_h - 30, ry + 25), l_img)
 
+                # 4. 하단 데이터 4열 배치
                 sec_w = (rw - 80) // 4
                 for i, (lab, val) in enumerate(items):
                     item_x = rx + 40 + (i * sec_w)
                     draw.text((item_x, ry + t_sz + d_sz + 50), lab, font=f_l, fill="#AAAAAA")
                     draw.text((item_x, ry + t_sz + d_sz + 50 + l_sz + 5), val, font=f_n, fill=sub_color)
             else:
-                # 세로 모드 (기존 유지)
+                # 세로 모드
                 draw.text((rx+40, ry+30), v_act, font=f_t, fill=m_color)
                 draw.text((rx+40, ry+30+t_sz+10), v_date, font=f_d, fill=sub_color)
                 y_c = ry + t_sz + d_sz + 90
                 for lab, val in items:
                     draw.text((rx+40, y_c), lab, font=f_l, fill="#AAAAAA")
                     draw.text((rx+40, y_c+l_sz+5), val, font=f_n, fill=sub_color); y_c += (n_sz + l_sz + 35)
+                
+                if a and a.get('map', {}).get('summary_polyline'):
+                    pts = polyline.decode(a['map']['summary_polyline'])
+                    lats, lons = zip(*pts)
+                    m_layer = Image.new("RGBA", (map_size, map_size), (0,0,0,0)); m_draw = ImageDraw.Draw(m_layer)
+                    def trans(la, lo):
+                        tx = 10 + (lo - min(lons)) / (max(lons) - min(lons) + 0.00001) * (map_size - 20)
+                        ty = (map_size - 10) - (la - min(lats)) / (max(lats) - min(lats) + 0.00001) * (map_size - 20)
+                        return tx, ty
+                    m_draw.line([trans(la, lo) for la, lo in pts], fill=hex_to_rgba(m_color, 255), width=4)
+                    overlay.paste(m_layer, (rx + rw - map_size - 20, ry + 20), m_layer)
+
+                if log_file:
+                    l_sz_v = 100
+                    l_img = ImageOps.fit(Image.open(log_file).convert("RGBA"), (l_sz_v, l_sz_v))
+                    mask = Image.new('L', (l_sz_v, l_sz_v), 0); ImageDraw.Draw(mask).ellipse((0, 0, l_sz_v, l_sz_v), fill=255); l_img.putalpha(mask)
+                    overlay.paste(l_img, (rx + rw - l_sz_v - 20, ry + rh - l_sz_v - 20), l_img)
 
         final = Image.alpha_composite(canvas, overlay).convert("RGB")
         with col2:
             st.image(final, use_container_width=True)
             buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
             st.download_button("📸 DOWNLOAD", buf.getvalue(), "result.jpg", use_container_width=True)
+                
     except Exception as e:
         st.error(f"Error: {e}")
-
