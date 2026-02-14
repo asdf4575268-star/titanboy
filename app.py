@@ -108,7 +108,7 @@ with col3:
     t_sz, d_sz, n_sz, l_sz = 70, 20, 45, 20
     
     if mode == "DAILY":
-        if box_orient == "Vertical": d_rx, d_ry, d_rw, d_rh = 70, 1250, 450, 540
+        if box_orient == "Vertical": d_rx, d_ry, d_rw, d_rh = 70, 1250, 450, 600
         else: d_rx, d_ry, d_rw, d_rh = 70, 1580, 940, 280
         rx, ry = st.number_input("X 위치", 0, 1080, d_rx), st.number_input("Y 위치", 0, 1920, d_ry)
         rw, rh = st.number_input("박스 너비", 100, 1080, d_rw), st.number_input("박스 높이", 100, 1920, d_rh)
@@ -174,3 +174,4 @@ if bg_files:
                 
     except Exception as e:
         st.error(f"Error: {e}")
+
