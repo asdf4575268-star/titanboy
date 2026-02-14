@@ -104,10 +104,11 @@ with col3:
     m_color = COLOR_OPTIONS[st.selectbox("포인트 컬러", list(COLOR_OPTIONS.keys()))]
     sub_color = COLOR_OPTIONS[st.selectbox("서브 컬러", list(COLOR_OPTIONS.keys()), index=1)]
     
-    t_sz, d_sz, n_sz, l_sz = 90, 30, 60, 20
+    # 크기 설정 (활동명 90, 날짜 30, 숫자 60)
+    t_sz, d_sz, n_sz, l_sz = 70, 20, 45, 20
     
     if mode == "DAILY":
-        if box_orient == "Vertical": d_rx, d_ry, d_rw, d_rh = 70, 1320, 480, 520
+        if box_orient == "Vertical": d_rx, d_ry, d_rw, d_rh = 70, 1250, 450, 540
         else: d_rx, d_ry, d_rw, d_rh = 70, 1580, 940, 280
         rx, ry = st.number_input("X 위치", 0, 1080, d_rx), st.number_input("Y 위치", 0, 1920, d_ry)
         rw, rh = st.number_input("박스 너비", 100, 1080, d_rw), st.number_input("박스 높이", 100, 1920, d_rh)
@@ -125,19 +126,10 @@ if bg_files:
             if show_box:
                 draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0,0,0,box_alpha))
                 
-                # 1. 활동 제목 쓰기 (위치 파악을 위해 텍스트 길이 측정)
-                title_w = draw.textlength(v_act, font=f_t)
+                # 1. 활동 제목 및 날짜 배치
                 draw.text((rx+40, ry+30), v_act, font=f_t, fill=m_color)
                 
-                # 2. 로고 배치 (제목 바로 옆)
-                if log_file:
-                    logo_size = 70 # 축소된 크기
-                    l_img = ImageOps.fit(Image.open(log_file).convert("RGBA"), (logo_size, logo_size))
-                    mask = Image.new('L', (logo_size, logo_size), 0); ImageDraw.Draw(mask).ellipse((0, 0, logo_size, logo_size), fill=255); l_img.putalpha(mask)
-                    # 제목 끝나는 지점 + 여백 20px
-                    overlay.paste(l_img, (int(rx + 40 + title_w + 20), int(ry + 45)), l_img)
-
-                # 3. 지도 배치 (박스 우측 상단 고정)
+                # 2. 지도 배치 (박스 우측 상단)
                 if acts and 'a' in locals():
                     p_line = a.get('map', {}).get('summary_polyline')
                     if p_line:
@@ -150,7 +142,7 @@ if bg_files:
                         m_draw.line([trans(la, lo) for la, lo in pts], fill=hex_to_rgba(m_color, 255), width=4)
                         overlay.paste(m_layer, (rx + rw - map_size - 20, ry + 20), m_layer)
 
-                # 4. 데이터 배치
+                # 3. 데이터 배치 (km, bpm 소문자 유지)
                 items = [("distance", f"{v_dist} km"), ("time", t_val), ("pace", v_pace), ("avg bpm", f"{v_hr} bpm")]
                 if box_orient == "Vertical":
                     draw.text((rx+40, ry+30+t_sz+10), v_date, font=f_d, fill=sub_color)
@@ -165,6 +157,14 @@ if bg_files:
                         item_x = rx + 40 + (i * sec_w)
                         draw.text((item_x, data_y), lab, font=f_l, fill="#AAAAAA")
                         draw.text((item_x, data_y + l_sz + 5), val, font=f_n, fill=sub_color)
+
+                # 4. 로고 배치 (박스 오른쪽 아래 구석 고정)
+                if log_file:
+                    logo_sz = 80 
+                    l_img = ImageOps.fit(Image.open(log_file).convert("RGBA"), (logo_sz, logo_sz))
+                    mask = Image.new('L', (logo_sz, logo_sz), 0); ImageDraw.Draw(mask).ellipse((0, 0, logo_sz, logo_sz), fill=255); l_img.putalpha(mask)
+                    # 박스 끝에서 20px 안쪽으로 배치
+                    overlay.paste(l_img, (rx + rw - logo_sz - 20, ry + rh - logo_sz - 20), l_img)
             
             final = Image.alpha_composite(canvas, overlay).convert("RGB")
             with col2:
