@@ -133,7 +133,7 @@ with col3:
 # --- [5. 렌더링 엔진] ---
 # 사진이 없어도 캔버스를 생성하도록 설정
 try:
-    f_t, f_d, f_n, f_l = load_font(sel_font, 90), load_font(sel_font, 30), load_font(sel_font, 60), load_font(sel_font, 20)
+    f_t, f_d, f_n, f_l = load_font(sel_font, 70), load_font(sel_font, 20), load_font(sel_font, 45), load_font(sel_font, 23)
     
     # 배경 생성: 사진이 있으면 사진으로, 없으면 검은색 배경으로 시작
     if bg_files:
@@ -198,4 +198,5 @@ except Exception as e:
     st.info("데이터를 불러오거나 사진을 업로드하면 대시보드가 생성됩니다.")
     # 개발용 에러 확인이 필요하면 아래 주석 해제
     # st.error(f"Error: {e}")
+
 
