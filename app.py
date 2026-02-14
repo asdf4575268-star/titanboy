@@ -2,15 +2,14 @@ import streamlit as st
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 import io, os, requests, polyline, math
 
-# --- [1. 기본 설정] ---
+# --- [1. 기본 설정 및 초기화 로직] ---
 CLIENT_ID = '202274'
 CLIENT_SECRET = 'cf2ab22bb9995254e6ea68ac3c942572f7114c9a'
 ACTUAL_URL = "https://titanboy-5fxenvcchdubwx3swjh8ut.streamlit.app"
 
 st.set_page_config(page_title="Garmin Photo Dashboard", layout="wide")
 
-# 세션 및 캐시 초기화 함수
-def logout():
+def logout_and_clear():
     st.cache_data.clear()
     st.cache_resource.clear()
     st.session_state.clear()
@@ -20,7 +19,7 @@ def logout():
 if 'access_token' not in st.session_state:
     st.session_state['access_token'] = None
 
-# --- [2. 인증 로직 - 강제성 부여] ---
+# --- [2. 인증 로직] ---
 query_params = st.query_params
 if "code" in query_params and st.session_state['access_token'] is None:
     try:
@@ -29,26 +28,21 @@ if "code" in query_params and st.session_state['access_token'] is None:
             "code": query_params["code"], "grant_type": "authorization_code"
         }, timeout=15)
         if res.status_code == 200:
-            data = res.json()
-            st.session_state['access_token'] = data['access_token']
-            # 현재 획득한 권한(scope) 저장
-            st.session_state['scope'] = data.get('scope', '')
+            st.session_state['access_token'] = res.json()['access_token']
             st.query_params.clear()
             st.rerun()
     except:
-        st.error("연결 중 오류가 발생했습니다.")
+        pass
 
 if st.session_state['access_token'] is None:
     st.title("🏃 Garmin Photo Dashboard")
-    # 필수 권한: read, activity:read_all
     auth_url = (f"https://www.strava.com/oauth/authorize?client_id={CLIENT_ID}"
                 f"&response_type=code&redirect_uri={ACTUAL_URL}"
                 f"&scope=read,activity:read_all&approval_prompt=force")
-    st.warning("기록이 보이지 않는다면 아래 버튼을 눌러 권한을 다시 승인해 주세요.")
-    st.link_button("🚀 Strava 다시 연동하기", auth_url)
+    st.link_button("🚀 Strava 연동하기", auth_url)
     st.stop()
 
-# --- [3. 유틸리티 및 데이터 로드] ---
+# --- [3. 유틸리티 함수] ---
 @st.cache_resource
 def load_font(font_type, size):
     fonts = {
@@ -64,27 +58,32 @@ def load_font(font_type, size):
         r = requests.get(f_url); open(f_path, "wb").write(r.content)
     return ImageFont.truetype(f_path, int(size))
 
+def hex_to_rgba(hex_color, alpha):
+    hex_color = hex_color.lstrip('#')
+    rgb = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+    return rgb + (alpha,)
+
+# --- [4. 데이터 로드] ---
 acts = []
 headers = {'Authorization': f"Bearer {st.session_state['access_token']}"}
 try:
     act_res = requests.get("https://www.strava.com/api/v3/athlete/activities?per_page=30", headers=headers, timeout=15)
-    if act_res.status_code == 200:
-        acts = act_res.json()
-    elif act_res.status_code == 401:
-        logout()
-except:
-    pass
+    if act_res.status_code == 200: acts = act_res.json()
+    elif act_res.status_code == 401: logout_and_clear()
+except: pass
 
-# --- [4. UI 레이아웃] ---
-col1, col2, col3 = st.columns([1.2, 2, 1], gap="medium") # 사진 확인을 위해 col2를 넓게 유지
+# --- [5. UI 레이아웃] ---
+col1, col2, col3 = st.columns([1.2, 2, 1], gap="medium")
 COLOR_OPTIONS = {"Garmin Yellow": "#FFD700", "Pure White": "#FFFFFF", "Neon Orange": "#FF4500", "Electric Blue": "#00BFFF", "Soft Grey": "#AAAAAA"}
 
 with col2:
-    mode = st.radio("모드", ["DAILY", "WEEKLY"], horizontal=True)
-    if not acts:
-        st.info("기록을 불러오는 중입니다... 잠시만 기다려주세요.")
-        if st.button("🔄 기록 새로고침"): st.rerun()
-
+    # 모드 선택과 로그아웃 버튼을 한 줄에 배치
+    m_col, l_col = st.columns([3, 1])
+    with m_col:
+        mode = st.radio("모드", ["DAILY", "WEEKLY"], horizontal=True, label_visibility="collapsed")
+    with l_col:
+        st.button("🔓 로그아웃/초기화", on_click=logout_and_clear, use_container_width=True)
+    
     if mode == "DAILY" and acts:
         act_options = [f"{a['start_date_local'][:10]} - {a['name']}" for a in acts]
         sel_str = st.selectbox("활동 선택", act_options)
@@ -94,6 +93,13 @@ with col2:
         p_val = f"{int((m_sec/d_km)//60)}'{int((m_sec/d_km)%60):02d}\"" if d_km > 0 else "0'00\""
         h_val = str(int(a.get('average_heartrate', 0))) if a.get('average_heartrate') else "0"
         t_val = f"{m_sec//3600:02d}:{(m_sec%3600)//60:02d}:{m_sec%60:02d}" if m_sec >= 3600 else f"{m_sec//60:02d}:{m_sec%60:02d}"
+    elif mode == "WEEKLY" and acts:
+        w_acts = acts[:7]
+        t_dist = sum([x.get('distance', 0) for x in w_acts]) / 1000
+        t_time = sum([x.get('moving_time', 0) for x in w_acts])
+        avg_p_val = f"{int((t_time/t_dist)//60)}'{int((t_time/t_dist)%60):02d}\"" if t_dist > 0 else "0'00\""
+        t_hrs = [x.get('average_heartrate', 0) for x in w_acts if x.get('average_heartrate')]
+        avg_hr = int(sum(t_hrs)/len(t_hrs)) if t_hrs else 0
 
 with col1:
     st.header("📸 DATA")
@@ -106,12 +112,6 @@ with col1:
         v_pace = st.text_input("페이스(분/km)", p_val)
         v_hr = st.text_input("심박(bpm)", h_val)
     elif mode == "WEEKLY" and acts:
-        w_acts = acts[:7]
-        t_dist = sum([x.get('distance', 0) for x in w_acts]) / 1000
-        t_time = sum([x.get('moving_time', 0) for x in w_acts])
-        avg_p_val = f"{int((t_time/t_dist)//60)}'{int((t_time/t_dist)%60):02d}\"" if t_dist > 0 else "0'00\""
-        t_hrs = [x.get('average_heartrate', 0) for x in w_acts if x.get('average_heartrate')]
-        avg_hr = int(sum(t_hrs)/len(t_hrs)) if t_hrs else 0
         v_act_w = st.text_input("제목", "WEEKLY RECAP")
         v_dist_w = st.text_input("총 거리(km)", f"{t_dist:.2f}")
         v_pace_w = st.text_input("평균 페이스", avg_p_val)
@@ -123,18 +123,16 @@ with col3:
     sel_font = st.selectbox("폰트", ["BlackHanSans", "Jua", "DoHyeon", "NanumBrush", "Sunflower"])
     m_color = COLOR_OPTIONS[st.selectbox("포인트 컬러", list(COLOR_OPTIONS.keys()))]
     sub_color = COLOR_OPTIONS[st.selectbox("서브 컬러", list(COLOR_OPTIONS.keys()), index=1)]
-    # 사용자 요청 고정 크기
-    t_sz = st.number_input("활동명(90)", value=90)
-    d_sz = st.number_input("날짜(30)", value=30)
-    n_sz = st.number_input("숫자(60)", value=60)
+    t_sz = st.number_input("활동명 크기", value=90)
+    d_sz = st.number_input("날짜 크기", value=30)
+    n_sz = st.number_input("숫자 크기", value=60)
     l_sz = st.slider("라벨 크기", 5, 80, 20)
-    
     if mode == "DAILY":
         rx, ry = st.slider("X", 0, 1080, 70), st.slider("Y", 0, 1920, 1150)
         box_alpha = st.slider("박스 투명도", 0, 255, 110)
         map_size, map_alpha = st.slider("지도 크기", 50, 400, 150), st.slider("지도 투명도", 0, 255, 255)
 
-# --- [5. 렌더링 및 다운로드] ---
+# --- [6. 렌더링 및 다운로드] ---
 if bg_files:
     try:
         f_t, f_d, f_n, f_l = load_font(sel_font, t_sz), load_font(sel_font, d_sz), load_font(sel_font, n_sz), load_font(sel_font, l_sz)
@@ -154,7 +152,6 @@ if bg_files:
                         return tx, ty
                     m_draw.line([trans(la, lo) for la, lo in pts], fill=hex_to_rgba(m_color, map_alpha), width=4)
                     overlay.paste(m_layer, (rx + 650 - map_size - 20, ry + 20), m_layer)
-                
                 items = [("distance", f"{v_dist} km"), ("time", t_val), ("pace", v_pace), ("avg bpm", f"{v_hr} bpm")]
                 draw.text((rx+40, ry+30), v_act, font=f_t, fill=m_color)
                 draw.text((rx+40, ry+30+t_sz+5), v_date, font=f_d, fill=sub_color)
@@ -183,7 +180,6 @@ if bg_files:
             final = canvas.convert("RGB")
 
         if log_file:
-            # 원형 로고 생성 및 우측 상단 배치
             l_img = Image.open(log_file).convert("RGBA")
             l_img = ImageOps.fit(l_img, (130, 130))
             mask = Image.new('L', (130, 130), 0); ImageDraw.Draw(mask).ellipse((0, 0, 130, 130), fill=255)
@@ -195,8 +191,4 @@ if bg_files:
             buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
             st.download_button("📸 DOWNLOAD", buf.getvalue(), "result.jpg", use_container_width=True)
     except:
-        st.error("이미지 생성 중 오류가 발생했습니다.")
-
-st.sidebar.button("🔓 로그아웃 및 초기화", on_click=logout)
-if st.session_state.get('scope'):
-    st.sidebar.caption(f"현재 권한: {st.session_state['scope']}")
+        st.error("이미지 생성 중 오류 발생")
