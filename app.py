@@ -2,16 +2,12 @@ import streamlit as st
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 import io, os, requests, polyline, math
 
-# --- [1. 기본 설정 및 경로 확보] ---
+# --- [1. 기본 설정] ---
 CLIENT_ID = '202274'
 CLIENT_SECRET = 'cf2ab22bb9995254e6ea68ac3c942572f7114c9a'
 ACTUAL_URL = "https://titanboy-5fxenvcchdubwx3swjh8ut.streamlit.app"
 
 st.set_page_config(page_title="Garmin Photo Dashboard", layout="wide")
-
-# 폰트 저장 폴더 생성
-if not os.path.exists("fonts"):
-    os.makedirs("fonts")
 
 def logout_and_clear():
     st.cache_data.clear()
@@ -44,34 +40,30 @@ if st.session_state['access_token'] is None:
     st.link_button("🚀 Strava 연동하기", auth_url)
     st.stop()
 
-# --- [3. 유틸리티 함수 - 폰트 철통 방어 로드] ---
+# --- [3. 유틸리티 함수 - 메모리 직접 로드 방식] ---
 @st.cache_resource
 def load_font(font_type, size):
-    # 구글 폰트 및 공신력 있는 저장소 주소
+    # 구글 폰트 공식 저장소 주소 (가장 안정적)
     font_urls = {
         "GmarketSans": "https://github.com/hyeonseok-dev/fonts/raw/main/GmarketSansBold.ttf",
-        "Pretendard": "https://github.com/orioncactus/pretendard/raw/v1.3.8/dist/public/static/Pretendard-Bold.ttf",
+        "Pretendard": "https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.8/dist/public/static/Pretendard-Bold.ttf",
         "Bazzi": "https://fonts.gstatic.com/s/bazzi/v1/rax_Hi1k7QO8wH_j.ttf",
         "KOTRA_BOLD": "https://github.com/dhun-dg/fonts/raw/main/KOTRA_BOLD.ttf",
-        "KyoboHandwriting": "https://fonts.gstatic.com/s/kyobohandwriting2019/v8/rax_Hi1k7QO8wH_j.ttf", # 예비 주소
+        "KyoboHandwriting": "https://fonts.gstatic.com/s/kyobohandwriting2019/v8/rax_Hi1k7QO8wH_j.ttf",
         "BlackHanSans": "https://fonts.gstatic.com/s/blackhansans/v17/ea8AadVp8QvS3_U7vO_98S764_vS.ttf",
         "Jua": "https://fonts.gstatic.com/s/jua/v16/U9MD6p7LIDR_7_O6.ttf"
     }
     
-    f_path = f"fonts/{font_type}.ttf"
+    url = font_urls.get(font_type, font_urls["GmarketSans"])
     
-    # 1단계: 로컬 파일 확인 및 다운로드
-    if not os.path.exists(f_path) or os.path.getsize(f_path) < 1000:
-        try:
-            r = requests.get(font_urls.get(font_type, font_urls["GmarketSans"]), timeout=10)
-            if r.status_code == 200:
-                with open(f_path, "wb") as f: f.write(r.content)
-            else: return ImageFont.load_default()
-        except: return ImageFont.load_default()
-
-    # 2단계: 폰트 적용 (에러 방지)
     try:
-        return ImageFont.truetype(f_path, int(size))
+        # 파일을 저장하지 않고 즉시 메모리로 다운로드
+        response = requests.get(url, timeout=10)
+        if response.status_code == 200:
+            font_data = io.BytesIO(response.content)
+            return ImageFont.truetype(font_data, int(size))
+        else:
+            return ImageFont.load_default()
     except Exception:
         return ImageFont.load_default()
 
@@ -129,7 +121,7 @@ with col3:
     m_color = COLOR_OPTIONS[st.selectbox("포인트 컬러", list(COLOR_OPTIONS.keys()))]
     sub_color = COLOR_OPTIONS[st.selectbox("서브 컬러", list(COLOR_OPTIONS.keys()), index=1)]
     
-    t_sz, d_sz, n_sz, l_sz = 70, 20, 40, 20 # 고정 크기 적용
+    t_sz, d_sz, n_sz, l_sz = 70, 20, 40, 20 # 고정 크기
     
     if mode == "DAILY":
         st.divider()
@@ -167,8 +159,7 @@ if bg_files:
                     draw.text((rx+40, y_c), lab, font=f_l, fill="#AAAAAA")
                     draw.text((rx+40, y_c+l_sz+2), val, font=f_n, fill=sub_color); y_c += (n_sz + l_sz + 25)
             final = Image.alpha_composite(canvas, overlay).convert("RGB")
-        # WEEKLY recap 부분은 이전과 동일 (생략 없이 유지)
-        else:
+        else: # WEEKLY
             canvas = Image.new("RGBA", (1080, 1080), (0,0,0,255)); n = len(bg_files)
             cols, rows = math.ceil(math.sqrt(n)), math.ceil(n / math.ceil(math.sqrt(n)))
             bh = 880 if show_box else 1080
