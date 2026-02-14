@@ -12,7 +12,7 @@ st.set_page_config(page_title="Garmin Photo Dashboard", layout="wide")
 if 'access_token' not in st.session_state:
     st.session_state['access_token'] = None
 
-# --- [2. 스포츠 폰트 5종 로드] ---
+# --- [2. 스포츠 폰트 5종] ---
 @st.cache_resource
 def load_font(font_type, size):
     fonts = {
@@ -57,7 +57,7 @@ if not st.session_state['access_token']:
     st.link_button("🚀 Strava 연동하기", auth_url)
     st.stop()
 
-# --- [4. 데이터 로드 및 3분할] ---
+# --- [4. 데이터 로드 및 레이아웃] ---
 headers = {'Authorization': f"Bearer {st.session_state['access_token']}"}
 act_res = requests.get("https://www.strava.com/api/v3/athlete/activities?per_page=30", headers=headers)
 
@@ -73,47 +73,56 @@ if act_res.status_code == 200:
             d_km, m_sec = a.get('distance', 0)/1000, a.get('moving_time', 0)
             p_val = f"{int((m_sec/d_km)//60)}:{int((m_sec/d_km)%60):02d}" if d_km > 0 else "0:00"
             h_val = str(int(a.get('average_heartrate', 0))) if a.get('average_heartrate') else "0"
+            t_val = f"{m_sec//3600:02d}:{(m_sec%3600)//60:02d}:{m_sec%60:02d}" if m_sec >= 3600 else f"{m_sec//60:02d}:{m_sec%60:02d}"
         else:
-            # WEEKLY 데이터 합산 (최근 7일)
             w_acts = acts[:7]
-            total_dist = sum([x.get('distance', 0) for x in w_acts]) / 1000
-            total_time = sum([x.get('moving_time', 0) for x in w_acts])
-            w_hr = [x.get('average_heartrate', 0) for x in w_acts if x.get('average_heartrate')]
-            avg_hr = int(sum(w_hr)/len(w_hr)) if w_hr else 0
-            p_val = f"{int((total_time/total_dist)//60)}:{int((total_time/total_dist)%60):02d}" if total_dist > 0 else "0:00"
+            t_dist = sum([x.get('distance', 0) for x in w_acts]) / 1000
+            t_time = sum([x.get('moving_time', 0) for x in w_acts])
+            w_hrs = [x.get('average_heartrate', 0) for x in w_acts if x.get('average_heartrate')]
+            avg_h = int(sum(w_hrs)/len(w_hrs)) if w_hrs else 0
+            p_val = f"{int((t_time/t_dist)//60)}:{int((t_time/t_dist)%60):02d}" if t_dist > 0 else "0:00"
+            t_val = f"{int(t_time//3600)}h {int((t_time%3600)//60)}m"
 
     with col1:
         st.header("📸 DATA")
-        bg_files = st.file_uploader("사진 선택", type=['jpg','jpeg','png'], accept_multiple_files=True)
+        bg_files = st.file_uploader("사진 업로드", type=['jpg','jpeg','png'], accept_multiple_files=True)
         log_file = st.file_uploader("로고 업로드", type=['jpg','jpeg','png'])
         st.markdown("---")
         if mode == "DAILY":
-            v_act, v_date = st.text_input("활동명", a['name']), st.text_input("날짜", a['start_date_local'][:10])
-            v_dist, v_pace, v_hr = st.text_input("거리(km)", f"{d_km:.2f}"), st.text_input("페이스(/km)", p_val), st.text_input("심박(bpm)", h_val)
+            v_act = st.text_input("활동명", a['name'])
+            v_date = st.text_input("날짜", a['start_date_local'][:10])
+            v_dist = st.text_input("거리(km)", f"{d_km:.2f}")
+            v_pace = st.text_input("페이스(/km)", p_val)
+            v_hr = st.text_input("심박(bpm)", h_val)
         else:
-            v_act, v_date = st.text_input("제목", "WEEKLY RECAP"), st.text_input("날짜", f"{acts[6]['start_date_local'][:10]} ~ {acts[0]['start_date_local'][:10]}")
-            v_dist, v_pace, v_hr = st.text_input("총 거리(km)", f"{total_dist:.2f}"), st.text_input("평균 페이스", p_val), st.text_input("평균 심박", str(avg_hr))
+            v_act = st.text_input("제목", "WEEKLY RECAP")
+            v_date = st.text_input("기간", f"{acts[6]['start_date_local'][:10]} ~ {acts[0]['start_date_local'][:10]}")
+            v_dist = st.text_input("총 거리(km)", f"{t_dist:.2f}")
+            v_pace = st.text_input("평균 페이스", p_val)
+            v_hr = st.text_input("평균 심박", str(avg_h))
 
     with col3:
         st.header("🎨 DESIGN")
-        sel_font = st.selectbox("스포츠 폰트", ["BlackHanSans", "Jua", "DoHyeon", "NanumBrush", "Sunflower"])
-        theme_color = st.radio("테마 색상", ["Yellow (#FFD700)", "Black (#000000)"], horizontal=True)
-        m_color = "#FFD700" if "Yellow" in theme_color else "#000000"
+        sel_font = st.selectbox("폰트 선택", ["BlackHanSans", "Jua", "DoHyeon", "NanumBrush", "Sunflower"])
+        t_color_sel = st.radio("테마 색상", ["Yellow (#FFD700)", "Black (#000000)"], horizontal=True)
+        m_color = "#FFD700" if "Yellow" in t_color_sel else "#000000"
         
-        # 폰트 수치 고정 (70, 20, 40, 20)
-        t_sz, d_sz, n_sz, l_sz = 70, 20, 40, 20
-        st.caption(f"고정: 활동명{t_sz}, 날짜{d_sz}, 숫자{n_sz}, 라벨{l_sz}")
+        st.subheader("📏 폰트 크기")
+        t_sz = st.slider("활동명", 10, 200, 70)
+        d_sz = st.slider("날짜", 5, 100, 20)
+        n_sz = st.slider("숫자", 10, 200, 40)
+        l_sz = st.slider("라벨", 5, 80, 20)
         
         st.markdown("---")
-        box_mode = st.radio("로그박스 정렬", ["Vertical", "Horizontal"])
-        rx = st.slider("박스 X", 0, 1080, 70)
-        ry = st.slider("박스 Y", 0, 1920, 1150)
-        rw_adj = st.slider("박스 너비 조절", 300, 1000, 500)
-        rh_adj = st.slider("박스 높이 조절", 200, 1000, 450)
+        box_mode = st.radio("박스 정렬", ["Vertical", "Horizontal"])
+        rx = st.slider("X 위치", 0, 1080, 70)
+        ry = st.slider("Y 위치", 0, 1920, 1150)
+        rw = st.slider("박스 너비", 200, 1000, 500)
+        rh = st.slider("박스 높이", 100, 1000, 450)
         box_alpha = st.slider("박스 투명도", 0, 255, 120)
-        map_alpha = st.slider("지도 투명도", 0, 255, 150)
+        map_alpha = st.slider("지도 투명도", 0, 255, 180)
 
-    # --- [5. 이미지 생성 엔진] ---
+    # --- [5. 이미지 렌더링] ---
     if bg_files:
         if mode == "DAILY":
             img = ImageOps.exif_transpose(Image.open(bg_files[0]))
@@ -122,55 +131,53 @@ if act_res.status_code == 200:
             canvas = Image.new("RGBA", (1080, 1920), (0,0,0,255))
             n = len(bg_files)
             rows = math.ceil(n / 2) if n > 1 else 1
-            h_pic = 1920 // rows
+            h_p = 1920 // rows
             for i, f in enumerate(bg_files):
-                w_pic = 1080 // (2 if n > 1 else 1)
-                p_img = ImageOps.fit(Image.open(f).convert("RGBA"), (w_pic, h_pic))
-                canvas.paste(p_img, ((i % 2) * w_pic if n > 1 else 0, (i // 2) * h_pic))
+                w_p = 1080 // (2 if n > 1 else 1)
+                p_i = ImageOps.fit(Image.open(f).convert("RGBA"), (w_p, h_p))
+                canvas.paste(p_i, ((i % 2) * w_p if n > 1 else 0, (i // 2) * h_p))
 
         overlay = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
         draw = ImageDraw.Draw(overlay)
         f_t, f_d, f_n, f_l = load_font(sel_font, t_sz), load_font(sel_font, d_sz), load_font(sel_font, n_sz), load_font(sel_font, l_sz)
 
-        # 1. 로그박스 그리기
-        draw.rectangle([rx, ry, rx+rw_adj, ry+rh_adj], fill=(0, 0, 0, box_alpha))
+        # 박스 그리기
+        draw.rectangle([rx, ry, rx+rw, ry+rh], fill=(0, 0, 0, box_alpha))
 
-        # 2. 지도 배경 오버레이 (박스 안으로)
-        current_polyline = a['map']['summary_polyline'] if mode == "DAILY" and 'map' in a and a['map'].get('summary_polyline') else None
-        if current_polyline:
-            pts = polyline.decode(current_polyline)
+        # 지도 오버레이 (박스 안 배경)
+        p_line = a['map']['summary_polyline'] if mode == "DAILY" and 'map' in a and a['map'].get('summary_polyline') else None
+        if p_line:
+            pts = polyline.decode(p_line)
             if pts:
                 lats, lons = zip(*pts)
                 mi_la, ma_la, mi_lo, ma_lo = min(lats), max(lats), min(lons), max(lons)
-                map_layer = Image.new("RGBA", (rw_adj, rh_adj), (0,0,0,0))
+                map_layer = Image.new("RGBA", (rw, rh), (0,0,0,0))
                 m_draw = ImageDraw.Draw(map_layer)
-                def t_map(la, lo):
-                    x = 20 + (lo - mi_lo) / (ma_lo - mi_lo + 0.00001) * (rw_adj - 40)
-                    y = (rh_adj - 20) - (la - mi_la) / (ma_la - mi_la + 0.00001) * (rh_adj - 40)
-                    return x, y
-                t_pts = [t_map(la, lo) for la, lo in pts]
-                m_draw.line(t_pts, fill=m_color + f"{map_alpha:02x}"[2:], width=6)
+                def transform(la, lo):
+                    tx = 30 + (lo - mi_lo) / (ma_lo - mi_lo + 0.00001) * (rw - 60)
+                    ty = (rh - 30) - (la - mi_la) / (ma_la - mi_la + 0.00001) * (rh - 60)
+                    return tx, ty
+                m_pts = [transform(la, lo) for la, lo in pts]
+                m_draw.line(m_pts, fill=m_color + f"{map_alpha:02x}"[2:], width=7)
                 overlay.paste(map_layer, (rx, ry), map_layer)
 
-        # 3. 텍스트 그리기
-        items = [("DISTANCE", f"{v_dist} km"), ("AVG PACE", f"{v_pace} /km"), ("AVG HR", f"{v_hr} bpm")]
+        # 텍스트 배치
+        items = [("DISTANCE", f"{v_dist} km"), ("TIME", t_val), ("AVG PACE", f"{v_pace} /km"), ("AVG HR", f"{v_hr} bpm")]
         if box_mode == "Vertical":
-            # 세로모드: 가장자리 왼쪽 정렬
-            draw.text((rx+30, ry+30), v_act, font=f_t, fill=m_color)
-            draw.text((rx+30, ry+30+t_sz+5), v_date, font=f_d, fill="#FFFFFF")
-            y_cur = ry + t_sz + d_sz + 60
+            draw.text((rx+35, ry+30), v_act, font=f_t, fill=m_color)
+            draw.text((rx+35, ry+30+t_sz+5), v_date, font=f_d, fill="#FFFFFF")
+            y_c = ry + t_sz + d_sz + 70
             for lab, val in items:
-                draw.text((rx+30, y_cur), lab, font=f_l, fill="#AAAAAA")
-                draw.text((rx+30, y_cur+l_sz+2), val, font=f_n, fill="#FFFFFF")
-                y_cur += (n_sz + l_sz + 35)
+                draw.text((rx+35, y_c), lab, font=f_l, fill="#AAAAAA")
+                draw.text((rx+35, y_c+l_sz+2), val, font=f_n, fill="#FFFFFF")
+                y_c += (n_sz + l_sz + 30)
         else:
-            # 가로모드: 가운데 정렬
-            draw.text((rx+rw_adj//2, ry+40), v_act, font=f_t, fill=m_color, anchor="ms")
-            draw.text((rx+rw_adj//2, ry+40+t_sz), v_date, font=f_d, fill="#FFFFFF", anchor="ms")
-            x_step = rw_adj // (len(items) + 1)
+            draw.text((rx+rw//2, ry+40), v_act, font=f_t, fill=m_color, anchor="ms")
+            draw.text((rx+rw//2, ry+40+t_sz), v_date, font=f_d, fill="#FFFFFF", anchor="ms")
+            x_s = rw // (len(items) + 1)
             for i, (lab, val) in enumerate(items):
-                draw.text((rx + x_step*(i+1), ry+rh_adj-100), lab, font=f_l, fill="#AAAAAA", anchor="ms")
-                draw.text((rx + x_step*(i+1), ry+rh_adj-50), val, font=f_n, fill="#FFFFFF", anchor="ms")
+                draw.text((rx + x_s*(i+1), ry+rh-90), lab, font=f_l, fill="#AAAAAA", anchor="ms")
+                draw.text((rx + x_s*(i+1), ry+rh-40), val, font=f_n, fill="#FFFFFF", anchor="ms")
 
         if log_file:
             logo = get_circle_logo(log_file)
@@ -180,4 +187,4 @@ if act_res.status_code == 200:
         with col2:
             st.image(final, use_container_width=True)
             buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
-            st.download_button("📸 DOWNLOAD", buf.getvalue(), "garmin_result.jpg", use_container_width=True)
+            st.download_button("📸 DOWNLOAD", buf.getvalue(), "garmin.jpg", use_container_width=True)
