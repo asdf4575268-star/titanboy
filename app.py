@@ -237,12 +237,30 @@ with col3:
 
 # --- [6. 렌더링 엔진] ---
 if bg_files:
-    try:
-        f_t, f_d, f_n, f_l = load_font(sel_font, t_sz), load_font(sel_font, d_sz), load_font(sel_font, n_sz), load_font(sel_font, l_sz)
-        
-        # [수정] 캔버스 크기 1:1 (1080 x 1080)
-        CW, CH = 1080, 1080
-        canvas = Image.new("RGBA", (CW, CH), (0,0,0,255))
+    # 사진이 있을 때만 콜라주 로직 실행
+    num_pics = len(bg_files)
+    if mode == "DAILY" or num_pics == 1:
+        img = ImageOps.exif_transpose(Image.open(bg_files[0]))
+        canvas = ImageOps.fit(img.convert("RGBA"), (CW, CH))
+    else:
+        # 콜라주 로직 (기존과 동일)
+        if num_pics <= 3: cols, rows = 1, num_pics
+        elif num_pics == 4: cols, rows = 2, 2
+        else: cols, rows = 2, math.ceil(num_pics / 2)
+        w_unit, h_unit = CW // cols, CH // rows
+        for i, f in enumerate(bg_files):
+            img = ImageOps.exif_transpose(Image.open(f))
+            if i == num_pics - 1 and num_pics % 2 == 1 and cols == 2:
+                img = ImageOps.fit(img.convert("RGBA"), (CW, h_unit), centering=(0.5, 0.5))
+                canvas.paste(img, (0, (i // cols) * h_unit))
+            else:
+                img = ImageOps.fit(img.convert("RGBA"), (w_unit, h_unit), centering=(0.5, 0.5))
+                canvas.paste(img, ((i % cols) * w_unit, (i // cols) * h_unit))
+else:
+    # 사진이 없을 때: 안내 문구 혹은 빈 캔버스 유지
+    draw_bg = ImageDraw.Draw(canvas)
+    # 필요하다면 여기에 배경 패턴이나 그라데이션을 넣을 수 있습니다.
+    pass
         
         # 콜라주 로직 (Zero Gap)
         num_pics = len(bg_files)
@@ -334,3 +352,4 @@ if bg_files:
                 
     except Exception as e:
         st.error(f"Error: {e}")
+
