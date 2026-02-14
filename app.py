@@ -65,7 +65,8 @@ if st.session_state['access_token']:
 
 # --- [5. UI 레이아웃] ---
 col1, col2, col3 = st.columns([1.2, 2, 1], gap="medium")
-COLOR_OPTIONS = {"Garmin Yellow": "#FFD700", "Pure White": "#FFFFFF", "Neon Orange": "#FF4500", "Electric Blue": "#00BFFF", "Soft Grey": "#AAAAAA"}
+# 2. 검정색 폰트 설정 추가
+COLOR_OPTIONS = {"Garmin Yellow": "#FFD700", "Pure White": "#FFFFFF", "Pure Black": "#000000", "Neon Orange": "#FF4500", "Electric Blue": "#00BFFF", "Soft Grey": "#AAAAAA"}
 
 with col2:
     m_col, l_col = st.columns([3, 1])
@@ -117,17 +118,16 @@ with col3:
     m_color = COLOR_OPTIONS[st.selectbox("포인트 컬러", list(COLOR_OPTIONS.keys()))]
     sub_color = COLOR_OPTIONS[st.selectbox("서브 컬러", list(COLOR_OPTIONS.keys()), index=1)]
     
-    # [활동명 90, 날짜 30, 숫자 60 고정]
+    # 지시하신 폰트 크기 고정 적용
     t_sz, d_sz, n_sz, l_sz = 70, 20, 45, 22
     
-    # 인스타 캔버스 크기 결정
     CW, CH = (1080, 1080) if insta_mode == "1:1 (Square)" else (1080, 1350)
     
-    d_rx, d_ry = (70, CH - 330) if box_orient == "Horizontal" else (70, CH - 670)
+    d_rx, d_ry = (70, CH - 360) if box_orient == "Horizontal" else (70, CH - 720)
     rx = st.number_input("X 위치", 0, CW, d_rx)
     ry = st.number_input("Y 위치", 0, CH, d_ry)
     rw = st.number_input("박스 너비", 100, CW, 940 if box_orient == "Horizontal" else 480)
-    rh = st.number_input("박스 높이", 100, CH, 260 if box_orient == "Horizontal" else 600)
+    rh = st.number_input("박스 높이", 100, CH, 300 if box_orient == "Horizontal" else 650)
     box_alpha = st.slider("박스 투명도", 0, 255, 110)
     map_size = st.slider("지도 크기", 50, CW//2, 100)
 
@@ -136,34 +136,31 @@ if bg_files:
     try:
         f_t, f_d, f_n, f_l = load_font(sel_font, t_sz), load_font(sel_font, d_sz), load_font(sel_font, n_sz), load_font(sel_font, l_sz)
         
-        # 1. 캔버스 생성 (여백 없이 꽉 차게)
+        # 1. 캔버스 생성 및 위클리 여백 없는 사이즈 자동 조정
         canvas = Image.new("RGBA", (CW, CH), (0,0,0,255))
+        num_pics = len(bg_files)
         
-        if mode == "DAILY":
+        if mode == "DAILY" or num_pics == 1:
             img = ImageOps.exif_transpose(Image.open(bg_files[0]))
             img = ImageOps.fit(img.convert("RGBA"), (CW, CH))
             canvas.paste(img, (0,0))
         else:
-            # WEEKLY 콜라주 (여백 없이 자동 분할)
-            num_pics = len(bg_files)
-            if num_pics == 1:
-                img = ImageOps.fit(ImageOps.exif_transpose(Image.open(bg_files[0])), (CW, CH))
-                canvas.paste(img, (0,0))
-            else:
-                cols = 2 if num_pics > 1 else 1
-                rows = math.ceil(num_pics / cols)
-                w_unit, h_unit = CW // cols, CH // rows
-                for i, f in enumerate(bg_files):
-                    img = ImageOps.fit(ImageOps.exif_transpose(Image.open(f)), (w_unit, h_unit))
-                    canvas.paste(img, ((i % cols) * w_unit, (i // cols) * h_unit))
+            # 위클리 콜라주: 인스타 규격(CW, CH) 내에서 여백 없이 분할
+            cols = 2 if num_pics > 1 else 1
+            rows = math.ceil(num_pics / cols)
+            w_unit, h_unit = CW // cols, CH // rows
+            for i, f in enumerate(bg_files):
+                img = ImageOps.exif_transpose(Image.open(f))
+                img = ImageOps.fit(img.convert("RGBA"), (w_unit, h_unit))
+                canvas.paste(img, ((i % cols) * w_unit, (i // cols) * h_unit))
 
         overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
         
         if show_box:
             draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0,0,0,box_alpha))
+            # km, bpm 소문자 유지
             items = [("distance", f"{v_dist} km"), ("time", v_time), ("pace", v_pace), ("avg bpm", f"{v_hr} bpm")]
             
-            # 지도 렌더링
             if mode == "DAILY" and a and a.get('map', {}).get('summary_polyline'):
                 pts = polyline.decode(a['map']['summary_polyline'])
                 lats, lons = zip(*pts)
@@ -175,14 +172,13 @@ if bg_files:
                 m_draw.line([trans(la, lo) for la, lo in pts], fill=hex_to_rgba(m_color, 255), width=4)
                 overlay.paste(m_layer, (rx + (30 if box_orient=="Horizontal" else rw - map_size - 20), ry + 20), m_layer)
 
-            # 텍스트 배치
             if box_orient == "Vertical":
                 draw.text((rx+40, ry+30), v_act, font=f_t, fill=m_color)
                 draw.text((rx+40, ry+30+t_sz+10), v_date, font=f_d, fill="#AAAAAA")
-                y_c = ry + t_sz + d_sz + 90
+                y_c = ry + t_sz + d_sz + 100
                 for lab, val in items:
                     draw.text((rx+40, y_c), lab, font=f_l, fill="#AAAAAA")
-                    draw.text((rx+40, y_c+l_sz+5), val, font=f_n, fill=sub_color); y_c += (n_sz + l_sz + 35)
+                    draw.text((rx+40, y_c+l_sz+5), val, font=f_n, fill=sub_color); y_c += 115
             else:
                 title_w = draw.textlength(v_act, font=f_t)
                 draw.text((rx+(rw//2)-(title_w//2), ry+25), v_act, font=f_t, fill=m_color)
@@ -191,8 +187,8 @@ if bg_files:
                 sec_w = (rw - 80) // 4
                 for i, (lab, val) in enumerate(items):
                     ix = rx + 40 + (i * sec_w)
-                    draw.text((ix, ry+t_sz+d_sz+50), lab, font=f_l, fill="#AAAAAA")
-                    draw.text((ix, ry+t_sz+d_sz+50+l_sz+5), val, font=f_n, fill=sub_color)
+                    draw.text((ix, ry+t_sz+d_sz+60), lab, font=f_l, fill="#AAAAAA")
+                    draw.text((ix, ry+t_sz+d_sz+60+l_sz+5), val, font=f_n, fill=sub_color)
 
             if log_file:
                 l_sz_img = 100 if box_orient == "Vertical" else 80
