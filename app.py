@@ -77,26 +77,29 @@ if not st.session_state['access_token']:
     st.link_button("🚀 Strava 연동하기", auth_url)
     st.stop()
 
-# --- [4. 사이드바] ---
+# --- [4. 사이드바 (기능 누락 방지)] ---
 with st.sidebar:
     app_mode = st.radio("🚀 작업 모드", ["DAILY", "WEEKLY"])
     st.markdown("---")
-    st.header("⚙️ 디자인/크기 설정")
+    st.header("⚙️ 디자인 설정")
+    box_mode = st.radio("📦 박스 모드", ["세로형(Portrait)", "가로형(Landscape)"])
     selected_font = st.selectbox("폰트 선택", ["Jua", "BlackHanSans", "NanumBrush", "DoHyeon", "GothicA1", "SongMyung", "SingleDay", "Pretendard"])
     main_color = st.color_picker("활동명 색상", "#FFD700")
     num_color = st.color_picker("날짜/정보 색상", "#FFFFFF")
     route_color = st.selectbox("지도 경로 색상", ["Yellow", "Black", "White"])
     
     st.markdown("---")
-    t_sz, d_sz, n_sz, l_sz = st.slider("활동명", 10, 200, 70), st.slider("날짜", 10, 100, 20), st.slider("숫자", 10, 150, 40), st.slider("라벨", 10, 80, 20)
+    st.subheader("크기 조절")
+    t_sz, d_sz, n_sz, l_sz = st.slider("활동명", 10, 200, 90), st.slider("날짜", 10, 100, 30), st.slider("숫자", 10, 150, 60), st.slider("라벨", 10, 80, 25)
     
     st.markdown("---")
     st.subheader("로그 박스 커스텀")
-    rx, ry, rw, rh = st.slider("X", 0, 1080, 70), st.slider("Y", 0, 1920, 1150), st.slider("Width", 300, 1000, 360), st.slider("Height", 300, 1150, 720)
-    alpha = st.slider("박스 투명도", 0, 255, 85)
+    rx, ry = st.slider("X 위치", 0, 1080, 70), st.slider("Y 위치", 0, 1920, 1150)
+    rw, rh = st.slider("박스 너비", 300, 1000, 500), st.slider("박스 높이", 100, 1200, 720)
+    alpha = st.slider("박스 투명도", 0, 255, 60)
     map_alpha = st.slider("지도 투명도", 0, 255, 100)
 
-# --- [5. 실행 로직] ---
+# --- [5. 메인 실행부] ---
 headers = {'Authorization': f"Bearer {st.session_state['access_token']}"}
 
 if app_mode == "DAILY":
@@ -117,7 +120,8 @@ if app_mode == "DAILY":
             bg_file = st.file_uploader("배경 사진", type=['jpg', 'jpeg', 'png'])
             log_file = st.file_uploader("로고 아이콘", type=['jpg', 'jpeg', 'png'])
         with col_inputs:
-            v_act, v_date = st.text_input("활동명", a['name']), st.text_input("날짜", a.get('start_date_local', "")[:16].replace("T", " "))
+            v_act = st.text_input("활동명", a['name'])
+            v_date = st.text_input("날짜", a.get('start_date_local', "")[:16].replace("T", " "))
             v_dist, v_time = st.text_input("거리(km)", f"{dist_km:.2f}"), st.text_input("시간", time_v)
             v_pace, v_hr = st.text_input("페이스", pace_v), st.text_input("심박수(bpm)", hr_v)
             v_weather = st.text_input("날씨", "")
@@ -132,44 +136,47 @@ if app_mode == "DAILY":
             # 1. 로그박스 배경
             draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0, 0, 0, alpha))
             
-            # 2. 지도 오버레이 (배경 느낌)
+            # 2. 지도 배경 오버레이 (누락 방지)
             poly = a.get('map', {}).get('summary_polyline', "")
             if poly:
                 try:
                     pts = polyline.decode(poly)
                     lats, lons = [p[0] for p in pts], [p[1] for p in pts]
                     mi_la, ma_la, mi_lo, ma_lo = min(lats), max(lats), min(lons), max(lons)
-                    
-                    # 박스 크기에 맞춘 지도 캔버스
-                    m_w, m_h = rw, rh
-                    r_img = Image.new("RGBA", (m_w, m_h), (0, 0, 0, 0))
+                    r_img = Image.new("RGBA", (rw, rh), (0, 0, 0, 0))
                     dr_r = ImageDraw.Draw(r_img)
-                    
                     def sc(p):
-                        # 여백 15% 적용하여 박스 안에 꽉 차게
-                        x = (p[1] - mi_lo) / (ma_lo - mi_lo + 1e-9) * (m_w * 0.7) + (m_w * 0.15)
-                        y = (m_h * 0.7) - ((p[0] - mi_la) / (ma_la - mi_la + 1e-9) * (m_h * 0.7)) + (m_h * 0.15)
+                        x = (p[1] - mi_lo) / (ma_lo - mi_lo + 1e-9) * (rw * 0.7) + (rw * 0.15)
+                        y = (rh * 0.7) - ((p[0] - mi_la) / (ma_la - mi_la + 1e-9) * (rh * 0.7)) + (rh * 0.15)
                         return (x, y)
-                    
                     r_f = {"Yellow": (255, 215, 0, map_alpha), "Black": (0, 0, 0, map_alpha), "White": (255, 255, 255, map_alpha)}.get(route_color, (255, 215, 0, map_alpha))
                     dr_r.line([sc(p) for p in pts], fill=r_f, width=8)
                     canvas.paste(r_img, (rx, ry), r_img)
                 except: pass
 
-            # 3. 텍스트 배치 (지도 위에 그려짐)
-            draw.text((rx + 50, ry + 40), v_act, font=f_t, fill=main_color)
-            draw.text((rx + rw - 50, ry + 40 + t_sz + 5), v_date, font=f_d, fill=num_color, anchor="ra")
+            # 3. 텍스트 배치 로직 (모드별 분기)
+            draw.text((rx + 30, ry + 20), v_act, font=f_t, fill=main_color)
+            draw.text((rx + rw - 30, ry + 20 + t_sz + 5), v_date, font=f_d, fill=num_color, anchor="ra")
             
             items = [("DISTANCE", f"{v_dist} km"), ("TIME", v_time), ("AVG PACE", f"{v_pace} /km"), ("AVG HR", f"{v_hr} bpm")]
             if v_weather: items.append(("WEATHER", v_weather))
-            
-            line_y_start = ry + t_sz + d_sz + 100
-            spacing = ((ry + rh - 50) - line_y_start) / len(items)
-            for i, (lab, val) in enumerate(items):
-                py = line_y_start + (i * spacing)
-                draw.text((rx + 60, py), lab, font=f_l, fill="#AAAAAA")
-                draw.text((rx + 60, py + l_sz + 5), val, font=f_n, fill=num_color)
 
+            if "세로형" in box_mode:
+                line_y_start = ry + t_sz + d_sz + 80
+                spacing = ((ry + rh - 40) - line_y_start) / len(items)
+                for i, (lab, val) in enumerate(items):
+                    py = line_y_start + (i * spacing)
+                    draw.text((rx + 40, py), lab, font=f_l, fill="#AAAAAA")
+                    draw.text((rx + 40, py + l_sz + 5), val, font=f_n, fill=num_color)
+            else: # 가로형
+                spacing = (rw - 60) / len(items)
+                item_y = ry + t_sz + d_sz + 60
+                for i, (lab, val) in enumerate(items):
+                    px = rx + 30 + (i * spacing)
+                    draw.text((px, item_y), lab, font=f_l, fill="#AAAAAA")
+                    draw.text((px, item_y + l_sz + 5), val, font=f_n, fill=num_color)
+
+            # 4. 로고 (누락 방지)
             if log_file:
                 logo = get_circle_logo(log_file)
                 canvas.paste(logo, (900, 60), logo)
@@ -205,4 +212,3 @@ elif app_mode == "WEEKLY":
                     st.image(collage, use_container_width=True)
                     buf = io.BytesIO(); collage.save(buf, format="JPEG", quality=95)
                     st.download_button("📸 콜라주 저장", buf.getvalue(), "weekly_collage.jpg")
-
