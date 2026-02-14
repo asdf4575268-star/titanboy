@@ -5,7 +5,7 @@ import io, os, requests, polyline, math
 # --- [1. 기본 설정 및 초기화] ---
 CLIENT_ID = '202274'
 CLIENT_SECRET = 'cf2ab22bb9995254e6ea68ac3c942572f7114c9a'
-ACTUAL_URL = "https://titanboy-5fxenvcchdubwx3swjh8ut.streamlit.app"
+ACTUAL_URL = "https://titanboy-kgcnje3tg3hbfpfsp6uwzc.streamlit.app"
 
 st.set_page_config(page_title="Garmin Photo Dashboard", layout="wide")
 
@@ -192,4 +192,5 @@ if bg_files:
                 
     except Exception as e:
         st.error(f"Error: {e}")
+
 
