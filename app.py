@@ -3,8 +3,8 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 import io, os, requests, polyline, math
 
 # --- [1. 기본 설정 및 초기화] ---
-CLIENT_ID = '202274'
-CLIENT_SECRET = 'cf2ab22bb9995254e6ea68ac3c942572f7114c9a'
+CLIENT_ID = '202275'
+CLIENT_SECRET = '969201cab488e4eaf1398b106de1d4e520dc564c'
 
 # ⚠️ [중요] 반드시 Strava 설정의 '인증 콜백 도메인'과 100% 일치해야 함
 ACTUAL_URL = "https://titanboy-5fxenvcchdubwx3swjh8ut.streamlit.app"
@@ -146,3 +146,4 @@ if bg_files:
             buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
             st.download_button("📸 DOWNLOAD", buf.getvalue(), "result.jpg", use_container_width=True)
     except Exception as e: st.error(f"렌더링 에러: {e}")
+
