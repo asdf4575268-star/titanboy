@@ -75,14 +75,14 @@ def get_weekly_stats(activities, target_date_str):
 
 def create_bar_chart(data, color_hex):
     days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-    fig, ax = plt.subplots(figsize=(8, 4), dpi=150)
+    fig, ax = plt.subplots(figsize=(10, 4), dpi=150) # 더 와이드하게 변경
     fig.patch.set_alpha(0); ax.patch.set_alpha(0)
     bars = ax.bar(days, data, color=color_hex, width=0.6)
     for s in ['top', 'right', 'left']: ax.spines[s].set_visible(False)
-    ax.tick_params(axis='x', colors='white', labelsize=12); ax.tick_params(axis='y', left=False, labelleft=False)
+    ax.tick_params(axis='x', colors='white', labelsize=14); ax.tick_params(axis='y', left=False, labelleft=False)
     for bar in bars:
         h = bar.get_height()
-        if h > 0: ax.text(bar.get_x() + bar.get_width()/2., h + 0.1, f'{h:.1f}', ha='center', va='bottom', color='white', fontsize=11, fontweight='bold')
+        if h > 0: ax.text(bar.get_x() + bar.get_width()/2., h + 0.1, f'{h:.1f}', ha='center', va='bottom', color='white', fontsize=12, fontweight='bold')
     plt.tight_layout(); buf = io.BytesIO(); plt.savefig(buf, format='png', transparent=True); buf.seek(0); plt.close(fig)
     return Image.open(buf)
 
@@ -133,23 +133,21 @@ with col3:
     sel_font = st.selectbox("폰트", ["BlackHanSans", "Jua", "DoHyeon", "NanumBrush", "Sunflower"])
     m_color = COLOR_OPTIONS[st.selectbox("포인트 컬러", list(COLOR_OPTIONS.keys()), index=0)]
     sub_color = COLOR_OPTIONS[st.selectbox("서브 컬러", list(COLOR_OPTIONS.keys()), index=1)]
-    
     CW, CH = (1080, 1920) if mode == "DAILY" else (1080, 1080)
     
     st.subheader("📦 박스 및 요소 조절")
     bx = st.number_input("박스 X", 0, 1080, 70)
     by = st.number_input("박스 Y", 0, 1920, 1400 if mode=="DAILY" else 750)
-    bw = st.number_input("박스 너비", 100, 1080, 940 if box_orient=="Horizontal" else 450)
-    bh = st.number_input("박스 높이", 100, 1080, 260 if box_orient=="Horizontal" else 620)
+    bw = st.number_input("박스 너비", 100, 1080, 940 if box_orient=="Horizontal" else 480)
+    bh = st.number_input("박스 높이", 100, 1080, 260 if box_orient=="Horizontal" else 550)
     box_alpha = st.slider("박스 투명도", 0, 255, 130)
-    vis_sz = st.slider("지도/그래프 크기", 50, 800, 180 if mode=="DAILY" else 800)
-    vis_alpha = st.slider("지도/그래프 투명도", 0, 255, 80)
-    if mode == "WEEKLY": g_y_off = st.slider("그래프 높이 조절", 0, 1000, 150)
-    
+    vis_sz = st.slider("지도/그래프 크기", 50, 1080, 200 if mode=="DAILY" else 1080)
+    vis_alpha = st.slider("지도/그래프 투명도", 0, 255, 100 if mode=="DAILY" else 220)
+    if mode == "WEEKLY": g_y_off = st.slider("그래프 상단 여백", 0, 500, 50)
 
 # --- [6. 렌더링 엔진] ---
 try:
-    f_t, f_d, f_n, f_l = load_font(sel_font, 70), load_font(sel_font, 20), load_font(sel_font, 45), load_font(sel_font, 22)
+    f_t, f_d, f_n, f_l = load_font(sel_font, 90), load_font(sel_font, 30), load_font(sel_font, 60), load_font(sel_font, 20)
     canvas = Image.new("RGBA", (CW, CH), (0, 0, 0, 255))
     
     if bg_files:
@@ -164,6 +162,8 @@ try:
                 canvas.paste(img, (0 if (i==num_pics-1 and num_pics%2==1 and cols==2) else (i%cols)*w_u, (i//cols)*h_u))
 
     overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
+    
+    # [시각화: 지도/그래프]
     vis_layer = None
     if mode == "DAILY" and a and a.get('map', {}).get('summary_polyline'):
         pts = polyline.decode(a['map']['summary_polyline']); lats, lons = zip(*pts)
@@ -174,15 +174,23 @@ try:
         chart_img = create_bar_chart(weekly_data['dists'], m_color)
         w_p = (vis_sz / float(chart_img.size[0])); vis_layer = chart_img.resize((vis_sz, int(chart_img.size[1]*w_p)), Image.Resampling.LANCZOS)
         alpha_mask = vis_layer.getchannel('A').point(lambda x: x * (vis_alpha / 255)); vis_layer.putalpha(alpha_mask)
+        overlay.paste(vis_layer, ((CW - vis_layer.width)//2, g_y_off), vis_layer)
 
+    # [로그박스]
     draw.rectangle([bx, by, bx + bw, by + bh], fill=(0,0,0,box_alpha))
-    items = [("distance", f"{v_dist} km"), ("time", v_time), ("pace", v_pace), ("avg bpm", f"{v_hr} bpm")]
     
+    # [로고] 위치 규칙 적용
+    if log_file:
+        ls = 100; l_img = ImageOps.fit(Image.open(log_file).convert("RGBA"), (ls, ls))
+        mask = Image.new('L', (ls, ls), 0); ImageDraw.Draw(mask).ellipse((0, 0, ls, ls), fill=255); l_img.putalpha(mask)
+        log_pos = (bx + bw - ls - 25, by + bh - ls - 25) if box_orient == "Vertical" else (bx + bw - ls - 25, by + 25)
+        overlay.paste(l_img, log_pos, l_img)
+
+    # [텍스트]
+    items = [("distance", f"{v_dist} km"), ("time", v_time), ("pace", v_pace), ("avg bpm", f"{v_hr} bpm")]
     if mode == "DAILY" and vis_layer:
         if box_orient == "Vertical": overlay.paste(vis_layer, (bx + bw - vis_layer.width - 20, by + 20), vis_layer)
         else: overlay.paste(vis_layer, (bx + 20, by + (bh - vis_layer.height)//2), vis_layer)
-    if mode == "WEEKLY" and vis_layer:
-        overlay.paste(vis_layer, ((CW - vis_layer.width)//2, by - vis_layer.height - g_y_off), vis_layer)
 
     if box_orient == "Vertical":
         draw.text((bx+40, by+30), v_act, font=f_t, fill=m_color)
@@ -192,18 +200,14 @@ try:
             draw.text((bx+40, y_c), lab.lower(), font=f_l, fill="#AAAAAA")
             draw.text((bx+40, y_c+25), val.lower() if "bpm" in val or "km" in val else val, font=f_n, fill=sub_color); y_c += 110
     else:
-        text_x_off = vis_layer.width + 40 if (mode == "DAILY" and vis_layer) else 40
+        text_x_off = (vis_layer.width + 40) if (mode == "DAILY" and vis_layer) else 40
         draw.text((bx + text_x_off, by + 40), v_act, font=f_t, fill=m_color)
         draw.text((bx + text_x_off, by + 130), v_date, font=f_d, fill="#AAAAAA")
         sec_w = (bw - text_x_off - 40) // 4
         for i, (lab, val) in enumerate(items):
-            draw.text((bx + text_x_off + (i*sec_w), by + 175), lab.lower(), font=f_l, fill="#AAAAAA")
-            draw.text((bx + text_x_off + (i*sec_w), by + 200), val.lower() if "bpm" in val or "km" in val else val, font=f_n, fill=sub_color)
-
-    if log_file:
-        ls = 100; l_img = ImageOps.fit(Image.open(log_file).convert("RGBA"), (ls, ls))
-        mask = Image.new('L', (ls, ls), 0); ImageDraw.Draw(mask).ellipse((0, 0, ls, ls), fill=255); l_img.putalpha(mask)
-        overlay.paste(l_img, (bx + bw - ls - 20, by + bh - ls - 20 if box_orient=="Vertical" else by + 25), l_img)
+            item_x = bx + text_x_off + (i * sec_w)
+            draw.text((item_x, by + 175), lab.lower(), font=f_l, fill="#AAAAAA")
+            draw.text((item_x, by + 205), val.lower() if "bpm" in val or "km" in val else val, font=f_n, fill=sub_color)
 
     final = Image.alpha_composite(canvas, overlay).convert("RGB")
     with col2:
@@ -211,101 +215,5 @@ try:
         buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
         st.download_button(f"📸 {mode} DOWNLOAD", buf.getvalue(), f"{mode.lower()}_result.jpg", use_container_width=True)
         if st.session_state['access_token']: st.button("🔓 로그아웃", on_click=logout_and_clear)
-    # [3] 로고 배치 (여기에 이 코드를 붙여넣으세요!)
-    if log_file:
-        ls = 100 
-        l_img = ImageOps.fit(Image.open(log_file).convert("RGBA"), (ls, ls))
-        mask = Image.new('L', (ls, ls), 0)
-        ImageDraw.Draw(mask).ellipse((0, 0, ls, ls), fill=255)
-        l_img.putalpha(mask)
-        
-        if box_orient == "Vertical":
-            # 세로 모드: 오른쪽 하단
-            log_pos = (bx + bw - ls - 25, by + bh - ls - 25)
-        else:
-            # 가로 모드: 오른쪽 상단
-            log_pos = (bx + bw - ls - 25, by + 25)
-            
-        overlay.paste(l_img, log_pos, l_img)
-    WEEKLY 모드의 완성도를 높이기 위해 두 가지 핵심 수정을 진행했습니다.
-
-1. 그래프의 압도적인 존재감: 투명도를 높여(불투명하게) 색감을 살리고, 캔버스 상단 좌우를 꽉 채우도록 크기와 여백을 조정했습니다.
-2. 로그박스의 가독성: WEEKLY 가로모드일 때 데이터 사이의 간격이 너무 촘촘하지 않도록 칸을 넓게 띄워 시원한 느낌을 주었습니다.
-
-💻 WEEKLY 집중 최적화 코드
-Python
-# --- [6. 렌더링 엔진 내 WEEKLY 특화 로직] ---
-try:
-    # 폰트 설정 (활동명 90, 날짜 30, 숫자 60)
-    f_t, f_d, f_n, f_l = load_font(sel_font, 90), load_font(sel_font, 30), load_font(sel_font, 60), load_font(sel_font, 20)
-    canvas = Image.new("RGBA", (CW, CH), (0, 0, 0, 255))
-    
-    # 배경 및 콜라주 로직 생략 (기존과 동일)
-    # ... 
-
-    overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
-    
-    # 1. WEEKLY 그래프 최적화 (상단 꽉 채우기)
-    vis_layer = None
-    if mode == "WEEKLY" and weekly_data:
-        # 그래프 생성 시 포인트 컬러 투명도 적용 (vis_alpha 반영)
-        chart_img = create_bar_chart(weekly_data['dists'], m_color)
-        
-        # 상단에 꽉 채우기 위해 너비를 CW(1080) 또는 vis_sz에 맞춤
-        target_w = vis_sz if vis_sz > 800 else 1000 
-        w_p = (target_w / float(chart_img.size[0]))
-        vis_layer = chart_img.resize((target_w, int(chart_img.size[1]*w_p)), Image.Resampling.LANCZOS)
-        
-        # 불투명도 적용 (사용자 설정 vis_alpha가 높을수록 진해짐)
-        alpha_mask = vis_layer.getchannel('A').point(lambda x: x * (vis_alpha / 255))
-        vis_layer.putalpha(alpha_mask)
-        
-        # 상단 중앙 배치
-        overlay.paste(vis_layer, ((CW - vis_layer.width)//2, g_y_off), vis_layer)
-
-    # 2. 로그박스 그리기
-    draw.rectangle([bx, by, bx + bw, by + bh], fill=(0,0,0,box_alpha))
-
-    # 3. 로고 배치 (요청하신 가변 위치)
-    if log_file:
-        ls = 100
-        l_img = ImageOps.fit(Image.open(log_file).convert("RGBA"), (ls, ls))
-        # ... (마스크 처리 생략)
-        log_pos = (bx + bw - ls - 25, by + bh - ls - 25) if box_orient == "Vertical" else (bx + bw - ls - 25, by + 25)
-        overlay.paste(l_img, log_pos, l_img)
-
-    # 4. WEEKLY 전용 로그박스 텍스트 배치 (칸 띄우기 적용)
-    items = [("distance", f"{v_dist} km"), ("time", v_time), ("pace", v_pace), ("avg bpm", f"{v_hr} bpm")]
-    
-    if box_orient == "Vertical":
-        draw.text((bx+40, by+30), v_act, font=f_t, fill=m_color)
-        draw.text((bx+40, by+130), v_date, font=f_d, fill="#AAAAAA")
-        y_c = by + 200
-        for lab, val in items:
-            draw.text((bx+40, y_c), lab.lower(), font=f_l, fill="#AAAAAA")
-            draw.text((bx+40, y_c+25), val.lower() if "bpm" in val or "km" in val else val, font=f_n, fill=sub_color)
-            y_c += 110
-    else:
-        # 가로모드: 데이터 간격을 더 넓게 띄움 (sec_w 계산 수정)
-        draw.text((bx + 40, by + 40), v_act, font=f_t, fill=m_color)
-        draw.text((bx + 40, by + 130), v_date, font=f_d, fill="#AAAAAA")
-        
-        # 아이템 시작 X 좌표를 활동명 아래가 아닌, 박스 전체 너비를 활용해 분산 배치
-        start_x = bx + 40
-        usable_w = bw - 80
-        sec_w = usable_w // 4 # 4개의 칸을 균등하게 분할
-        
-        for i, (lab, val) in enumerate(items):
-            item_x = start_x + (i * sec_w)
-            draw.text((item_x, by + 175), lab.lower(), font=f_l, fill="#AAAAAA")
-            draw.text((item_x, by + 205), val.lower() if "bpm" in val or "km" in val else val, font=f_n, fill=sub_color)
-
-    # 최종 합성
-    final = Image.alpha_composite(canvas, overlay).convert("RGB")
-    # ... (출력 로직)
 except Exception as e:
     st.error(f"Error: {e}")
-
-
-
-
