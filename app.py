@@ -14,7 +14,7 @@ CURRENT_CFG = API_CONFIGS["PRIMARY"]
 CLIENT_ID, CLIENT_SECRET = CURRENT_CFG["ID"], CURRENT_CFG["SECRET"]
 ACTUAL_URL = "https://titanboy-kgcnje3tg3hbfpfsp6uwzc.streamlit.app"
 
-st.set_page_config(page_title="Garmin Photo Dashboard", layout="wide")
+st.set_page_config(page_title="TITAN BOY", layout="wide")
 mpl.use('Agg')
 
 # --- [2. 유틸리티 및 데이터 처리] ---
@@ -108,6 +108,8 @@ with col2:
             if weekly_data: v_act, v_date, v_dist, v_time, v_pace, v_hr = "WEEKLY RUN", weekly_data['range'], weekly_data['total_dist'], weekly_data['total_time'], weekly_data['avg_pace'], weekly_data['avg_hr']
 
 with col1:
+    # 대시보드 왼쪽 상단 메인 타이틀
+    st.title("TITAN BOY")
     st.header("📸 DATA INPUT")
     bg_files = st.file_uploader("배경 사진", type=['jpg','jpeg','png'], accept_multiple_files=True)
     log_file = st.file_uploader("원형 로고", type=['jpg','jpeg','png'])
