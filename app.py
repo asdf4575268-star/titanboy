@@ -46,7 +46,7 @@ def get_circle_logo(img_file, size=(130, 130)):
     img.putalpha(mask)
     return img
 
-# 인증 처리
+# 인증 처리 (기존 로직 동일)
 params = st.query_params
 if "code" in params and st.session_state['access_token'] is None:
     try:
@@ -73,15 +73,7 @@ act_res = requests.get("https://www.strava.com/api/v3/athlete/activities?per_pag
 if act_res.status_code == 200:
     acts = act_res.json()
     col1, col2, col3 = st.columns([1, 2, 1], gap="medium")
-
-    # 컬러 팔레트 정의
-    COLOR_OPTIONS = {
-        "Garmin Yellow": "#FFD700",
-        "Pure White": "#FFFFFF",
-        "Neon Orange": "#FF4500",
-        "Electric Blue": "#00BFFF",
-        "Soft Grey": "#AAAAAA"
-    }
+    COLOR_OPTIONS = {"Garmin Yellow": "#FFD700", "Pure White": "#FFFFFF", "Neon Orange": "#FF4500", "Electric Blue": "#00BFFF", "Soft Grey": "#AAAAAA"}
 
     with col2:
         mode = st.radio("작업 모드", ["DAILY", "WEEKLY"], horizontal=True)
@@ -94,10 +86,8 @@ if act_res.status_code == 200:
             h_val = str(int(a.get('average_heartrate', 0))) if a.get('average_heartrate') else "0"
             t_val = f"{m_sec//3600:02d}:{(m_sec%3600)//60:02d}:{m_sec%60:02d}" if m_sec >= 3600 else f"{m_sec//60:02d}:{m_sec%60:02d}"
         else:
-            w_acts = acts[:7]
-            t_dist = sum([x.get('distance', 0) for x in w_acts]) / 1000
-            t_time = sum([x.get('moving_time', 0) for x in w_acts])
-            t_hrs = [x.get('average_heartrate', 0) for x in w_acts if x.get('average_heartrate')]
+            w_acts = acts[:7]; t_dist = sum([x.get('distance', 0) for x in w_acts]) / 1000
+            t_time = sum([x.get('moving_time', 0) for x in w_acts]); t_hrs = [x.get('average_heartrate', 0) for x in w_acts if x.get('average_heartrate')]
             avg_hr, avg_spd = (int(sum(t_hrs)/len(t_hrs)) if t_hrs else 0), ((t_dist / (t_time/3600)) if t_time > 0 else 0)
             t_val = f"{int(t_time//3600)}h {int((t_time%3600)//60)}m"
 
@@ -115,35 +105,27 @@ if act_res.status_code == 200:
     with col3:
         st.header("🎨 DESIGN")
         sel_font = st.selectbox("폰트 선택", ["BlackHanSans", "Jua", "DoHyeon", "NanumBrush", "Sunflower"])
-        
-        # [컬러 선택 최적화]
-        sel_m_color = st.selectbox("포인트 컬러 (활동명)", list(COLOR_OPTIONS.keys()), index=0)
-        sel_sub_color = st.selectbox("서브 컬러 (텍스트)", list(COLOR_OPTIONS.keys()), index=1)
-        sel_map_color = st.selectbox("지도 컬러", list(COLOR_OPTIONS.keys()), index=4)
-        
-        m_color = COLOR_OPTIONS[sel_m_color]
-        sub_color = COLOR_OPTIONS[sel_sub_color]
-        map_color = COLOR_OPTIONS[sel_map_color]
+        sel_m_color = st.selectbox("포인트 컬러", list(COLOR_OPTIONS.keys()), index=0)
+        sel_sub_color = st.selectbox("서브 컬러", list(COLOR_OPTIONS.keys()), index=1)
+        sel_map_color = st.selectbox("지도 컬러", list(COLOR_OPTIONS.keys()), index=0) # 포인트와 맞춤
+        m_color, sub_color, map_color = COLOR_OPTIONS[sel_m_color], COLOR_OPTIONS[sel_sub_color], COLOR_OPTIONS[sel_map_color]
 
         st.markdown("---")
-        t_sz = st.slider("활동명 크기", 10, 200, 90)
-        d_sz = st.slider("날짜 크기", 5, 100, 30)
-        n_sz = st.slider("숫자 크기", 10, 200, 60)
-        l_sz = st.slider("라벨 크기", 5, 80, 20)
+        t_sz, d_sz, n_sz, l_sz = st.slider("활동명 크기", 10, 200, 90), st.slider("날짜 크기", 5, 100, 30), st.slider("숫자 크기", 10, 200, 60), st.slider("라벨 크기", 5, 80, 20)
         
         if mode == "DAILY":
             st.markdown("---")
             box_mode = st.radio("박스 정렬", ["Vertical", "Horizontal"])
             rx, ry = st.slider("X 위치", 0, 1080, 70), st.slider("Y 위치", 0, 1920, 1150)
             
-            auto_w = 560 if box_mode == "Vertical" else 1000
+            # 초기 박스 사이즈 설정
+            auto_w = 600 if box_mode == "Vertical" else 1000
             auto_h = (t_sz + d_sz + 4 * (n_sz + l_sz + 35) + 120) if box_mode == "Vertical" else (t_sz + d_sz + n_sz + l_sz + 180)
+            rw, rh = st.slider("박스 가로 크기", 100, 1080, int(auto_w)), st.slider("박스 세로 크기", 100, 1500, int(auto_h))
             
-            rw = st.slider("박스 가로 크기", 100, 1080, int(auto_w))
-            rh = st.slider("박스 세로 크기", 100, 1500, int(auto_h))
-            
-            box_alpha = st.slider("박스 투명도", 0, 255, 110)
-            map_alpha = st.slider("지도 투명도", 0, 255, 30)
+            # [지도 옵션]
+            map_size = st.slider("지도 크기", 50, 400, 150)
+            box_alpha, map_alpha = st.slider("박스 투명도", 0, 255, 110), st.slider("지도 투명도", 0, 255, 255)
         
         st.markdown("<br><br>", unsafe_allow_html=True)
         if st.button("🔓 로그아웃", use_container_width=True): logout()
@@ -156,19 +138,23 @@ if act_res.status_code == 200:
             overlay = Image.new("RGBA", canvas.size, (0, 0, 0, 0)); draw = ImageDraw.Draw(overlay)
             f_t, f_d, f_n, f_l = load_font(sel_font, t_sz), load_font(sel_font, d_sz), load_font(sel_font, n_sz), load_font(sel_font, l_sz)
             
+            # 박스 배경
             draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0, 0, 0, box_alpha))
             
+            # 미니 지도 렌더링
             p_line = a['map']['summary_polyline'] if 'map' in a and a['map'].get('summary_polyline') else None
             if p_line:
                 pts = polyline.decode(p_line); lats, lons = zip(*pts)
-                map_layer = Image.new("RGBA", (int(rw), int(rh)), (0,0,0,0)); m_draw = ImageDraw.Draw(map_layer)
-                def trans(la, lo):
-                    tx = 50 + (lo - min(lons)) / (max(lons) - min(lons) + 0.0001) * (rw - 100)
-                    ty = (rh - 50) - (la - min(lats)) / (max(lats) - min(lats) + 0.0001) * (rh - 100)
+                map_layer = Image.new("RGBA", (map_size, map_size), (0,0,0,0)); m_draw = ImageDraw.Draw(map_layer)
+                def trans_mini(la, lo):
+                    tx = 10 + (lo - min(lons)) / (max(lons) - min(lons) + 0.0001) * (map_size - 20)
+                    ty = (map_size - 10) - (la - min(lats)) / (max(lats) - min(lats) + 0.0001) * (map_size - 20)
                     return tx, ty
-                m_draw.line([trans(la, lo) for la, lo in pts], fill=hex_to_rgba(map_color, map_alpha), width=7)
-                overlay.paste(map_layer, (rx, ry), map_layer)
+                m_draw.line([trans_mini(la, lo) for la, lo in pts], fill=hex_to_rgba(map_color, map_alpha), width=5)
+                # 활동명 오른쪽 상단 구석에 배치
+                overlay.paste(map_layer, (rx + rw - map_size - 20, ry + 20), map_layer)
 
+            # 텍스트 렌더링
             items = [("DISTANCE", f"{v_dist} km"), ("TIME", t_val), ("AVG PACE", f"{v_pace} /km"), ("AVG HR", f"{v_hr} bpm")]
             if box_mode == "Vertical":
                 draw.text((rx+45, ry+35), v_act, font=f_t, fill=m_color)
@@ -179,8 +165,8 @@ if act_res.status_code == 200:
                     draw.text((rx+45, y_c+l_sz+5), val, font=f_n, fill=sub_color)
                     y_c += (n_sz + l_sz + 38)
             else:
-                draw.text((rx+rw//2, ry+40), v_act, font=f_t, fill=m_color, anchor="ms")
-                draw.text((rx+rw//2, ry+40+t_sz), v_date, font=f_d, fill=sub_color, anchor="ms")
+                draw.text((rx+40, ry+40), v_act, font=f_t, fill=m_color)
+                draw.text((rx+40, ry+40+t_sz), v_date, font=f_d, fill=sub_color)
                 x_s = rw // (len(items) + 1)
                 for i, (lab, val) in enumerate(items):
                     draw.text((rx + x_s*(i+1), ry+rh-n_sz-l_sz-30), lab, font=f_l, fill="#AAAAAA", anchor="ms")
@@ -188,20 +174,15 @@ if act_res.status_code == 200:
             final = Image.alpha_composite(canvas, overlay).convert("RGB")
         else:
             # WEEKLY
-            canvas = Image.new("RGBA", (1080, 1080), (0,0,0,255))
-            n = len(bg_files); cols = 2 if n > 1 else 1; rows = math.ceil(n / cols)
-            img_h, img_w = 880 // rows, 1080 // cols
-            for i, f in enumerate(bg_files):
-                canvas.paste(ImageOps.fit(Image.open(f).convert("RGBA"), (img_w, img_h)), ((i % cols) * img_w, (i // cols) * img_h))
-            draw = ImageDraw.Draw(canvas)
-            f_t, f_n, f_l = load_font(sel_font, 45), load_font(sel_font, 35), load_font(sel_font, 18)
+            canvas = Image.new("RGBA", (1080, 1080), (0,0,0,255)); n = len(bg_files)
+            cols = 2 if n > 1 else 1; rows = math.ceil(n / cols); img_h, img_w = 880 // rows, 1080 // cols
+            for i, f in enumerate(bg_files): canvas.paste(ImageOps.fit(Image.open(f).convert("RGBA"), (img_w, img_h)), ((i % cols) * img_w, (i // cols) * img_h))
+            draw = ImageDraw.Draw(canvas); f_t, f_n, f_l = load_font(sel_font, 45), load_font(sel_font, 35), load_font(sel_font, 18)
             draw.rectangle([0, 880, 1080, 1080], fill=(15, 15, 15, 255))
             draw.text((40, 910), v_act_w, font=f_t, fill=m_color)
             w_items = [("DIST", v_dist_w), ("TIME", v_time_w), ("SPD", v_spd_w), ("HR", v_hr_w)]
             for i, (lab, val) in enumerate(w_items):
-                x_p = 40 + (i * 260)
-                draw.text((x_p, 975), lab, font=f_l, fill="#AAAAAA")
-                draw.text((x_p, 1000), val, font=f_n, fill=sub_color)
+                x_p = 40 + (i * 260); draw.text((x_p, 975), lab, font=f_l, fill="#AAAAAA"); draw.text((x_p, 1000), val, font=f_n, fill=sub_color)
             final = canvas.convert("RGB")
 
         if log_file:
