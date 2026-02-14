@@ -148,7 +148,7 @@ with col3:
 # --- [6. 렌더링 엔진] ---
 try:
     # 폰트 로드 (90/30/60 규칙 준수)
-    f_t, f_d, f_n, f_l = load_font(sel_font, 90), load_font(sel_font, 30), load_font(sel_font, 60), load_font(sel_font, 20)
+    f_t, f_d, f_n, f_l = load_font(sel_font, 70), load_font(sel_font, 20), load_font(sel_font, 40), load_font(sel_font, 25)
     canvas = Image.new("RGBA", (CW, CH), (0, 0, 0, 255))
     
     if bg_files:
@@ -224,4 +224,5 @@ try:
         if st.session_state['access_token']: st.button("🔓 로그아웃", on_click=logout_and_clear)
 except Exception as e:
     st.error(f"Error: {e}")
+
 
