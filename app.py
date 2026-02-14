@@ -143,12 +143,12 @@ with col3:
     m_color = COLOR_OPTIONS[st.selectbox("포인트 컬러", list(COLOR_OPTIONS.keys()), index=0)]
     sub_color = COLOR_OPTIONS[st.selectbox("서브 컬러", list(COLOR_OPTIONS.keys()), index=1)]
     
-    # 모드별 가변 캔버스 사이즈 설정
     CW, CH = (1080, 1920) if mode == "DAILY" else (1080, 1080)
     
-    st.subheader("📊 시각화 요소")
-    g_y = st.slider("상단 요소 Y", 0, 1000, 200 if mode=="DAILY" else 100)
-    g_size = st.slider("크기", 300, 1000, 400 if mode=="DAILY" else 850)
+    st.subheader("📊 시각화 요소 (지도/그래프)")
+    vis_x = st.slider("가로 위치(X)", 0, 1080, 540)
+    vis_y = st.slider("세로 위치(Y)", 0, 1920, 400 if mode=="DAILY" else 300)
+    vis_sz = st.slider("크기", 200, 1000, 600 if mode=="DAILY" else 850)
     
     st.subheader("📦 로그박스")
     bx = st.number_input("박스 X", 0, 1080, 70)
@@ -159,9 +159,7 @@ with col3:
 
 # --- [6. 렌더링 엔진] ---
 try:
-    # 요청된 글자 크기: 활동명 90, 날짜 30, 숫자 60
     f_t, f_d, f_n, f_l = load_font(sel_font, 90), load_font(sel_font, 30), load_font(sel_font, 60), load_font(sel_font, 20)
-    
     canvas = Image.new("RGBA", (CW, CH), (0, 0, 0, 255))
     
     if bg_files:
@@ -177,19 +175,27 @@ try:
 
     overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
     
+    # --- 시각화 레이어 (지도/그래프) 처리 ---
     vis_layer = None
     if mode == "DAILY" and a and a.get('map', {}).get('summary_polyline'):
         pts = polyline.decode(a['map']['summary_polyline']); lats, lons = zip(*pts)
-        vis_layer = Image.new("RGBA", (g_size, g_size), (0,0,0,0)); m_draw = ImageDraw.Draw(vis_layer)
-        def tr(la, lo): return (lo-min(lons))/(max(lons)-min(lons)+1e-5)*(g_size-40)+20, (g_size-20)-(la-min(lats))/(max(lats)-min(lats)+1e-5)*(g_size-40)
-        m_draw.line([tr(la, lo) for la, lo in pts], fill=m_color, width=6)
+        vis_layer = Image.new("RGBA", (vis_sz, vis_sz), (0,0,0,0)); m_draw = ImageDraw.Draw(vis_layer)
+        # 지도가 프레임 안에 꽉 차도록 여백 계산
+        def tr(la, lo): 
+            margin = 40
+            tx = (lo-min(lons))/(max(lons)-min(lons)+1e-5)*(vis_sz-margin*2)+margin
+            ty = (vis_sz-margin)-(la-min(lats))/(max(lats)-min(lats)+1e-5)*(vis_sz-margin*2)
+            return tx, ty
+        m_draw.line([tr(la, lo) for la, lo in pts], fill=m_color, width=8)
     elif mode == "WEEKLY" and weekly_data:
         chart_img = create_bar_chart(weekly_data['dists'], m_color)
-        w_p = (g_size / float(chart_img.size[0])); vis_layer = chart_img.resize((g_size, int(chart_img.size[1]*w_p)), Image.Resampling.LANCZOS)
+        w_p = (vis_sz / float(chart_img.size[0])); vis_layer = chart_img.resize((vis_sz, int(chart_img.size[1]*w_p)), Image.Resampling.LANCZOS)
     
     if vis_layer:
-        overlay.paste(vis_layer, ((CW - vis_layer.width)//2, g_y), vis_layer)
+        # 설정한 X, Y가 이미지의 정중앙이 되도록 배치
+        overlay.paste(vis_layer, (vis_x - vis_layer.width//2, vis_y - vis_layer.height//2), vis_layer)
 
+    # --- 로그박스 처리 ---
     draw.rectangle([bx, by, bx + bw, by + bh], fill=(0,0,0,box_alpha))
     items = [("distance", f"{v_dist} km"), ("time", v_time), ("pace", v_pace), ("avg bpm", f"{v_hr} bpm")]
     
