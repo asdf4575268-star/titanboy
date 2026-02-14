@@ -181,6 +181,49 @@ try:
             draw.text((item_x, ry+180), lab.lower(), font=f_l, fill="#AAAAAA")
             draw.text((item_x, ry+205), val.lower() if "bpm" in val or "km" in val else val, font=f_n, fill=sub_color)
 
+   else:
+        # 1. 가로모드 설정: 너비를 1080 전체로 고정
+        rw = 1080 
+        rx = 0  # 왼쪽 끝부터 시작
+        
+        # 박스 배경 다시 그리기 (너비 1080 고정)
+        draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0,0,0,box_alpha))
+
+        # 2. 지도 배치 (가로모드일 때 왼쪽 정렬)
+        if mode == "DAILY" and vis_layer:
+            overlay.paste(vis_layer, (30, ry + (rh - vis_layer.height)//2), vis_layer)
+        
+        # 3. 활동명 및 날짜 가운데 정렬 계산
+        title_font = f_t
+        date_font = f_d
+        
+        # 텍스트 길이 측정 후 중앙 위치 계산
+        t_w = draw.textlength(v_act, font=title_font)
+        d_w = draw.textlength(v_date, font=date_font)
+        
+        draw.text(((rw - t_w) // 2, ry + 35), v_act, font=title_font, fill=m_color)
+        draw.text(((rw - d_w) // 2, ry + 125), v_date, font=date_font, fill="#AAAAAA")
+        
+        # 4. 4개 정보 균등 분할 배치 (시인성 최적화)
+        # 박스 전체 너비 1080을 4등분하여 각 섹션의 중앙에 배치
+        sec_w = rw // 4
+        for i, (lab, val) in enumerate(items):
+            # 각 섹션의 중앙 X 좌표 계산
+            center_x = (i * sec_w) + (sec_w // 2)
+            
+            # 라벨 및 숫자 길이 측정하여 중앙 정렬
+            l_w = draw.textlength(lab.lower(), font=f_l)
+            v_str = val.lower() if "bpm" in val or "km" in val else val
+            v_w = draw.textlength(v_str, font=f_n)
+            
+            draw.text((center_x - (l_w // 2), ry + 175), lab.lower(), font=f_l, fill="#AAAAAA")
+            draw.text((center_x - (v_w // 2), ry + 205), v_str, font=f_n, fill=sub_color)
+
+        # 5. 로고 배치 (가로모드 우측 상단 고정)
+        if log_file:
+            ls = 100
+            l_pos = (rw - ls - 30, ry + 25)
+            overlay.paste(l_img, l_pos, l_img)
     # [로고]
     if log_file:
         ls = 100; l_img = ImageOps.fit(Image.open(log_file).convert("RGBA"), (ls, ls))
@@ -198,5 +241,6 @@ except Exception as e:
     st.info("데이터를 불러오거나 사진을 업로드하면 대시보드가 생성됩니다.")
     # 개발용 에러 확인이 필요하면 아래 주석 해제
     # st.error(f"Error: {e}")
+
 
 
