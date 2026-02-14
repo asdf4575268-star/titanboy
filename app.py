@@ -44,7 +44,6 @@ if st.session_state['access_token'] is None:
 # --- [3. 유틸리티 함수] ---
 @st.cache_resource
 def load_font(font_type, size):
-    # 안정적인 폰트 로드를 위해 원본 주소 유지
     fonts = {
         "BlackHanSans": "https://github.com/google/fonts/raw/main/ofl/blackhansans/BlackHanSans-Regular.ttf",
         "Jua": "https://github.com/google/fonts/raw/main/ofl/jua/Jua-Regular.ttf",
@@ -120,44 +119,24 @@ with col3:
     m_color = COLOR_OPTIONS[st.selectbox("포인트 컬러", list(COLOR_OPTIONS.keys()))]
     sub_color = COLOR_OPTIONS[st.selectbox("서브 컬러", list(COLOR_OPTIONS.keys()), index=1)]
     
-    # 크기 설정 (활동명 90, 날짜 30, 숫자 60 유지)
+    # 크기 고정 (활동명 90, 날짜 30, 숫자 60)
     t_sz, d_sz, n_sz, l_sz = 90, 30, 60, 20
     
     if mode == "DAILY":
         st.divider()
         st.subheader("Box Layout")
-        # 모드별 디폴트 값 설정
+        # 모드별 디폴트 위치 설정
         if box_orient == "Vertical":
-                    # (세로 모드는 기존 유지)
-                    draw.text((rx+40, ry+30), v_act, font=f_t, fill=m_color)
-                    draw.text((rx+40, ry+30+t_sz+10), v_date, font=f_d, fill=sub_color)
-                    y_c = ry + t_sz + d_sz + 80
-                    for lab, val in items:
-                        draw.text((rx+40, y_c), lab, font=f_l, fill="#AAAAAA")
-                        draw.text((rx+40, y_c+l_sz+5), val, font=f_n, fill=sub_color); y_c += (n_sz + l_sz + 35)
-                
-                else: # Horizontal 모드: 제목/날짜 아래에 1열로 데이터 균형 배치
-                    # 1. 상단: 활동명 및 날짜 (중앙 정렬 느낌)
-                    draw.text((rx+40, ry+25), v_act, font=f_t, fill=m_color)
-                    draw.text((rx+40, ry+25+t_sz+5), v_date, font=f_d, fill="#AAAAAA")
-                    
-                    # 2. 하단: 기록 데이터 1열 배치 (4등분 균형 계산)
-                    y_data_top = ry + t_sz + d_sz + 45
-                    section_w = (rw - 80) // len(items) # 박스 너비를 아이템 수로 나눔
-                    
-                    for i, (lab, val) in enumerate(items):
-                        curr_x = rx + 40 + (i * section_w)
-                        # 라벨(distance 등) 소문자
-                        draw.text((curr_x, y_data_top), lab, font=f_l, fill="#AAAAAA")
-                        # 값(10.00 km 등)
-                        draw.text((curr_x, y_data_top + l_sz + 5), val, font=f_n, fill=sub_color)
+            d_rx, d_ry, d_rw, d_rh = 70, 1320, 480, 520
+        else:
+            d_rx, d_ry, d_rw, d_rh = 70, 1580, 940, 280
             
         rx = st.number_input("X 위치", 0, 1080, d_rx)
         ry = st.number_input("Y 위치", 0, 1920, d_ry)
         rw = st.number_input("박스 너비", 100, 1080, d_rw)
         rh = st.number_input("박스 높이", 100, 1920, d_rh)
         box_alpha = st.slider("박스 투명도", 0, 255, 110)
-        map_size = st.slider("지도 크기", 50, 400, 150 if box_orient == "Vertical" else 100)
+        map_size = st.slider("지도 크기", 50, 400, 150)
 
 # --- [6. 렌더링 엔진] ---
 if bg_files:
@@ -179,26 +158,34 @@ if bg_files:
                             ty = (map_size - 10) - (la - min(lats)) / (max(lats) - min(lats) + 0.00001) * (map_size - 20)
                             return tx, ty
                         m_draw.line([trans(la, lo) for la, lo in pts], fill=hex_to_rgba(m_color, 255), width=4)
+                        # 지도는 박스 우상단 고정
                         overlay.paste(m_layer, (rx + rw - map_size - 20, ry + 20), m_layer)
                 
+                # 기록 항목 (km, bpm 소문자 준수)
                 items = [("distance", f"{v_dist} km"), ("time", t_val), ("pace", v_pace), ("avg bpm", f"{v_hr} bpm")]
                 
                 if box_orient == "Vertical":
-                    draw.text((rx+40, ry+30), v_act, font=f_t, fill=m_color)
-                    draw.text((rx+40, ry+30+t_sz+10), v_date, font=f_d, fill=sub_color)
-                    y_c = ry + t_sz + d_sz + 80
+                    draw.text((rx+40, ry+35), v_act, font=f_t, fill=m_color)
+                    draw.text((rx+40, ry+35+t_sz+10), v_date, font=f_d, fill=sub_color)
+                    y_c = ry + t_sz + d_sz + 90
                     for lab, val in items:
                         draw.text((rx+40, y_c), lab, font=f_l, fill="#AAAAAA")
                         draw.text((rx+40, y_c+l_sz+5), val, font=f_n, fill=sub_color); y_c += (n_sz + l_sz + 35)
-                else: # Horizontal 모드 텍스트 배치
-                    draw.text((rx+40, ry+20), v_act, font=f_t, fill=m_color)
-                    draw.text((rx+40, ry+20+t_sz+5), v_date, font=f_d, fill="#AAAAAA")
-                    x_c = rx + 300
-                    for lab, val in items:
-                        draw.text((x_c, ry+40), lab, font=f_l, fill="#AAAAAA")
-                        draw.text((x_c, ry+40+l_sz+5), val, font=f_n, fill=sub_color); x_c += 180
+                else: # Horizontal 모드: 제목 하단에 데이터 1열 배치
+                    draw.text((rx+40, ry+30), v_act, font=f_t, fill=m_color)
+                    draw.text((rx+40, ry+30+t_sz+5), v_date, font=f_d, fill="#AAAAAA")
+                    
+                    # 하단 데이터 열 배치 (4등분 균형)
+                    data_y = ry + t_sz + d_sz + 55
+                    sec_w = (rw - 80) // 4
+                    for i, (lab, val) in enumerate(items):
+                        item_x = rx + 40 + (i * sec_w)
+                        draw.text((item_x, data_y), lab, font=f_l, fill="#AAAAAA")
+                        draw.text((item_x, data_y + l_sz + 5), val, font=f_n, fill=sub_color)
             
             final = Image.alpha_composite(canvas, overlay).convert("RGB")
+        
+        # --- [WEEKLY 및 공통 마무리] ---
         else: # WEEKLY
             canvas = Image.new("RGBA", (1080, 1080), (0,0,0,255)); n = len(bg_files)
             cols = math.ceil(math.sqrt(n)); rows = math.ceil(n / cols)
@@ -219,10 +206,8 @@ if bg_files:
             final = canvas.convert("RGB")
 
         if log_file:
-            l_img = Image.open(log_file).convert("RGBA")
-            l_img = ImageOps.fit(l_img, (130, 130))
-            mask = Image.new('L', (130, 130), 0); ImageDraw.Draw(mask).ellipse((0, 0, 130, 130), fill=255)
-            l_img.putalpha(mask)
+            l_img = ImageOps.fit(Image.open(log_file).convert("RGBA"), (130, 130))
+            mask = Image.new('L', (130, 130), 0); ImageDraw.Draw(mask).ellipse((0, 0, 130, 130), fill=255); l_img.putalpha(mask)
             final.paste(l_img, (final.size[0] - 160, 30), l_img)
 
         with col2:
@@ -231,4 +216,3 @@ if bg_files:
             st.download_button("📸 DOWNLOAD", buf.getvalue(), "result.jpg", use_container_width=True)
     except Exception as e:
         st.error(f"Error: {e}")
-
