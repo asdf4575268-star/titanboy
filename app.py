@@ -16,6 +16,10 @@ mpl.use('Agg')
 def logout_and_clear():
     st.cache_data.clear(); st.cache_resource.clear(); st.session_state.clear(); st.query_params.clear(); st.rerun()
 
+def hex_to_rgba(hex_color, alpha):
+    hex_color = hex_color.lstrip('#')
+    return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4)) + (alpha,)
+
 if 'access_token' not in st.session_state: st.session_state['access_token'] = None
 
 # --- [2. Strava 인증] ---
@@ -138,46 +142,12 @@ with col3:
     bw = st.number_input("박스 너비", 100, 1080, 940 if box_orient=="Horizontal" else 480)
     bh = st.number_input("박스 높이", 100, 1080, 260 if box_orient=="Horizontal" else 550)
     box_alpha = st.slider("박스 투명도", 0, 255, 130)
-    
-    # 지도/그래프 세부 설정 (작고 흐릿하게 조절 가능)
     vis_sz = st.slider("지도/그래프 크기", 50, 800, 180 if mode=="DAILY" else 800)
-    vis_alpha = st.slider("지도/그래프 투명도", 0, 255, 80) # 기본값을 낮게 설정하여 흐릿하게 함
-    
-    if mode == "WEEKLY": 
-        g_y_off = st.slider("그래프 높이 조절", 0, 1000, 150)
+    vis_alpha = st.slider("지도/그래프 투명도", 0, 255, 80)
+    if mode == "WEEKLY": g_y_off = st.slider("그래프 높이 조절", 0, 1000, 150)
 
 # --- [6. 렌더링 엔진] ---
 try:
-    f_t, f_d, f_n, f_l = load_font(sel_font, 90), load_font(sel_font, 30), load_font(sel_font, 60), load_font(sel_font, 20)
-    canvas = Image.new("RGBA", (CW, CH), (0, 0, 0, 255))
-    
-    # ... [배경 사진/콜라주 로직 생략] ...
-
-    overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
-    
-    # 1. 시각화 소스 생성 (투명도 반영)
-    vis_layer = None
-    if mode == "DAILY" and a and a.get('map', {}).get('summary_polyline'):
-        pts = polyline.decode(a['map']['summary_polyline']); lats, lons = zip(*pts)
-        vis_layer = Image.new("RGBA", (vis_sz, vis_sz), (0,0,0,0)); m_draw = ImageDraw.Draw(vis_layer)
-        def tr(la, lo): 
-            m = 20
-            return (lo-min(lons))/(max(lons)-min(lons)+1e-5)*(vis_sz-m*2)+m, (vis_sz-m)-(la-min(lats))/(la_max-la_min+1e-5)*(vis_sz-m*2)
-        
-        # 포인트 컬러에 투명도(vis_alpha) 적용
-        target_rgba = hex_to_rgba(m_color, vis_alpha)
-        m_draw.line([tr(la, lo) for la, lo in pts], fill=target_rgba, width=4) # 선 굵기를 4로 가늘게 변경
-        
-    elif mode == "WEEKLY" and weekly_data:
-        chart_img = create_bar_chart(weekly_data['dists'], m_color)
-        w_p = (vis_sz / float(chart_img.size[0]))
-        vis_layer = chart_img.resize((vis_sz, int(chart_img.size[1]*w_p)), Image.Resampling.LANCZOS)
-        # 그래프 이미지 전체에 투명도 적용
-        alpha_mask = vis_layer.getchannel('A').point(lambda x: x * (vis_alpha / 255))
-        vis_layer.putalpha(alpha_mask)
-
-# --- [6. 렌더링 엔진] ---
-    try:    
     f_t, f_d, f_n, f_l = load_font(sel_font, 90), load_font(sel_font, 30), load_font(sel_font, 60), load_font(sel_font, 20)
     canvas = Image.new("RGBA", (CW, CH), (0, 0, 0, 255))
     
@@ -193,36 +163,26 @@ try:
                 canvas.paste(img, (0 if (i==num_pics-1 and num_pics%2==1 and cols==2) else (i%cols)*w_u, (i//cols)*h_u))
 
     overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
-    
-    # 1. 시각화 소스 생성
     vis_layer = None
     if mode == "DAILY" and a and a.get('map', {}).get('summary_polyline'):
         pts = polyline.decode(a['map']['summary_polyline']); lats, lons = zip(*pts)
         vis_layer = Image.new("RGBA", (vis_sz, vis_sz), (0,0,0,0)); m_draw = ImageDraw.Draw(vis_layer)
-        def tr(la, lo): return (lo-min(lons))/(max(lons)-min(lons)+1e-5)*(vis_sz-40)+20, (vis_sz-20)-(la-min(lats))/(max(lats)-min(lats)+1e-5)*(vis_sz-40)
-        m_draw.line([tr(la, lo) for la, lo in pts], fill=m_color, width=8)
+        def tr(la, lo): return (lo-min(lons))/(max(lons)-min(lons)+1e-5)*(vis_sz-30)+15, (vis_sz-15)-(la-min(lats))/(max(lats)-min(lats)+1e-5)*(vis_sz-30)
+        m_draw.line([tr(la, lo) for la, lo in pts], fill=hex_to_rgba(m_color, vis_alpha), width=4)
     elif mode == "WEEKLY" and weekly_data:
         chart_img = create_bar_chart(weekly_data['dists'], m_color)
         w_p = (vis_sz / float(chart_img.size[0])); vis_layer = chart_img.resize((vis_sz, int(chart_img.size[1]*w_p)), Image.Resampling.LANCZOS)
+        alpha_mask = vis_layer.getchannel('A').point(lambda x: x * (vis_alpha / 255)); vis_layer.putalpha(alpha_mask)
 
-    # 2. 로그박스 및 텍스트 배치
     draw.rectangle([bx, by, bx + bw, by + bh], fill=(0,0,0,box_alpha))
     items = [("distance", f"{v_dist} km"), ("time", v_time), ("pace", v_pace), ("avg bpm", f"{v_hr} bpm")]
     
     if mode == "DAILY" and vis_layer:
-        # [DAILY] 지도를 박스 내부 레이아웃에 맞춰 배치
-        if box_orient == "Vertical":
-            # 활동명 우측 상단 배치
-            overlay.paste(vis_layer, (bx + bw - vis_layer.width - 20, by + 20), vis_layer)
-        else:
-            # 활동명 좌측 배치
-            overlay.paste(vis_layer, (bx + 20, by + (bh - vis_layer.height)//2), vis_layer)
-    
+        if box_orient == "Vertical": overlay.paste(vis_layer, (bx + bw - vis_layer.width - 20, by + 20), vis_layer)
+        else: overlay.paste(vis_layer, (bx + 20, by + (bh - vis_layer.height)//2), vis_layer)
     if mode == "WEEKLY" and vis_layer:
-        # [WEEKLY] 그래프는 박스 외부 상단 중앙
         overlay.paste(vis_layer, ((CW - vis_layer.width)//2, by - vis_layer.height - g_y_off), vis_layer)
 
-    # 텍스트 렌더링
     if box_orient == "Vertical":
         draw.text((bx+40, by+30), v_act, font=f_t, fill=m_color)
         draw.text((bx+40, by+130), v_date, font=f_d, fill="#AAAAAA")
@@ -231,7 +191,6 @@ try:
             draw.text((bx+40, y_c), lab.lower(), font=f_l, fill="#AAAAAA")
             draw.text((bx+40, y_c+25), val.lower() if "bpm" in val or "km" in val else val, font=f_n, fill=sub_color); y_c += 110
     else:
-        # Horizontal 모드일 때 지도가 있으면 텍스트를 오른쪽으로 밀기
         text_x_off = vis_layer.width + 40 if (mode == "DAILY" and vis_layer) else 40
         draw.text((bx + text_x_off, by + 40), v_act, font=f_t, fill=m_color)
         draw.text((bx + text_x_off, by + 130), v_date, font=f_d, fill="#AAAAAA")
@@ -251,6 +210,5 @@ try:
         buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
         st.download_button(f"📸 {mode} DOWNLOAD", buf.getvalue(), f"{mode.lower()}_result.jpg", use_container_width=True)
         if st.session_state['access_token']: st.button("🔓 로그아웃", on_click=logout_and_clear)
-except Exception as e: st.error(f"Error: {e}")
-
-
+except Exception as e:
+    st.error(f"Error: {e}")
