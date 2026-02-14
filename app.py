@@ -46,7 +46,7 @@ def get_circle_logo(img_file, size=(130, 130)):
     img.putalpha(mask)
     return img
 
-# 인증 처리 (기존 로직 동일)
+# 인증 처리
 params = st.query_params
 if "code" in params and st.session_state['access_token'] is None:
     try:
@@ -104,11 +104,11 @@ if act_res.status_code == 200:
 
     with col3:
         st.header("🎨 DESIGN")
+        show_box = st.checkbox("로그 박스 표시", value=True) # 박스 표시 여부 선택
         sel_font = st.selectbox("폰트 선택", ["BlackHanSans", "Jua", "DoHyeon", "NanumBrush", "Sunflower"])
         sel_m_color = st.selectbox("포인트 컬러", list(COLOR_OPTIONS.keys()), index=0)
         sel_sub_color = st.selectbox("서브 컬러", list(COLOR_OPTIONS.keys()), index=1)
-        sel_map_color = st.selectbox("지도 컬러", list(COLOR_OPTIONS.keys()), index=0) # 포인트와 맞춤
-        m_color, sub_color, map_color = COLOR_OPTIONS[sel_m_color], COLOR_OPTIONS[sel_sub_color], COLOR_OPTIONS[sel_map_color]
+        m_color, sub_color = COLOR_OPTIONS[sel_m_color], COLOR_OPTIONS[sel_sub_color]
 
         st.markdown("---")
         t_sz, d_sz, n_sz, l_sz = st.slider("활동명 크기", 10, 200, 90), st.slider("날짜 크기", 5, 100, 30), st.slider("숫자 크기", 10, 200, 60), st.slider("라벨 크기", 5, 80, 20)
@@ -117,15 +117,11 @@ if act_res.status_code == 200:
             st.markdown("---")
             box_mode = st.radio("박스 정렬", ["Vertical", "Horizontal"])
             rx, ry = st.slider("X 위치", 0, 1080, 70), st.slider("Y 위치", 0, 1920, 1150)
-            
-            # 초기 박스 사이즈 설정
             auto_w = 600 if box_mode == "Vertical" else 1000
             auto_h = (t_sz + d_sz + 4 * (n_sz + l_sz + 35) + 120) if box_mode == "Vertical" else (t_sz + d_sz + n_sz + l_sz + 180)
             rw, rh = st.slider("박스 가로 크기", 100, 1080, int(auto_w)), st.slider("박스 세로 크기", 100, 1500, int(auto_h))
-            
-            # [지도 옵션]
-            map_size = st.slider("지도 크기", 50, 400, 150)
-            box_alpha, map_alpha = st.slider("박스 투명도", 0, 255, 110), st.slider("지도 투명도", 0, 255, 255)
+            map_size, map_alpha = st.slider("지도 크기", 50, 400, 150), st.slider("지도 투명도", 0, 255, 255)
+            box_alpha = st.slider("박스 투명도", 0, 255, 110)
         
         st.markdown("<br><br>", unsafe_allow_html=True)
         if st.button("🔓 로그아웃", use_container_width=True): logout()
@@ -138,58 +134,59 @@ if act_res.status_code == 200:
             overlay = Image.new("RGBA", canvas.size, (0, 0, 0, 0)); draw = ImageDraw.Draw(overlay)
             f_t, f_d, f_n, f_l = load_font(sel_font, t_sz), load_font(sel_font, d_sz), load_font(sel_font, n_sz), load_font(sel_font, l_sz)
             
-            # 박스 배경
-            draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0, 0, 0, box_alpha))
-            
-            # 미니 지도 렌더링
-            p_line = a['map']['summary_polyline'] if 'map' in a and a['map'].get('summary_polyline') else None
-            if p_line:
-                pts = polyline.decode(p_line); lats, lons = zip(*pts)
-                map_layer = Image.new("RGBA", (map_size, map_size), (0,0,0,0)); m_draw = ImageDraw.Draw(map_layer)
-                def trans_mini(la, lo):
-                    tx = 10 + (lo - min(lons)) / (max(lons) - min(lons) + 0.0001) * (map_size - 20)
-                    ty = (map_size - 10) - (la - min(lats)) / (max(lats) - min(lats) + 0.0001) * (map_size - 20)
-                    return tx, ty
-                m_draw.line([trans_mini(la, lo) for la, lo in pts], fill=hex_to_rgba(map_color, map_alpha), width=5)
-                # 활동명 오른쪽 상단 구석에 배치
-                overlay.paste(map_layer, (rx + rw - map_size - 20, ry + 20), map_layer)
+            if show_box:
+                draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0, 0, 0, box_alpha))
+                p_line = a['map']['summary_polyline'] if 'map' in a and a['map'].get('summary_polyline') else None
+                if p_line:
+                    pts = polyline.decode(p_line); lats, lons = zip(*pts)
+                    map_layer = Image.new("RGBA", (map_size, map_size), (0,0,0,0)); m_draw = ImageDraw.Draw(map_layer)
+                    def trans_mini(la, lo):
+                        tx = 10 + (lo - min(lons)) / (max(lons) - min(lons) + 0.0001) * (map_size - 20)
+                        ty = (map_size - 10) - (la - min(lats)) / (max(lats) - min(lats) + 0.0001) * (map_size - 20)
+                        return tx, ty
+                    m_draw.line([trans_mini(la, lo) for la, lo in pts], fill=hex_to_rgba(m_color, map_alpha), width=5)
+                    overlay.paste(map_layer, (rx + rw - map_size - 20, ry + 20), map_layer)
 
-            # 텍스트 렌더링
-            items = [("DISTANCE", f"{v_dist} km"), ("TIME", t_val), ("AVG PACE", f"{v_pace} /km"), ("AVG HR", f"{v_hr} bpm")]
-            if box_mode == "Vertical":
-                draw.text((rx+45, ry+35), v_act, font=f_t, fill=m_color)
-                draw.text((rx+45, ry+35+t_sz+10), v_date, font=f_d, fill=sub_color)
-                y_c = ry + t_sz + d_sz + 85
-                for lab, val in items:
-                    draw.text((rx+45, y_c), lab, font=f_l, fill="#AAAAAA")
-                    draw.text((rx+45, y_c+l_sz+5), val, font=f_n, fill=sub_color)
-                    y_c += (n_sz + l_sz + 38)
-            else:
-                draw.text((rx+40, ry+40), v_act, font=f_t, fill=m_color)
-                draw.text((rx+40, ry+40+t_sz), v_date, font=f_d, fill=sub_color)
-                x_s = rw // (len(items) + 1)
-                for i, (lab, val) in enumerate(items):
-                    draw.text((rx + x_s*(i+1), ry+rh-n_sz-l_sz-30), lab, font=f_l, fill="#AAAAAA", anchor="ms")
-                    draw.text((rx + x_s*(i+1), ry+rh-n_sz-5), val, font=f_n, fill=sub_color, anchor="ms")
+                items = [("DISTANCE", f"{v_dist} km"), ("TIME", t_val), ("AVG PACE", f"{v_pace} /km"), ("AVG HR", f"{v_hr} bpm")]
+                if box_mode == "Vertical":
+                    draw.text((rx+45, ry+35), v_act, font=f_t, fill=m_color)
+                    draw.text((rx+45, ry+35+t_sz+10), v_date, font=f_d, fill=sub_color)
+                    y_c = ry + t_sz + d_sz + 85
+                    for lab, val in items:
+                        draw.text((rx+45, y_c), lab, font=f_l, fill="#AAAAAA")
+                        draw.text((rx+45, y_c+l_sz+5), val, font=f_n, fill=sub_color); y_c += (n_sz + l_sz + 38)
+                else:
+                    draw.text((rx+40, ry+40), v_act, font=f_t, fill=m_color)
+                    draw.text((rx+40, ry+40+t_sz), v_date, font=f_d, fill=sub_color)
+                    x_s = rw // (len(items) + 1)
+                    for i, (lab, val) in enumerate(items):
+                        draw.text((rx + x_s*(i+1), ry+rh-n_sz-l_sz-30), lab, font=f_l, fill="#AAAAAA", anchor="ms")
+                        draw.text((rx + x_s*(i+1), ry+rh-n_sz-5), val, font=f_n, fill=sub_color, anchor="ms")
             final = Image.alpha_composite(canvas, overlay).convert("RGB")
         else:
-            # WEEKLY
+            # WEEKLY: 공백 없는 완벽 콜라주
             canvas = Image.new("RGBA", (1080, 1080), (0,0,0,255)); n = len(bg_files)
-            cols = 2 if n > 1 else 1; rows = math.ceil(n / cols); img_h, img_w = 880 // rows, 1080 // cols
-            for i, f in enumerate(bg_files): canvas.paste(ImageOps.fit(Image.open(f).convert("RGBA"), (img_w, img_h)), ((i % cols) * img_w, (i // cols) * img_h))
-            draw = ImageDraw.Draw(canvas); f_t, f_n, f_l = load_font(sel_font, 45), load_font(sel_font, 35), load_font(sel_font, 18)
-            draw.rectangle([0, 880, 1080, 1080], fill=(15, 15, 15, 255))
-            draw.text((40, 910), v_act_w, font=f_t, fill=m_color)
-            w_items = [("DIST", v_dist_w), ("TIME", v_time_w), ("SPD", v_spd_w), ("HR", v_hr_w)]
-            for i, (lab, val) in enumerate(w_items):
-                x_p = 40 + (i * 260); draw.text((x_p, 975), lab, font=f_l, fill="#AAAAAA"); draw.text((x_p, 1000), val, font=f_n, fill=sub_color)
+            cols = math.ceil(math.sqrt(n)); rows = math.ceil(n / cols)
+            img_w, img_h = 1080 // cols, (1080 if not show_box else 880) // rows
+            for i, f in enumerate(bg_files):
+                x, y = (i % cols) * img_w, (i // cols) * img_h
+                # 마지막 이미지들이 가로 전체를 채우도록 너비 보정
+                current_w = img_w if (i + 1) % cols != 0 else 1080 - x
+                canvas.paste(ImageOps.fit(Image.open(f).convert("RGBA"), (current_w, img_h)), (x, y))
+            
+            if show_box:
+                draw = ImageDraw.Draw(canvas); f_t, f_n, f_l = load_font(sel_font, 45), load_font(sel_font, 35), load_font(sel_font, 18)
+                draw.rectangle([0, 880, 1080, 1080], fill=(15, 15, 15, 255))
+                draw.text((40, 910), v_act_w, font=f_t, fill=m_color)
+                w_items = [("DIST", v_dist_w), ("TIME", v_time_w), ("SPD", v_spd_w), ("HR", v_hr_w)]
+                for i, (lab, val) in enumerate(w_items):
+                    x_p = 40 + (i * 260); draw.text((x_p, 975), lab, font=f_l, fill="#AAAAAA"); draw.text((x_p, 1000), val, font=f_n, fill=sub_color)
             final = canvas.convert("RGB")
 
         if log_file:
-            logo = get_circle_logo(log_file)
-            final.paste(logo, (920, 30), logo if logo.mode=='RGBA' else None)
+            logo = get_circle_logo(log_file); final.paste(logo, (920, 30), logo if logo.mode=='RGBA' else None)
 
         with col2:
             st.image(final, use_container_width=True)
             buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
-            st.download_button("📸 DOWNLOAD", buf.getvalue(), "garmin_final.jpg", use_container_width=True)
+            st.download_button("📸 DOWNLOAD", buf.getvalue(), "garmin_weekly.jpg", use_container_width=True)
