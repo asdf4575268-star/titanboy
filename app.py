@@ -1,7 +1,6 @@
 import streamlit as st
 from PIL import Image, ImageDraw, ImageFont, ImageOps
-import io, os, requests, polyline, time
-from datetime import datetime, timedelta
+import io, os, requests, polyline, math
 
 # --- [1. 기본 설정] ---
 CLIENT_ID = '202274'
@@ -10,35 +9,59 @@ ACTUAL_URL = "https://titanboy-5fxenvcchdubwx3swjh8ut.streamlit.app"
 
 st.set_page_config(page_title="Garmin Photo Dashboard", layout="wide")
 
-# 세션 초기화 함수
-def reset_session():
-    for key in list(st.session_state.keys()):
-        del st.session_state[key]
+if 'access_token' not in st.session_state:
+    st.session_state['access_token'] = None
+
+def logout():
+    st.session_state.clear()
+    st.query_params.clear()
     st.rerun()
 
-# --- [2. 유틸리티 함수] ---
+# --- [2. 인증 로직 - Scope 강화] ---
+query_params = st.query_params
+if "code" in query_params and st.session_state['access_token'] is None:
+    try:
+        res = requests.post("https://www.strava.com/oauth/token", data={
+            "client_id": CLIENT_ID, "client_secret": CLIENT_SECRET,
+            "code": query_params["code"], "grant_type": "authorization_code"
+        }, timeout=15)
+        if res.status_code == 200:
+            st.session_state['access_token'] = res.json()['access_token']
+            st.query_params.clear()
+            st.rerun()
+        else:
+            st.error("인증 토큰 교환 실패. Strava 설정을 확인하세요.")
+    except Exception as e:
+        st.error(f"연결 오류: {e}")
+
+if st.session_state['access_token'] is None:
+    st.title("🏃 Garmin Photo Dashboard")
+    # scope에 activity:read_all을 반드시 포함해야 기록이 보입니다.
+    auth_url = (f"https://www.strava.com/oauth/authorize?client_id={CLIENT_ID}"
+                f"&response_type=code&redirect_uri={ACTUAL_URL}"
+                f"&scope=read,activity:read_all&approval_prompt=force")
+    st.info("기록을 불러오려면 Strava 연동이 필요합니다. (활동 읽기 권한을 꼭 체크해주세요)")
+    st.link_button("🚀 Strava 연동하기", auth_url)
+    st.stop()
+
+# --- [3. 유틸리티 함수] ---
 @st.cache_resource
-def load_custom_font(font_type, size):
+def load_font(font_type, size):
     fonts = {
         "BlackHanSans": "https://github.com/google/fonts/raw/main/ofl/blackhansans/BlackHanSans-Regular.ttf",
-        "NanumBrush": "https://github.com/google/fonts/raw/main/ofl/nanumbrushscript/NanumBrushScript-Regular.ttf",
         "Jua": "https://github.com/google/fonts/raw/main/ofl/jua/Jua-Regular.ttf",
         "DoHyeon": "https://github.com/google/fonts/raw/main/ofl/dohyeon/DoHyeon-Regular.ttf",
-        "GothicA1": "https://github.com/google/fonts/raw/main/ofl/gothica1/GothicA1-Black.ttf",
-        "SongMyung": "https://github.com/google/fonts/raw/main/ofl/songmyung/SongMyung-Regular.ttf",
-        "SingleDay": "https://github.com/google/fonts/raw/main/ofl/singleday/SingleDay-Regular.ttf",
-        "Pretendard": "https://github.com/google/fonts/raw/main/ofl/notosanskr/NotoSansKR%5Bwght%5D.ttf"
+        "NanumBrush": "https://github.com/google/fonts/raw/main/ofl/nanumbrushscript/NanumBrushScript-Regular.ttf",
+        "Sunflower": "https://github.com/google/fonts/raw/main/ofl/sunflower/Sunflower-Bold.ttf"
     }
-    font_url = fonts.get(font_type, fonts["Jua"])
-    font_path = f"font_{font_type}.ttf"
-    if not os.path.exists(font_path):
+    f_url = fonts.get(font_type, fonts["BlackHanSans"])
+    f_path = f"font_{font_type}_{int(size)}.ttf"
+    if not os.path.exists(f_path):
         try:
-            r = requests.get(font_url, timeout=10)
-            with open(font_path, "wb") as f: f.write(r.content)
-            time.sleep(0.5)
+            r = requests.get(f_url, timeout=10)
+            with open(f_path, "wb") as f: f.write(r.content)
         except: return ImageFont.load_default()
-    try: return ImageFont.truetype(font_path, int(size))
-    except: return ImageFont.load_default()
+    return ImageFont.truetype(f_path, int(size))
 
 def get_circle_logo(img_file, size=(130, 130)):
     img = Image.open(img_file).convert("RGBA")
@@ -49,172 +72,157 @@ def get_circle_logo(img_file, size=(130, 130)):
     img.putalpha(mask)
     return img
 
-def create_collage(image_files, target_size=(1080, 1350)):
-    imgs = [ImageOps.exif_transpose(Image.open(f).convert("RGB")) for f in image_files]
-    if not imgs: return None
-    count = len(imgs)
-    cols = 1 if count == 1 else (2 if count <= 4 else 3)
-    rows = (count + cols - 1) // cols
-    cell_w, cell_h = target_size[0] // cols, target_size[1] // rows
-    collage = Image.new("RGB", target_size, (0, 0, 0))
-    for i, img in enumerate(imgs):
-        is_last = (i == count - 1)
-        draw_w = cell_w * (cols - (count % cols) + 1) if is_last and (count % cols != 0) else cell_w
-        img_fitted = ImageOps.fit(img, (draw_w, cell_h), centering=(0.5, 0.5))
-        collage.paste(img_fitted, ((i % cols) * cell_w, (i // cols) * cell_h))
-    return collage
+def hex_to_rgba(hex_color, alpha):
+    hex_color = hex_color.lstrip('#')
+    rgb = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+    return rgb + (alpha,)
 
-# --- [3. 스트라바 인증] ---
-if 'access_token' not in st.session_state:
-    st.session_state['access_token'] = None
-
-params = st.query_params
-if "code" in params and not st.session_state['access_token']:
-    try:
-        res = requests.post("https://www.strava.com/oauth/token", data={
-            "client_id": CLIENT_ID, "client_secret": CLIENT_SECRET,
-            "code": params["code"], "grant_type": "authorization_code"
-        })
-        if res.status_code == 200:
-            st.session_state['access_token'] = res.json()['access_token']
-            st.query_params.clear()
-            st.rerun()
-        else:
-            reset_session()
-    except:
-        reset_session()
-
-if not st.session_state['access_token']:
-    st.title("🏃 Garmin Photo Dashboard")
-    auth_url = f"https://www.strava.com/oauth/authorize?client_id={CLIENT_ID}&response_type=code&redirect_uri={ACTUAL_URL}&scope=activity:read_all&approval_prompt=force"
-    st.link_button("🚀 Strava 연동하기", auth_url)
-    if st.button("🔌 세션 강제 초기화"):
-        reset_session()
-    st.stop()
-
-# --- [4. 사이드바 (기본 크기 변경 적용)] ---
-with st.sidebar:
-    app_mode = st.radio("🚀 작업 모드", ["DAILY", "WEEKLY"])
-    st.markdown("---")
-    st.header("⚙️ 디자인/크기 설정")
-    selected_font = st.selectbox("폰트 선택", ["Jua", "BlackHanSans", "NanumBrush", "DoHyeon", "GothicA1", "SongMyung", "SingleDay", "Pretendard"])
-    main_color = st.color_picker("활동명 색상", "#FFD700")
-    num_color = st.color_picker("날짜/정보 색상", "#FFFFFF")
-    route_color = st.selectbox("지도 경로 색상", ["Yellow", "Black", "White"])
-    
-    st.markdown("---")
-    # 🌟 요청하신 가이드로 기본값 수정 (80, 20, 50)
-    t_sz = st.slider("활동명", 10, 200, 80)
-    d_sz = st.slider("날짜", 5, 100, 20)
-    n_sz = st.slider("숫자", 10, 300, 50)
-    l_sz = st.slider("라벨", 10, 80, 25)
-    
-    st.markdown("---")
-    rx, ry, rw, rh = st.slider("X", 0, 1080, 70), st.slider("Y", 0, 1920, 1150), st.slider("Width", 300, 1000, 500), st.slider("Height", 300, 1200, 720)
-    alpha = st.slider("박스 투명도", 0, 255, 60)
-    map_alpha = st.slider("지도 투명도", 0, 255, 100)
-
-# --- [5. 실행 로직] ---
+# --- [4. 데이터 로드 및 검증] ---
+acts = []
 headers = {'Authorization': f"Bearer {st.session_state['access_token']}"}
+with st.sidebar:
+    with st.status("데이터 동기화 중...", expanded=False) as status:
+        try:
+            # 최근 30개의 활동을 가져옵니다.
+            act_res = requests.get("https://www.strava.com/api/v3/athlete/activities?per_page=30", headers=headers, timeout=15)
+            if act_res.status_code == 200:
+                acts = act_res.json()
+                status.update(label="동기화 완료!", state="complete")
+            elif act_res.status_code == 401:
+                logout()
+            else:
+                st.error(f"데이터 로드 실패 (코드: {act_res.status_code})")
+        except:
+            st.error("Strava 서버 연결에 실패했습니다.")
 
-if app_mode == "DAILY":
-    act_res = requests.get("https://www.strava.com/api/v3/athlete/activities?per_page=10", headers=headers)
-    if act_res.status_code == 200:
-        acts = act_res.json()
-        sel = st.selectbox("기록 선택", [f"{a['start_date_local']} - {a['name']}" for a in acts])
-        a = acts[[f"{x['start_date_local']} - {x['name']}" for x in acts].index(sel)]
+# --- [5. UI 레이아웃] ---
+col1, col2, col3 = st.columns([1, 2, 1], gap="medium")
+COLOR_OPTIONS = {"Garmin Yellow": "#FFD700", "Pure White": "#FFFFFF", "Neon Orange": "#FF4500", "Electric Blue": "#00BFFF", "Soft Grey": "#AAAAAA"}
+
+with col2:
+    mode = st.radio("작업 모드", ["DAILY", "WEEKLY"], horizontal=True)
+    
+    if not acts:
+        st.warning("⚠️ Strava에서 활동 기록을 찾을 수 없습니다. 연동 시 '활동 데이터 읽기' 권한을 승인했는지 확인해주세요.")
+    
+    if mode == "DAILY" and acts:
+        # 활동명 리스트 생성
+        act_options = [f"{a['start_date_local'][:10]} - {a['name']}" for a in acts]
+        sel_str = st.selectbox("활동 선택", act_options)
+        idx = act_options.index(sel_str)
+        a = acts[idx]
         
-        m_time = a.get('moving_time', 0)
-        time_v = f"{m_time//3600:02d}:{ (m_time%3600)//60 :02d}:{m_time%60:02d}" if m_time >= 3600 else f"{m_time//60:02d}:{m_time%60:02d}"
-        dist_km = a.get('distance', 0) / 1000
-        pace_v = f"{int((m_time/dist_km)//60)}:{int((m_time/dist_km)%60):02d}" if dist_km > 0 else "0:00"
-        hr_v = str(int(a.get('average_heartrate', 0))) if a.get('average_heartrate') else "0"
+        d_km = a.get('distance', 0)/1000
+        m_sec = a.get('moving_time', 0)
+        p_val = f"{int((m_sec/d_km)//60)}'{int((m_sec/d_km)%60):02d}\"" if d_km > 0 else "0'00\""
+        h_val = str(int(a.get('average_heartrate', 0))) if a.get('average_heartrate') else "0"
+        t_val = f"{m_sec//3600:02d}:{(m_sec%3600)//60:02d}:{m_sec%60:02d}" if m_sec >= 3600 else f"{m_sec//60:02d}:{m_sec%60:02d}"
+    elif mode == "WEEKLY" and acts:
+        w_acts = acts[:7]
+        t_dist = sum([x.get('distance', 0) for x in w_acts]) / 1000
+        t_time = sum([x.get('moving_time', 0) for x in w_acts])
+        avg_p_val = f"{int((t_time/t_dist)//60)}'{int((t_time/t_dist)%60):02d}\"" if t_dist > 0 else "0'00\""
+        t_hrs = [x.get('average_heartrate', 0) for x in w_acts if x.get('average_heartrate')]
+        avg_hr = int(sum(t_hrs)/len(t_hrs)) if t_hrs else 0
 
-        col_files, col_inputs = st.columns([1, 1])
-        with col_files:
-            bg_file = st.file_uploader("배경 사진", type=['jpg', 'jpeg', 'png'])
-            log_file = st.file_uploader("로고 아이콘", type=['jpg', 'jpeg', 'png'])
-        with col_inputs:
-            v_act, v_date = st.text_input("활동명", a['name']), st.text_input("날짜", a.get('start_date_local', "")[:16].replace("T", " "))
-            v_dist, v_time = st.text_input("거리(km)", f"{dist_km:.2f}"), st.text_input("시간", time_v)
-            v_pace, v_hr = st.text_input("페이스", pace_v), st.text_input("심박수(bpm)", hr_v)
-            v_weather = st.text_input("날씨", "")
+with col1:
+    st.header("📸 DATA")
+    bg_files = st.file_uploader("사진 선택", type=['jpg','jpeg','png'], accept_multiple_files=True)
+    log_file = st.file_uploader("로고 선택", type=['jpg','jpeg','png'])
+    
+    if mode == "DAILY" and acts:
+        v_act = st.text_input("활동명", a['name'])
+        v_date = st.text_input("날짜", a['start_date_local'][:10])
+        v_dist = st.text_input("거리(km)", f"{d_km:.2f}")
+        v_pace = st.text_input("페이스(분/km)", p_val)
+        v_hr = st.text_input("심박(bpm)", h_val)
+    elif mode == "WEEKLY" and acts:
+        v_act_w = st.text_input("주간 제목", "WEEKLY RECAP")
+        v_dist_w = st.text_input("총 거리(km)", f"{t_dist:.2f}")
+        v_pace_w = st.text_input("평균 페이스(분/km)", avg_p_val)
+        v_hr_w = st.text_input("평균 심박(bpm)", f"{avg_hr}")
 
-        if bg_file:
-            orig_bg = ImageOps.exif_transpose(Image.open(bg_file))
-            canvas = ImageOps.fit(orig_bg.convert("RGBA"), (1080, 1920), centering=(0.5, 0.5))
-            overlay = Image.new('RGBA', canvas.size, (0, 0, 0, 0))
-            draw = ImageDraw.Draw(overlay)
-            f_t, f_d, f_n, f_l = load_custom_font(selected_font, t_sz), load_custom_font(selected_font, d_sz), load_custom_font(selected_font, n_sz), load_custom_font(selected_font, l_sz)
+with col3:
+    st.header("🎨 DESIGN")
+    show_box = st.checkbox("로그 박스 표시", value=True)
+    sel_font = st.selectbox("폰트 선택", ["BlackHanSans", "Jua", "DoHyeon", "NanumBrush", "Sunflower"])
+    m_color = COLOR_OPTIONS[st.selectbox("포인트 컬러", list(COLOR_OPTIONS.keys()), index=0)]
+    sub_color = COLOR_OPTIONS[st.selectbox("서브 컬러", list(COLOR_OPTIONS.keys()), index=1)]
+    
+    t_sz, d_sz, n_sz = 90, 30, 60 # 사용자 요청 디폴트값
+    t_sz = st.slider("활동명 크기", 10, 200, t_sz)
+    d_sz = st.slider("날짜 크기", 5, 100, d_sz)
+    n_sz = st.slider("숫자 크기", 10, 200, n_sz)
+    l_sz = st.slider("라벨 크기", 5, 80, 20)
+    
+    if mode == "DAILY":
+        rx, ry = st.slider("X 위치", 0, 1080, 70), st.slider("Y 위치", 0, 1920, 1150)
+        box_alpha = st.slider("박스 투명도", 0, 255, 110)
+        map_size, map_alpha = st.slider("지도 크기", 50, 400, 150), st.slider("지도 투명도", 0, 255, 255)
 
-            # 1. 로그박스
-            draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0, 0, 0, alpha))
+# --- [6. 렌더링 엔진] ---
+if bg_files:
+    try:
+        f_t, f_d, f_n, f_l = load_font(sel_font, t_sz), load_font(sel_font, d_sz), load_font(sel_font, n_sz), load_font(sel_font, l_sz)
+        
+        if mode == "DAILY":
+            img = ImageOps.exif_transpose(Image.open(bg_files[0]))
+            canvas = ImageOps.fit(img.convert("RGBA"), (1080, 1920))
+            overlay = Image.new("RGBA", (1080, 1920), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
             
-            # 2. 지도 배경 오버레이
-            poly = a.get('map', {}).get('summary_polyline', "")
-            if poly:
-                try:
-                    pts = polyline.decode(poly)
-                    lats, lons = [p[0] for p in pts], [p[1] for p in pts]
-                    mi_la, ma_la, mi_lo, ma_lo = min(lats), max(lats), min(lons), max(lons)
-                    r_img = Image.new("RGBA", (rw, rh), (0, 0, 0, 0))
-                    dr_r = ImageDraw.Draw(r_img)
-                    def sc(p):
-                        x = (p[1] - mi_lo) / (ma_lo - mi_lo + 1e-9) * (rw * 0.7) + (rw * 0.15)
-                        y = (rh * 0.7) - ((p[0] - mi_la) / (ma_la - mi_la + 1e-9) * (rh * 0.7)) + (rh * 0.15)
-                        return (x, y)
-                    r_f = {"Yellow": (255, 215, 0, map_alpha), "Black": (0, 0, 0, map_alpha), "White": (255, 255, 255, map_alpha)}.get(route_color, (255, 215, 0, map_alpha))
-                    dr_r.line([sc(p) for p in pts], fill=r_f, width=8)
-                    canvas.paste(r_img, (rx, ry), r_img)
-                except: pass
-
-            # 3. 텍스트
-            draw.text((rx + 50, ry + 40), v_act, font=f_t, fill=main_color)
-            draw.text((rx + rw - 50, ry + 40 + t_sz + 5), v_date, font=f_d, fill=num_color, anchor="ra")
-            
-            items = [("DISTANCE", f"{v_dist} km"), ("TIME", v_time), ("AVG PACE", f"{v_pace} /km"), ("AVG HR", f"{v_hr} bpm")]
-            if v_weather: items.append(("WEATHER", v_weather))
-            
-            line_y_start = ry + t_sz + d_sz + 60
-            spacing = ((ry + rh - 40) - line_y_start) / len(items)
-            for i, (lab, val) in enumerate(items):
-                py = line_y_start + (i * spacing)
-                draw.text((rx + 60, py), lab, font=f_l, fill="#AAAAAA")
-                draw.text((rx + 60, py + l_sz + 2), val, font=f_n, fill=num_color)
-
-            if log_file:
-                logo = get_circle_logo(log_file)
-                canvas.paste(logo, (910, 60), logo)
-
+            if show_box:
+                # 박스 너비 고정 (안정성)
+                draw.rectangle([rx, ry, rx + 650, ry + 680], fill=(0,0,0,box_alpha))
+                # 지도 그리기
+                if acts and 'a' in locals():
+                    p_line = a.get('map', {}).get('summary_polyline')
+                    if p_line:
+                        pts = polyline.decode(p_line); lats, lons = zip(*pts)
+                        m_layer = Image.new("RGBA", (map_size, map_size), (0,0,0,0)); m_draw = ImageDraw.Draw(m_layer)
+                        def trans(la, lo):
+                            tx = 10 + (lo - min(lons)) / (max(lons) - min(lons) + 0.00001) * (map_size - 20)
+                            ty = (map_size - 10) - (la - min(lats)) / (max(lats) - min(lats) + 0.00001) * (map_size - 20)
+                            return tx, ty
+                        m_draw.line([trans(la, lo) for la, lo in pts], fill=hex_to_rgba(m_color, map_alpha), width=4)
+                        overlay.paste(m_layer, (rx + 650 - map_size - 20, ry + 20), m_layer)
+                
+                items = [("distance", f"{v_dist} km"), ("time", t_val), ("pace", v_pace), ("avg bpm", f"{v_hr} bpm")]
+                draw.text((rx+40, ry+30), v_act, font=f_t, fill=m_color)
+                draw.text((rx+40, ry+30+t_sz+5), v_date, font=f_d, fill=sub_color)
+                y_c = ry + t_sz + d_sz + 60
+                for lab, val in items:
+                    draw.text((rx+40, y_c), lab, font=f_l, fill="#AAAAAA")
+                    draw.text((rx+40, y_c+l_sz+2), val, font=f_n, fill=sub_color); y_c += (n_sz + l_sz + 30)
             final = Image.alpha_composite(canvas, overlay).convert("RGB")
+            
+        else: # WEEKLY
+            canvas = Image.new("RGBA", (1080, 1080), (0,0,0,255)); n = len(bg_files)
+            cols = math.ceil(math.sqrt(n)); rows = math.ceil(n / cols)
+            bh = 880 if show_box else 1080
+            iw, ih = 1080 // cols, bh // rows
+            for i, f in enumerate(bg_files):
+                x, y = (i % cols) * iw, (i // cols) * ih
+                cw, ch = (iw if (i+1)%cols != 0 else 1080-x), (ih if (i+cols) < n else bh-y)
+                canvas.paste(ImageOps.fit(Image.open(f).convert("RGBA"), (cw, ch)), (x, y))
+            if show_box:
+                draw = ImageDraw.Draw(canvas)
+                draw.rectangle([0, 880, 1080, 1080], fill=(15,15,15,255))
+                draw.text((40, 900), v_act_w, font=load_font(sel_font, 45), fill=m_color)
+                w_items = [("dist", f"{v_dist_w} km"), ("pace", v_pace_w), ("bpm", f"{v_hr_w} bpm")]
+                for i, (lab, val) in enumerate(w_items):
+                    draw.text((40+i*340, 970), lab, font=f_l, fill="#AAAAAA")
+                    draw.text((40+i*340, 995), val, font=f_n, fill=sub_color)
+            final = canvas.convert("RGB")
+
+        if log_file:
+            logo = get_circle_logo(log_file)
+            final.paste(logo, (final.size[0] - logo.size[0] - 30, 30), logo)
+
+        with col2:
             st.image(final, use_container_width=True)
             buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
-            st.download_button("📸 DOWNLOAD", buf.getvalue(), "garmin_final.jpg")
+            st.download_button("📸 DOWNLOAD", buf.getvalue(), "garmin_result.jpg", use_container_width=True)
+    except Exception as e:
+        st.error(f"이미지 생성 오류: {e}")
 
-elif app_mode == "WEEKLY":
-    st.title("📅 Weekly Recap")
-    after_ts = int((datetime.now() - timedelta(days=7)).timestamp())
-    act_res = requests.get(f"https://www.strava.com/api/v3/athlete/activities?after={after_ts}", headers=headers)
-    if act_res.status_code == 200:
-        w_acts = act_res.json()
-        if w_acts:
-            total_dist = sum(a.get('distance', 0) for a in w_acts) / 1000
-            total_time = sum(a.get('moving_time', 0) for a in w_acts)
-            avg_hr = sum(a.get('average_heartrate', 0) for a in w_acts if a.get('average_heartrate')) / len([a for a in w_acts if a.get('average_heartrate')]) if any(a.get('average_heartrate') for a in w_acts) else 0
-            
-            m1, m2, m3 = st.columns(3)
-            m1.metric("이번 주 총 거리", f"{total_dist:.2f} km")
-            if total_dist > 0:
-                p_sec = total_time / total_dist
-                m2.metric("평균 페이스", f"{int(p_sec//60)}:{int(p_sec%60):02d} /km")
-            m3.metric("평균 심박수", f"{int(avg_hr)} bpm")
-            
-            st.markdown("---")
-            w_files = st.file_uploader("콜라주 사진 선택 (여러 장)", type=['jpg', 'jpeg', 'png'], accept_multiple_files=True)
-            if w_files:
-                collage = create_collage(w_files)
-                if collage:
-                    st.image(collage, use_container_width=True)
-                    buf = io.BytesIO(); collage.save(buf, format="JPEG", quality=95)
-                    st.download_button("📸 콜라주 저장", buf.getvalue(), "weekly_collage.jpg")
-
+st.sidebar.button("🔓 로그아웃", on_click=logout)
