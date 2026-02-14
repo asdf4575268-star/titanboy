@@ -9,15 +9,18 @@ ACTUAL_URL = "https://titanboy-5fxenvcchdubwx3swjh8ut.streamlit.app"
 
 st.set_page_config(page_title="Garmin Photo Dashboard", layout="wide")
 
-if 'access_token' not in st.session_state:
-    st.session_state['access_token'] = None
-
+# 세션 및 캐시 초기화 함수
 def logout():
+    st.cache_data.clear()
+    st.cache_resource.clear()
     st.session_state.clear()
     st.query_params.clear()
     st.rerun()
 
-# --- [2. 인증 로직 - Scope 강화] ---
+if 'access_token' not in st.session_state:
+    st.session_state['access_token'] = None
+
+# --- [2. 인증 로직 - 강제성 부여] ---
 query_params = st.query_params
 if "code" in query_params and st.session_state['access_token'] is None:
     try:
@@ -26,25 +29,26 @@ if "code" in query_params and st.session_state['access_token'] is None:
             "code": query_params["code"], "grant_type": "authorization_code"
         }, timeout=15)
         if res.status_code == 200:
-            st.session_state['access_token'] = res.json()['access_token']
+            data = res.json()
+            st.session_state['access_token'] = data['access_token']
+            # 현재 획득한 권한(scope) 저장
+            st.session_state['scope'] = data.get('scope', '')
             st.query_params.clear()
             st.rerun()
-        else:
-            st.error("인증 토큰 교환 실패. Strava 설정을 확인하세요.")
-    except Exception as e:
-        st.error(f"연결 오류: {e}")
+    except:
+        st.error("연결 중 오류가 발생했습니다.")
 
 if st.session_state['access_token'] is None:
     st.title("🏃 Garmin Photo Dashboard")
-    # scope에 activity:read_all을 반드시 포함해야 기록이 보입니다.
+    # 필수 권한: read, activity:read_all
     auth_url = (f"https://www.strava.com/oauth/authorize?client_id={CLIENT_ID}"
                 f"&response_type=code&redirect_uri={ACTUAL_URL}"
                 f"&scope=read,activity:read_all&approval_prompt=force")
-    st.info("기록을 불러오려면 Strava 연동이 필요합니다. (활동 읽기 권한을 꼭 체크해주세요)")
-    st.link_button("🚀 Strava 연동하기", auth_url)
+    st.warning("기록이 보이지 않는다면 아래 버튼을 눌러 권한을 다시 승인해 주세요.")
+    st.link_button("🚀 Strava 다시 연동하기", auth_url)
     st.stop()
 
-# --- [3. 유틸리티 함수] ---
+# --- [3. 유틸리티 및 데이터 로드] ---
 @st.cache_resource
 def load_font(font_type, size):
     fonts = {
@@ -57,79 +61,44 @@ def load_font(font_type, size):
     f_url = fonts.get(font_type, fonts["BlackHanSans"])
     f_path = f"font_{font_type}_{int(size)}.ttf"
     if not os.path.exists(f_path):
-        try:
-            r = requests.get(f_url, timeout=10)
-            with open(f_path, "wb") as f: f.write(r.content)
-        except: return ImageFont.load_default()
+        r = requests.get(f_url); open(f_path, "wb").write(r.content)
     return ImageFont.truetype(f_path, int(size))
 
-def get_circle_logo(img_file, size=(130, 130)):
-    img = Image.open(img_file).convert("RGBA")
-    img = ImageOps.fit(img, size, centering=(0.5, 0.5))
-    mask = Image.new('L', size, 0)
-    draw = ImageDraw.Draw(mask)
-    draw.ellipse((0, 0) + size, fill=255)
-    img.putalpha(mask)
-    return img
-
-def hex_to_rgba(hex_color, alpha):
-    hex_color = hex_color.lstrip('#')
-    rgb = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
-    return rgb + (alpha,)
-
-# --- [4. 데이터 로드 및 검증] ---
 acts = []
 headers = {'Authorization': f"Bearer {st.session_state['access_token']}"}
-with st.sidebar:
-    with st.status("데이터 동기화 중...", expanded=False) as status:
-        try:
-            # 최근 30개의 활동을 가져옵니다.
-            act_res = requests.get("https://www.strava.com/api/v3/athlete/activities?per_page=30", headers=headers, timeout=15)
-            if act_res.status_code == 200:
-                acts = act_res.json()
-                status.update(label="동기화 완료!", state="complete")
-            elif act_res.status_code == 401:
-                logout()
-            else:
-                st.error(f"데이터 로드 실패 (코드: {act_res.status_code})")
-        except:
-            st.error("Strava 서버 연결에 실패했습니다.")
+try:
+    act_res = requests.get("https://www.strava.com/api/v3/athlete/activities?per_page=30", headers=headers, timeout=15)
+    if act_res.status_code == 200:
+        acts = act_res.json()
+    elif act_res.status_code == 401:
+        logout()
+except:
+    pass
 
-# --- [5. UI 레이아웃] ---
-col1, col2, col3 = st.columns([1, 2, 1], gap="medium")
+# --- [4. UI 레이아웃] ---
+col1, col2, col3 = st.columns([1.2, 2, 1], gap="medium") # 사진 확인을 위해 col2를 넓게 유지
 COLOR_OPTIONS = {"Garmin Yellow": "#FFD700", "Pure White": "#FFFFFF", "Neon Orange": "#FF4500", "Electric Blue": "#00BFFF", "Soft Grey": "#AAAAAA"}
 
 with col2:
-    mode = st.radio("작업 모드", ["DAILY", "WEEKLY"], horizontal=True)
-    
+    mode = st.radio("모드", ["DAILY", "WEEKLY"], horizontal=True)
     if not acts:
-        st.warning("⚠️ Strava에서 활동 기록을 찾을 수 없습니다. 연동 시 '활동 데이터 읽기' 권한을 승인했는지 확인해주세요.")
-    
+        st.info("기록을 불러오는 중입니다... 잠시만 기다려주세요.")
+        if st.button("🔄 기록 새로고침"): st.rerun()
+
     if mode == "DAILY" and acts:
-        # 활동명 리스트 생성
         act_options = [f"{a['start_date_local'][:10]} - {a['name']}" for a in acts]
         sel_str = st.selectbox("활동 선택", act_options)
-        idx = act_options.index(sel_str)
-        a = acts[idx]
-        
+        a = acts[act_options.index(sel_str)]
         d_km = a.get('distance', 0)/1000
         m_sec = a.get('moving_time', 0)
         p_val = f"{int((m_sec/d_km)//60)}'{int((m_sec/d_km)%60):02d}\"" if d_km > 0 else "0'00\""
         h_val = str(int(a.get('average_heartrate', 0))) if a.get('average_heartrate') else "0"
         t_val = f"{m_sec//3600:02d}:{(m_sec%3600)//60:02d}:{m_sec%60:02d}" if m_sec >= 3600 else f"{m_sec//60:02d}:{m_sec%60:02d}"
-    elif mode == "WEEKLY" and acts:
-        w_acts = acts[:7]
-        t_dist = sum([x.get('distance', 0) for x in w_acts]) / 1000
-        t_time = sum([x.get('moving_time', 0) for x in w_acts])
-        avg_p_val = f"{int((t_time/t_dist)//60)}'{int((t_time/t_dist)%60):02d}\"" if t_dist > 0 else "0'00\""
-        t_hrs = [x.get('average_heartrate', 0) for x in w_acts if x.get('average_heartrate')]
-        avg_hr = int(sum(t_hrs)/len(t_hrs)) if t_hrs else 0
 
 with col1:
     st.header("📸 DATA")
-    bg_files = st.file_uploader("사진 선택", type=['jpg','jpeg','png'], accept_multiple_files=True)
-    log_file = st.file_uploader("로고 선택", type=['jpg','jpeg','png'])
-    
+    bg_files = st.file_uploader("배경 사진", type=['jpg','jpeg','png'], accept_multiple_files=True)
+    log_file = st.file_uploader("원형 로고", type=['jpg','jpeg','png'])
     if mode == "DAILY" and acts:
         v_act = st.text_input("활동명", a['name'])
         v_date = st.text_input("날짜", a['start_date_local'][:10])
@@ -137,54 +106,54 @@ with col1:
         v_pace = st.text_input("페이스(분/km)", p_val)
         v_hr = st.text_input("심박(bpm)", h_val)
     elif mode == "WEEKLY" and acts:
-        v_act_w = st.text_input("주간 제목", "WEEKLY RECAP")
+        w_acts = acts[:7]
+        t_dist = sum([x.get('distance', 0) for x in w_acts]) / 1000
+        t_time = sum([x.get('moving_time', 0) for x in w_acts])
+        avg_p_val = f"{int((t_time/t_dist)//60)}'{int((t_time/t_dist)%60):02d}\"" if t_dist > 0 else "0'00\""
+        t_hrs = [x.get('average_heartrate', 0) for x in w_acts if x.get('average_heartrate')]
+        avg_hr = int(sum(t_hrs)/len(t_hrs)) if t_hrs else 0
+        v_act_w = st.text_input("제목", "WEEKLY RECAP")
         v_dist_w = st.text_input("총 거리(km)", f"{t_dist:.2f}")
-        v_pace_w = st.text_input("평균 페이스(분/km)", avg_p_val)
-        v_hr_w = st.text_input("평균 심박(bpm)", f"{avg_hr}")
+        v_pace_w = st.text_input("평균 페이스", avg_p_val)
+        v_hr_w = st.text_input("평균 심박", f"{avg_hr}")
 
 with col3:
     st.header("🎨 DESIGN")
     show_box = st.checkbox("로그 박스 표시", value=True)
-    sel_font = st.selectbox("폰트 선택", ["BlackHanSans", "Jua", "DoHyeon", "NanumBrush", "Sunflower"])
-    m_color = COLOR_OPTIONS[st.selectbox("포인트 컬러", list(COLOR_OPTIONS.keys()), index=0)]
+    sel_font = st.selectbox("폰트", ["BlackHanSans", "Jua", "DoHyeon", "NanumBrush", "Sunflower"])
+    m_color = COLOR_OPTIONS[st.selectbox("포인트 컬러", list(COLOR_OPTIONS.keys()))]
     sub_color = COLOR_OPTIONS[st.selectbox("서브 컬러", list(COLOR_OPTIONS.keys()), index=1)]
-    
-    t_sz, d_sz, n_sz = 90, 30, 60 # 사용자 요청 디폴트값
-    t_sz = st.slider("활동명 크기", 10, 200, t_sz)
-    d_sz = st.slider("날짜 크기", 5, 100, d_sz)
-    n_sz = st.slider("숫자 크기", 10, 200, n_sz)
+    # 사용자 요청 고정 크기
+    t_sz = st.number_input("활동명(90)", value=90)
+    d_sz = st.number_input("날짜(30)", value=30)
+    n_sz = st.number_input("숫자(60)", value=60)
     l_sz = st.slider("라벨 크기", 5, 80, 20)
     
     if mode == "DAILY":
-        rx, ry = st.slider("X 위치", 0, 1080, 70), st.slider("Y 위치", 0, 1920, 1150)
+        rx, ry = st.slider("X", 0, 1080, 70), st.slider("Y", 0, 1920, 1150)
         box_alpha = st.slider("박스 투명도", 0, 255, 110)
         map_size, map_alpha = st.slider("지도 크기", 50, 400, 150), st.slider("지도 투명도", 0, 255, 255)
 
-# --- [6. 렌더링 엔진] ---
+# --- [5. 렌더링 및 다운로드] ---
 if bg_files:
     try:
         f_t, f_d, f_n, f_l = load_font(sel_font, t_sz), load_font(sel_font, d_sz), load_font(sel_font, n_sz), load_font(sel_font, l_sz)
-        
         if mode == "DAILY":
             img = ImageOps.exif_transpose(Image.open(bg_files[0]))
             canvas = ImageOps.fit(img.convert("RGBA"), (1080, 1920))
             overlay = Image.new("RGBA", (1080, 1920), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
-            
             if show_box:
-                # 박스 너비 고정 (안정성)
                 draw.rectangle([rx, ry, rx + 650, ry + 680], fill=(0,0,0,box_alpha))
-                # 지도 그리기
-                if acts and 'a' in locals():
-                    p_line = a.get('map', {}).get('summary_polyline')
-                    if p_line:
-                        pts = polyline.decode(p_line); lats, lons = zip(*pts)
-                        m_layer = Image.new("RGBA", (map_size, map_size), (0,0,0,0)); m_draw = ImageDraw.Draw(m_layer)
-                        def trans(la, lo):
-                            tx = 10 + (lo - min(lons)) / (max(lons) - min(lons) + 0.00001) * (map_size - 20)
-                            ty = (map_size - 10) - (la - min(lats)) / (max(lats) - min(lats) + 0.00001) * (map_size - 20)
-                            return tx, ty
-                        m_draw.line([trans(la, lo) for la, lo in pts], fill=hex_to_rgba(m_color, map_alpha), width=4)
-                        overlay.paste(m_layer, (rx + 650 - map_size - 20, ry + 20), m_layer)
+                p_line = a.get('map', {}).get('summary_polyline')
+                if p_line:
+                    pts = polyline.decode(p_line); lats, lons = zip(*pts)
+                    m_layer = Image.new("RGBA", (map_size, map_size), (0,0,0,0)); m_draw = ImageDraw.Draw(m_layer)
+                    def trans(la, lo):
+                        tx = 10 + (lo - min(lons)) / (max(lons) - min(lons) + 0.00001) * (map_size - 20)
+                        ty = (map_size - 10) - (la - min(lats)) / (max(lats) - min(lats) + 0.00001) * (map_size - 20)
+                        return tx, ty
+                    m_draw.line([trans(la, lo) for la, lo in pts], fill=hex_to_rgba(m_color, map_alpha), width=4)
+                    overlay.paste(m_layer, (rx + 650 - map_size - 20, ry + 20), m_layer)
                 
                 items = [("distance", f"{v_dist} km"), ("time", t_val), ("pace", v_pace), ("avg bpm", f"{v_hr} bpm")]
                 draw.text((rx+40, ry+30), v_act, font=f_t, fill=m_color)
@@ -194,8 +163,7 @@ if bg_files:
                     draw.text((rx+40, y_c), lab, font=f_l, fill="#AAAAAA")
                     draw.text((rx+40, y_c+l_sz+2), val, font=f_n, fill=sub_color); y_c += (n_sz + l_sz + 30)
             final = Image.alpha_composite(canvas, overlay).convert("RGB")
-            
-        else: # WEEKLY
+        else: # WEEKLY 콜라주 (공백 제거)
             canvas = Image.new("RGBA", (1080, 1080), (0,0,0,255)); n = len(bg_files)
             cols = math.ceil(math.sqrt(n)); rows = math.ceil(n / cols)
             bh = 880 if show_box else 1080
@@ -215,14 +183,20 @@ if bg_files:
             final = canvas.convert("RGB")
 
         if log_file:
-            logo = get_circle_logo(log_file)
-            final.paste(logo, (final.size[0] - logo.size[0] - 30, 30), logo)
+            # 원형 로고 생성 및 우측 상단 배치
+            l_img = Image.open(log_file).convert("RGBA")
+            l_img = ImageOps.fit(l_img, (130, 130))
+            mask = Image.new('L', (130, 130), 0); ImageDraw.Draw(mask).ellipse((0, 0, 130, 130), fill=255)
+            l_img.putalpha(mask)
+            final.paste(l_img, (final.size[0] - 160, 30), l_img)
 
         with col2:
             st.image(final, use_container_width=True)
             buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
-            st.download_button("📸 DOWNLOAD", buf.getvalue(), "garmin_result.jpg", use_container_width=True)
-    except Exception as e:
-        st.error(f"이미지 생성 오류: {e}")
+            st.download_button("📸 DOWNLOAD", buf.getvalue(), "result.jpg", use_container_width=True)
+    except:
+        st.error("이미지 생성 중 오류가 발생했습니다.")
 
-st.sidebar.button("🔓 로그아웃", on_click=logout)
+st.sidebar.button("🔓 로그아웃 및 초기화", on_click=logout)
+if st.session_state.get('scope'):
+    st.sidebar.caption(f"현재 권한: {st.session_state['scope']}")
