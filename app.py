@@ -9,7 +9,6 @@ ACTUAL_URL = "https://titanboy-5fxenvcchdubwx3swjh8ut.streamlit.app"
 
 st.set_page_config(page_title="Garmin Photo Dashboard", layout="wide")
 
-# 세션이 초기화되지 않도록 체크
 if 'access_token' not in st.session_state:
     st.session_state['access_token'] = None
 
@@ -27,7 +26,7 @@ if "code" in query_params and st.session_state['access_token'] is None:
     })
     if res.status_code == 200:
         st.session_state['access_token'] = res.json()['access_token']
-        st.query_params.clear() # 코드 사용 후 파라미터 제거하여 루프 방지
+        st.query_params.clear()
         st.rerun()
 
 if st.session_state['access_token'] is None:
@@ -39,6 +38,8 @@ if st.session_state['access_token'] is None:
     st.stop()
 
 # --- [3. 폰트 및 데이터 로드] ---
+FONT_LIST = ["BlackHanSans", "Jua", "DoHyeon", "NanumBrush", "Sunflower"]
+
 @st.cache_resource
 def load_font(font_type, size):
     fonts = {
@@ -54,7 +55,7 @@ def load_font(font_type, size):
         r = requests.get(f_url); open(f_path, "wb").write(r.content)
     return ImageFont.truetype(f_path, int(size))
 
-@st.cache_data(ttl=600) # 10분간 데이터 유지 (자주 끊김 방지)
+@st.cache_data(ttl=600)
 def get_activities(token):
     headers = {'Authorization': f"Bearer {token}"}
     res = requests.get("https://www.strava.com/api/v3/athlete/activities?per_page=30", headers=headers)
@@ -92,7 +93,8 @@ with col3:
     st.header("🎨 DESIGN")
     show_box = st.checkbox("로그 박스 표시", value=True)
     box_orient = st.radio("방향", ["Vertical", "Horizontal"], horizontal=True)
-    sel_font = st.selectbox("폰트", list(load_font.__wrapped__.__defaults__[-1] if hasattr(load_font, '__wrapped__') else ["BlackHanSans", "Jua", "DoHyeon", "NanumBrush", "Sunflower"]))
+    # [수정된 부분] 복잡한 로직 대신 FONT_LIST 직접 참조
+    sel_font = st.selectbox("폰트", FONT_LIST)
     m_color = COLOR_OPTIONS[st.selectbox("포인트 컬러", list(COLOR_OPTIONS.keys()))]
     sub_color = COLOR_OPTIONS[st.selectbox("서브 컬러", list(COLOR_OPTIONS.keys()), index=1)]
     
@@ -118,9 +120,7 @@ if bg_files:
                 draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0,0,0,box_alpha))
                 items = [("distance", f"{v_dist} km"), ("time", t_val), ("pace", v_pace), ("avg bpm", f"{v_hr} bpm")]
                 
-                # 가로 모드: 좌지도 - 중제목 - 우로고
                 if box_orient == "Horizontal":
-                    # 1. 왼쪽 지도
                     if 'a' in locals() and a.get('map', {}).get('summary_polyline'):
                         pts = polyline.decode(a['map']['summary_polyline'])
                         lats, lons = zip(*pts)
@@ -132,25 +132,22 @@ if bg_files:
                         m_draw.line([tr(la, lo) for la, lo in pts], fill=m_color, width=4)
                         ovl.paste(m_lyr, (rx + 30, ry + 25), m_lyr)
 
-                    # 2. 중앙 제목 & 날짜
                     tw = draw.textlength(v_act, font=f_t)
                     draw.text((rx + (rw//2) - (tw//2), ry + 25), v_act, font=f_t, fill=m_color)
                     dw = draw.textlength(v_date, font=f_d)
                     draw.text((rx + (rw//2) - (dw//2), ry + 25 + t_sz + 5), v_date, font=f_d, fill="#AAAAAA")
                     
-                    # 3. 오른쪽 로고
                     if log_file:
                         l_img = ImageOps.fit(Image.open(log_file).convert("RGBA"), (80, 80))
                         mask = Image.new('L', (80, 80), 0); ImageDraw.Draw(mask).ellipse((0, 0, 80, 80), fill=255); l_img.putalpha(mask)
                         ovl.paste(l_img, (rx + rw - 110, ry + 30), l_img)
 
-                    # 4. 하단 기록 (1열)
                     sw = (rw - 80) // 4
                     for i, (lb, vl) in enumerate(items):
                         draw.text((rx + 40 + i*sw, ry + t_sz + d_sz + 50), lb, font=f_l, fill="#AAAAAA")
                         draw.text((rx + 40 + i*sw, ry + t_sz + d_sz + 50 + l_sz + 5), vl, font=f_n, fill=sub_color)
 
-                else: # 세로 모드 (기존 유지)
+                else: # Vertical
                     draw.text((rx+40, ry+30), v_act, font=f_t, fill=m_color)
                     draw.text((rx+40, ry+30+t_sz+10), v_date, font=f_d, fill=sub_color)
                     y_c = ry + t_sz + d_sz + 90
