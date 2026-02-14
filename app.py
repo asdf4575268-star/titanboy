@@ -162,11 +162,41 @@ try:
     f_t, f_d, f_n, f_l = load_font(sel_font, 70), load_font(sel_font, 20), load_font(sel_font, 40), load_font(sel_font, 25)
     
     if bg_files:
-        canvas = ImageOps.fit(ImageOps.exif_transpose(Image.open(bg_files[0])).convert("RGBA"), (CW, CH))
+        # 여러 장이면 콜라주 생성, 한 장이면 fit으로 생성 (함수 내부에서 처리됨)
+        canvas = make_smart_collage(bg_files, (CW, CH))
     else:
+        # 사진이 없을 때만 기본 배경
         canvas = Image.new("RGBA", (CW, CH), (20, 20, 20, 255))
     
     overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
+    def make_smart_collage(files, target_size):
+    tw, th = target_size
+    imgs = [ImageOps.exif_transpose(Image.open(f).convert("RGBA")) for f in files[:10]]
+    n = len(imgs)
+    
+    if n == 0: return Image.new("RGBA", (tw, th), (30, 30, 30, 255))
+    if n == 1: return ImageOps.fit(imgs[0], (tw, th))
+
+    # 그리드 설정 (가로형 비율에 최적화)
+    if n == 2: cols, rows = 2, 1
+    elif n <= 4: cols, rows = 2, 2
+    elif n <= 6: cols, rows = 3, 2
+    elif n <= 9: cols, rows = 3, 3
+    else: cols, rows = 5, 2 # 10장
+
+    canvas = Image.new("RGBA", (tw, th), (0, 0, 0, 255))
+    w_step, h_step = tw / cols, th / rows
+
+    for i, img in enumerate(imgs):
+        r, c = divmod(i, cols)
+        x1, y1 = int(c * w_step), int(r * h_step)
+        x2 = int((c + 1) * w_step) if (c + 1) < cols else tw
+        y2 = int((r + 1) * h_step) if (r + 1) < rows else th
+        
+        sub_img = ImageOps.fit(img, (x2 - x1, y2 - y1))
+        canvas.paste(sub_img, (x1, y1))
+        
+    return canvas
     
     # [시각화: 지도/그래프]
     vis_layer = None
@@ -224,4 +254,5 @@ try:
 
 except Exception as e:
     with col_main: st.info("활동을 선택하거나 사진을 업로드해 주세요.")
+
 
