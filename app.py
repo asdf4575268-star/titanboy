@@ -150,3 +150,4 @@ if bg_files:
             buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
             st.download_button("📸 DOWNLOAD", buf.getvalue(), "result.jpg", use_container_width=True)
     except Exception as e: st.error(f"Error: {e}")
+
