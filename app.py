@@ -239,7 +239,7 @@ try:
             overlay.paste(vis_layer, ((CW - vis_layer.width)//2, CH - vis_layer.height - 20), vis_layer)
 
     # ... (로그 및 하단 처리 동일)
-    with col_main: st.info(f"활동 데이터 확인 중: {e}")
+
 
 
 
