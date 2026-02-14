@@ -217,4 +217,3 @@ elif app_mode == "WEEKLY":
                     st.image(collage, use_container_width=True)
                     buf = io.BytesIO(); collage.save(buf, format="JPEG", quality=95)
                     st.download_button("📸 콜라주 저장", buf.getvalue(), "weekly_collage.jpg")
-
