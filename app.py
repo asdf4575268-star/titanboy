@@ -180,8 +180,7 @@ try:
             item_x = rx + t_x + (i * sec_w)
             draw.text((item_x, ry+180), lab.lower(), font=f_l, fill="#AAAAAA")
             draw.text((item_x, ry+205), val.lower() if "bpm" in val or "km" in val else val, font=f_n, fill=sub_color)
-
-   else:
+    else:    
         # 1. 가로모드 설정: 너비를 1080 전체로 고정
         rw = 1080 
         rx = 0  # 왼쪽 끝부터 시작
@@ -241,6 +240,7 @@ except Exception as e:
     st.info("데이터를 불러오거나 사진을 업로드하면 대시보드가 생성됩니다.")
     # 개발용 에러 확인이 필요하면 아래 주석 해제
     # st.error(f"Error: {e}")
+
 
 
 
