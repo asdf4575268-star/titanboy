@@ -122,7 +122,7 @@ with col1:
 with col3:
     st.header("🎨 DESIGN")
     show_box = st.checkbox("로그 박스 표시", value=True)
-    sel_font = st.selectbox("폰트", ["BlackHanSans", "Jua", "DoHyeon", "NanumBrush", "Sunflower"])
+    sel_font = st.selectbox("폰트 선택", ["GmarketSans", "Pretendard", "Bazzi", "KOTRA_BOLD", "KyoboHandwriting", "BlackHanSans", "Jua"])
     m_color = COLOR_OPTIONS[st.selectbox("포인트 컬러", list(COLOR_OPTIONS.keys()))]
     sub_color = COLOR_OPTIONS[st.selectbox("서브 컬러", list(COLOR_OPTIONS.keys()), index=1)]
     
@@ -201,5 +201,6 @@ if bg_files:
             st.download_button("📸 DOWNLOAD", buf.getvalue(), "result.jpg", use_container_width=True)
     except Exception as e:
         st.error(f"Error: {e}")
+
 
 
