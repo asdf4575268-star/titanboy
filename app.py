@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 
-# --- [1. Strava API 설정] ---
+# --- [1. Strava API 및 기본 설정] ---
 API_CONFIGS = {
     "PRIMARY": {"ID": '202275', "SECRET": '969201cab488e4eaf1398b106de1d4e520dc564c'},
     "SECONDARY": {"ID": '202274', "SECRET": '63f6a7007ebe6b405763fc3104e17bb53b468ad0'}
@@ -17,7 +17,7 @@ ACTUAL_URL = "https://titanboy-kgcnje3tg3hbfpfsp6uwzc.streamlit.app"
 st.set_page_config(page_title="TITAN BOY", layout="wide")
 mpl.use('Agg')
 
-# --- [2. 유틸리티 및 데이터 처리] ---
+# --- [2. 유틸리티 함수 (기존 로직 동일)] ---
 def logout_and_clear():
     st.cache_data.clear(); st.cache_resource.clear(); st.session_state.clear(); st.query_params.clear(); st.rerun()
 
@@ -81,21 +81,42 @@ if st.session_state['access_token']:
     r = requests.get("https://www.strava.com/api/v3/athlete/activities?per_page=30", headers=headers)
     if r.status_code == 200: acts = r.json()
 
-# --- [4. UI 레이아웃] ---
-col1, col2, col3 = st.columns([1.2, 2, 1], gap="medium")
-COLOR_OPTIONS = {"Garmin Yellow": "#FFD700", "Pure White": "#FFFFFF", "Neon Orange": "#FF4500", "Electric Blue": "#00BFFF", "Soft Grey": "#AAAAAA"}
+# --- [4. 수기 입력창만 사이드바로 이동] ---
+with st.sidebar:
+    st.header("✍️ MANUAL EDIT")
+    v_act_input = st.text_input("활동명")
+    v_date_input = st.text_input("날짜")
+    v_dist_input = st.text_input("거리(km)")
+    v_time_input = st.text_input("시간")
+    v_pace_input = st.text_input("페이스(분/km)")
+    v_hr_input = st.text_input("심박(bpm)")
 
-with col2:
-    m_col, l_col = st.columns([3, 1])
-    with m_col: mode = st.radio("모드", ["DAILY", "WEEKLY"], horizontal=True, label_visibility="collapsed")
-    with l_col: 
-        if st.session_state['access_token']: st.button("🔓 로그아웃", on_click=logout_and_clear, use_container_width=True)
+# --- [5. 메인 레이아웃 구성] ---
+col_main, col_design = st.columns([2, 1], gap="medium")
+
+with col_main:
+    st.title("TITAN BOY")
+    
+    # 인증 상태 및 로그아웃 버튼
+    auth_col, logout_col = st.columns([3, 1])
+    with auth_col:
+        if st.session_state['access_token']: st.success("✅ Strava 연결됨")
         else: st.link_button("🚀 Strava 연동", f"https://www.strava.com/oauth/authorize?client_id={CLIENT_ID}&response_type=code&redirect_uri={ACTUAL_URL}&scope=read,activity:read_all&approval_prompt=force", use_container_width=True)
+    with logout_col:
+        if st.session_state['access_token']: st.button("🔓 로그아웃", on_click=logout_and_clear, use_container_width=True)
 
+    st.subheader("📝 ACTIVITY & PREVIEW")
+    mode = st.radio("모드", ["DAILY", "WEEKLY"], horizontal=True, label_visibility="collapsed")
+    
+    # 파일 업로드 (원래 그대로 좌측)
+    bg_files = st.file_uploader("📸 배경 사진", type=['jpg','jpeg','png'], accept_multiple_files=True)
+    log_file = st.file_uploader("🔘 원형 로고", type=['jpg','jpeg','png'])
+    
+    # 활동 선택 (원래 그대로 좌측)
     v_act, v_date, v_dist, v_time, v_pace, v_hr, weekly_data, a = "RUNNING", "2026-02-14", "0.00", "00:00:00", "0'00\"", "0", None, None
     if acts:
         act_options = [f"{act['start_date_local'][:10]} - {act['name']}" for act in acts]
-        sel_str = st.selectbox("기록 선택 (Strava)", act_options)
+        sel_str = st.selectbox("🏃 활동 선택", act_options)
         a = acts[act_options.index(sel_str)]
         if mode == "DAILY":
             d_km = a.get('distance', 0)/1000; m_sec = a.get('moving_time', 0)
@@ -107,21 +128,21 @@ with col2:
             weekly_data = get_weekly_stats(acts, a['start_date_local'][:10])
             if weekly_data: v_act, v_date, v_dist, v_time, v_pace, v_hr = "WEEKLY RUN", weekly_data['range'], weekly_data['total_dist'], weekly_data['total_time'], weekly_data['avg_pace'], weekly_data['avg_hr']
 
-with col1:
-    # 대시보드 왼쪽 상단 메인 타이틀
-    st.title("TITAN BOY")
-    st.header("📸")
-    bg_files = st.file_uploader("배경 사진", type=['jpg','jpeg','png'], accept_multiple_files=True)
-    log_file = st.file_uploader("원형 로고", type=['jpg','jpeg','png'])
-    v_act = st.text_input("활동명", v_act); v_date = st.text_input("날짜", v_date)
-    v_dist = st.text_input("거리(km)", v_dist); v_time = st.text_input("시간", v_time)
-    v_pace = st.text_input("페이스(분/km)", v_pace); v_hr = st.text_input("심박(bpm)", v_hr)
+    # 수기 입력값이 있으면 우선 적용
+    v_act = v_act_input if v_act_input else v_act
+    v_date = v_date_input if v_date_input else v_date
+    v_dist = v_dist_input if v_dist_input else v_dist
+    v_time = v_time_input if v_time_input else v_time
+    v_pace = v_pace_input if v_pace_input else v_pace
+    v_hr = v_hr_input if v_hr_input else v_hr
 
-with col3:
+with col_design:
     st.header("🎨 DESIGN")
+    COLOR_OPTIONS = {"Garmin Yellow": "#FFD700", "Pure White": "#FFFFFF", "Neon Orange": "#FF4500", "Electric Blue": "#00BFFF", "Soft Grey": "#AAAAAA"}
     box_orient = st.radio("박스 방향", ["Vertical", "Horizontal"], horizontal=True)
     sel_font = st.selectbox("폰트", ["BlackHanSans", "Jua", "DoHyeon", "NanumBrush", "Sunflower"])
     m_color, sub_color = COLOR_OPTIONS[st.selectbox("포인트 컬러", list(COLOR_OPTIONS.keys()))], COLOR_OPTIONS[st.selectbox("서브 컬러", list(COLOR_OPTIONS.keys()), index=1)]
+    
     CW, CH = (1080, 1920) if mode == "DAILY" else (1080, 1080)
     rx = st.number_input("X 위치", 0, 1080, 70)
     ry = st.number_input("Y 위치", 0, 1920, 1250 if mode=="DAILY" else 750)
@@ -132,12 +153,10 @@ with col3:
     vis_alpha = st.slider("지도/그래프 투명도", 0, 255, 150 if mode=="DAILY" else 220)
     if mode == "WEEKLY": g_y_off = st.slider("그래프 상단 여백", 0, 500, 50)
 
-# --- [6. 렌더링 엔진] ---
+# --- [6. 렌더링 엔진 (기존 로직 100% 동일)] ---
 try:
-    # 폰트 로드 (90/30/60 규칙)
-    f_t, f_d, f_n, f_l = load_font(sel_font, 70), load_font(sel_font, 20), load_font(sel_font, 40), load_font(sel_font, 25)
+    f_t, f_d, f_n, f_l = load_font(sel_font, 90), load_font(sel_font, 30), load_font(sel_font, 60), load_font(sel_font, 20)
     
-    # 배경 생성: 사진 유무와 관계없이 실행
     if bg_files:
         canvas = ImageOps.fit(ImageOps.exif_transpose(Image.open(bg_files[0])).convert("RGBA"), (CW, CH))
     else:
@@ -145,7 +164,6 @@ try:
     
     overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
     
-    # [시각화: 지도/그래프]
     vis_layer = None
     if mode == "DAILY" and a and a.get('map', {}).get('summary_polyline'):
         pts = polyline.decode(a['map']['summary_polyline']); lats, lons = zip(*pts)
@@ -158,11 +176,9 @@ try:
         alpha_mask = vis_layer.getchannel('A').point(lambda x: x * (vis_alpha / 255)); vis_layer.putalpha(alpha_mask)
         overlay.paste(vis_layer, ((CW - vis_layer.width)//2, g_y_off), vis_layer)
 
-    # [로그박스 배치 로직]
     items = [("distance", f"{v_dist} km"), ("time", v_time), ("pace", v_pace), ("avg bpm", f"{v_hr} bpm")]
 
     if box_orient == "Vertical":
-        # 세로모드: 기존 로직 유지
         draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0,0,0,box_alpha))
         if mode == "DAILY" and vis_layer: 
             overlay.paste(vis_layer, (rx + rw - vis_layer.width - 20, ry + 20), vis_layer)
@@ -174,55 +190,34 @@ try:
             draw.text((rx+40, y_c+25), val.lower() if "bpm" in val or "km" in val else val, font=f_n, fill=sub_color)
             y_c += 110
     else:
-        # 가로모드: 너비 1080 고정 및 가운데 정렬 최적화
-        cur_rw = 1080
-        cur_rx = 0
+        cur_rw = 1080; cur_rx = 0
         draw.rectangle([cur_rx, ry, cur_rx + cur_rw, ry + rh], fill=(0,0,0,box_alpha))
-        
-        # 지도 (가로모드일 땐 왼쪽에 작게 배치)
         if mode == "DAILY" and vis_layer:
             overlay.paste(vis_layer, (20, ry + (rh - vis_layer.height)//2), vis_layer)
-        
-        # 활동명 & 날짜 가운데 정렬
-        t_w = draw.textlength(v_act, font=f_t)
-        d_w = draw.textlength(v_date, font=f_d)
+        t_w = draw.textlength(v_act, font=f_t); d_w = draw.textlength(v_date, font=f_d)
         draw.text(((cur_rw - t_w) // 2, ry + 35), v_act, font=f_t, fill=m_color)
         draw.text(((cur_rw - d_w) // 2, ry + 125), v_date, font=f_d, fill="#AAAAAA")
-        
-        # 4개 정보 270px씩 균등 분할 (1080 / 4)
         sec_w = cur_rw // 4
         for i, (lab, val) in enumerate(items):
             center_x = (i * sec_w) + (sec_w // 2)
             v_str = val.lower() if "bpm" in val or "km" in val else val
-            l_w = draw.textlength(lab.lower(), font=f_l)
-            v_w = draw.textlength(v_str, font=f_n)
-            
+            l_w = draw.textlength(lab.lower(), font=f_l); v_w = draw.textlength(v_str, font=f_n)
             draw.text((center_x - (l_w // 2), ry + 175), lab.lower(), font=f_l, fill="#AAAAAA")
             draw.text((center_x - (v_w // 2), ry + 205), v_str, font=f_n, fill=sub_color)
 
-    # [로고 배치]
     if log_file:
-        ls = 100
-        l_img = ImageOps.fit(Image.open(log_file).convert("RGBA"), (ls, ls))
+        ls = 100; l_img = ImageOps.fit(Image.open(log_file).convert("RGBA"), (ls, ls))
         mask = Image.new('L', (ls, ls), 0); ImageDraw.Draw(mask).ellipse((0, 0, ls, ls), fill=255); l_img.putalpha(mask)
-        # 가로모드일 땐 우측 상단 고정
         l_pos = (1080 - ls - 25, ry + 25) if box_orient == "Horizontal" else (rx + rw - ls - 25, ry + rh - ls - 25)
         overlay.paste(l_img, l_pos, l_img)
 
-    # 최종 합성
     final = Image.alpha_composite(canvas, overlay).convert("RGB")
-    with col2:
+    
+    # [중요] 미리보기를 좌측(col_main) 하단에 배치
+    with col_main:
         st.image(final, use_container_width=True)
         buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
         st.download_button(f"📸 {mode} DOWNLOAD", buf.getvalue(), f"{mode.lower()}.jpg", use_container_width=True)
 
 except Exception as e:
-    st.info("데이터를 불러오거나 사진을 업로드하면 대시보드가 생성됩니다.")
-    # 개발용 에러 확인이 필요하면 아래 주석 해제
-    # st.error(f"Error: {e}")
-
-
-
-
-
-
+    with col_main: st.info("데이터를 불러오거나 사진을 업로드하면 대시보드가 생성됩니다.")
