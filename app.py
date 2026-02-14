@@ -65,7 +65,8 @@ if st.session_state['access_token']:
 
 # --- [5. UI 레이아웃] ---
 col1, col2, col3 = st.columns([1.2, 2, 1], gap="medium")
-COLOR_OPTIONS = {"Garmin Yellow": "#FFD700", "Pure White": "#FFFFFF", "Neon Orange": "#FF4500", "Electric Blue": "#00BFFF", "Soft Grey": "#AAAAAA"}
+# [수정 2] Pure Black 추가
+COLOR_OPTIONS = {"Garmin Yellow": "#FFD700", "Pure White": "#FFFFFF", "Pure Black": "#000000", "Neon Orange": "#FF4500", "Electric Blue": "#00BFFF", "Soft Grey": "#AAAAAA"}
 
 with col2:
     m_col, l_col = st.columns([3, 1])
@@ -118,7 +119,7 @@ with col3:
     sub_color = COLOR_OPTIONS[st.selectbox("서브 컬러", list(COLOR_OPTIONS.keys()), index=1)]
     
     # [약속된 크기 설정]
-    t_sz, d_sz, n_sz, l_sz = 70, 20, 45, 22
+    t_sz, d_sz, n_sz, l_sz = 90, 30, 60, 20
     
     d_rx, d_ry, d_rw, d_rh = (70, 1250, 480, 600) if box_orient == "Vertical" else (70, 1600, 940, 260)
     rx = st.number_input("X 위치", 0, 1080, d_rx)
@@ -132,9 +133,27 @@ with col3:
 if bg_files:
     try:
         f_t, f_d, f_n, f_l = load_font(sel_font, t_sz), load_font(sel_font, d_sz), load_font(sel_font, n_sz), load_font(sel_font, l_sz)
-        img = ImageOps.exif_transpose(Image.open(bg_files[0]))
-        canvas = ImageOps.fit(img.convert("RGBA"), (1080, 1920))
-        overlay = Image.new("RGBA", (1080, 1920), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
+        
+        # [수정 1] 위클리 콜라주 자동 여백 제거 로직 적용
+        CW, CH = 1080, 1920
+        canvas = Image.new("RGBA", (CW, CH), (0,0,0,255))
+        
+        if mode == "DAILY" or len(bg_files) == 1:
+            img = ImageOps.exif_transpose(Image.open(bg_files[0]))
+            canvas = ImageOps.fit(img.convert("RGBA"), (CW, CH))
+        else:
+            # WEEKLY 모드: 자동으로 빈틈없이 꽉 차게 계산 (ImageOps.fit 활용)
+            num_pics = len(bg_files)
+            cols = 2
+            rows = math.ceil(num_pics / cols)
+            w_unit, h_unit = CW // cols, CH // rows
+            
+            for i, f in enumerate(bg_files):
+                img = ImageOps.exif_transpose(Image.open(f))
+                img = ImageOps.fit(img.convert("RGBA"), (w_unit, h_unit), centering=(0.5, 0.5))
+                canvas.paste(img, ((i % cols) * w_unit, (i // cols) * h_unit))
+
+        overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
         
         if show_box:
             draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0,0,0,box_alpha))
@@ -192,5 +211,3 @@ if bg_files:
                 
     except Exception as e:
         st.error(f"Error: {e}")
-
-
