@@ -57,6 +57,15 @@ def load_font(font_type, size):
         except: return ImageFont.load_default()
     return ImageFont.truetype(f_path, int(size))
 
+def get_circle_logo(img_file, size=(130, 130)):
+    img = Image.open(img_file).convert("RGBA")
+    img = ImageOps.fit(img, size, centering=(0.5, 0.5))
+    mask = Image.new('L', size, 0)
+    draw = ImageDraw.Draw(mask)
+    draw.ellipse((0, 0) + size, fill=255)
+    img.putalpha(mask)
+    return img
+
 def hex_to_rgba(hex_color, alpha):
     hex_color = hex_color.lstrip('#')
     rgb = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
@@ -89,11 +98,11 @@ with col2:
         avg_p_val = f"{int((t_time/t_dist)//60)}'{int((t_time/t_dist)%60):02d}\"" if t_dist > 0 else "0'00\""
         t_hrs = [x.get('average_heartrate', 0) for x in w_acts if x.get('average_heartrate')]
         avg_hr = int(sum(t_hrs)/len(t_hrs)) if t_hrs else 0
-        t_val_w = f"{int(t_time//3600)}h {int((t_time%3600)//60)}m"
 
 with col1:
     st.header("📸 DATA")
     bg_files = st.file_uploader("사진 선택", type=['jpg','jpeg','png'], accept_multiple_files=True)
+    log_file = st.file_uploader("로고 선택 (우측 상단)", type=['jpg','jpeg','png'])
     if mode == "DAILY" and acts:
         v_act = st.text_input("활동명", a['name'])
         v_date = st.text_input("날짜", a['start_date_local'][:10])
@@ -120,7 +129,7 @@ with col3:
         box_alpha = st.slider("박스 투명도", 0, 255, 110)
         map_size, map_alpha = st.slider("지도 크기", 50, 400, 150), st.slider("지도 투명도", 0, 255, 255)
 
-# --- [6. 핵심 렌더링 엔진 - 미리보기 복구] ---
+# --- [6. 렌더링 엔진] ---
 if bg_files:
     try:
         f_t, f_d, f_n, f_l = load_font(sel_font, t_sz), load_font(sel_font, d_sz), load_font(sel_font, n_sz), load_font(sel_font, l_sz)
@@ -132,7 +141,6 @@ if bg_files:
             
             if show_box:
                 draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0,0,0,box_alpha))
-                # 미니맵 렌더링
                 p_line = a.get('map', {}).get('summary_polyline')
                 if p_line:
                     pts = polyline.decode(p_line); lats, lons = zip(*pts)
@@ -144,7 +152,6 @@ if bg_files:
                     m_draw.line([trans(la, lo) for la, lo in pts], fill=hex_to_rgba(m_color, map_alpha), width=4)
                     overlay.paste(m_layer, (rx + rw - map_size - 20, ry + 20), m_layer)
                 
-                # 데이터 텍스트 (소문자 레이블)
                 items = [("distance", f"{v_dist} km"), ("time", t_val), ("pace", v_pace), ("avg bpm", f"{v_hr} bpm")]
                 draw.text((rx+40, ry+30), v_act, font=f_t, fill=m_color)
                 draw.text((rx+40, ry+30+t_sz+5), v_date, font=f_d, fill=sub_color)
@@ -154,7 +161,7 @@ if bg_files:
                     draw.text((rx+40, y_c+l_sz+2), val, font=f_n, fill=sub_color); y_c += (n_sz + l_sz + 30)
             final = Image.alpha_composite(canvas, overlay).convert("RGB")
             
-        else: # WEEKLY 콜라주 (공백 제거 로직)
+        else: # WEEKLY
             canvas = Image.new("RGBA", (1080, 1080), (0,0,0,255)); n = len(bg_files)
             cols = math.ceil(math.sqrt(n)); rows = math.ceil(n / cols)
             bh = 880 if show_box else 1080
@@ -172,6 +179,11 @@ if bg_files:
                     draw.text((40+i*340, 970), lab, font=f_l, fill="#AAAAAA")
                     draw.text((40+i*340, 995), val, font=f_n, fill=sub_color)
             final = canvas.convert("RGB")
+
+        # 로고 붙이기 (우측 상단 고정)
+        if log_file:
+            logo = get_circle_logo(log_file)
+            final.paste(logo, (1080 - logo.size[0] - 30, 30), logo)
 
         with col2:
             st.image(final, use_container_width=True)
