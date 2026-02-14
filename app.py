@@ -77,7 +77,7 @@ if not st.session_state['access_token']:
     st.link_button("🚀 Strava 연동하기", auth_url)
     st.stop()
 
-# --- [4. 사이드바] ---
+# --- [4. 사이드바 (위치 고정 설정)] ---
 with st.sidebar:
     app_mode = st.radio("🚀 작업 모드", ["DAILY", "WEEKLY"])
     st.markdown("---")
@@ -89,11 +89,14 @@ with st.sidebar:
     route_color = st.selectbox("지도 경로 색상", ["Yellow", "Black", "White"])
     
     st.markdown("---")
+    st.subheader("크기 조절")
     t_sz, d_sz, n_sz, l_sz = st.slider("활동명 크기", 10, 200, 90), st.slider("날짜 크기", 10, 100, 30), st.slider("숫자 크기", 10, 150, 60), st.slider("라벨 크기", 10, 80, 25)
     
     st.markdown("---")
-    st.subheader("위치 및 투명도")
-    rx, ry = st.slider("X 위치", 0, 1080, 70), st.slider("Y 위치", 0, 1920, 1150)
+    st.subheader("로그 박스 커스텀")
+    # 🌟 요청하신 대로 X=70, Y=1150 기본값 고정
+    rx = st.slider("X 위치", 0, 1080, 70)
+    ry = st.slider("Y 위치", 0, 1920, 1150)
     alpha = st.slider("박스 투명도", 0, 255, 60)
     map_alpha = st.slider("지도 투명도", 0, 255, 100)
     
@@ -140,21 +143,21 @@ if app_mode == "DAILY":
             items = [("DISTANCE", f"{v_dist} km"), ("TIME", v_time), ("AVG PACE", f"{v_pace} /km"), ("AVG HR", f"{v_hr} bpm")]
             if v_weather: items.append(("WEATHER", v_weather))
 
-            # --- [가로모드 오토 레이아웃 계산] ---
+            # 가로모드 오토 레이아웃 너비 계산
             if "가로형" in box_mode:
-                # 텍스트 길이에 따른 너비 계산
                 max_item_w = 0
                 for lab, val in items:
                     w = max(draw.textbbox((0,0), lab, font=f_l)[2], draw.textbbox((0,0), val, font=f_n)[2])
                     max_item_w = max(max_item_w, w)
-                
                 header_w = max(draw.textbbox((0,0), v_act, font=f_t)[2], draw.textbbox((0,0), v_date, font=f_d)[2]) + 100
                 total_items_w = (max_item_w + 60) * len(items) + 40
                 rw = max(header_w, total_items_w)
-                rh = t_sz + d_sz + n_sz + l_sz + 180  # 가로형 고정 높이 비율
+                rh = t_sz + d_sz + n_sz + l_sz + 180
 
-            # 1. 로그박스 및 지도 배경
+            # 1. 로그박스 배경 (rx=70, ry=1150 고정값 사용)
             draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0, 0, 0, alpha))
+            
+            # 2. 지도 배경 오버레이
             poly = a.get('map', {}).get('summary_polyline', "")
             if poly:
                 try:
@@ -172,7 +175,7 @@ if app_mode == "DAILY":
                     canvas.paste(r_img, (rx, ry), r_img)
                 except: pass
 
-            # 2. 텍스트 그리기
+            # 3. 텍스트 그리기
             draw.text((rx + 30, ry + 20), v_act, font=f_t, fill=main_color)
             draw.text((rx + rw - 30, ry + 20 + t_sz + 5), v_date, font=f_d, fill=num_color, anchor="ra")
             
@@ -201,7 +204,7 @@ if app_mode == "DAILY":
             st.download_button("📸 DOWNLOAD", buf.getvalue(), "garmin_final.jpg")
 
 elif app_mode == "WEEKLY":
-    # ... (WEEKLY 모드 생략 없이 그대로 유지)
+    # (WEEKLY 모드 동일하게 유지)
     st.title("📅 Weekly Recap")
     after_ts = int((datetime.now() - timedelta(days=7)).timestamp())
     act_res = requests.get(f"https://www.strava.com/api/v3/athlete/activities?after={after_ts}", headers=headers)
