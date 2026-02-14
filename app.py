@@ -161,18 +161,12 @@ try:
     # 폰트 규칙 (활동명 90, 날짜 30, 숫자 60)
     f_t, f_d, f_n, f_l = load_font(sel_font, 70), load_font(sel_font, 20), load_font(sel_font, 40), load_font(sel_font, 25)
     
-    # 1. 함수 정의 (상단 유틸리티 섹션)
-def make_smart_collage(files, target_size):
-    # ... (작성하신 콜라주 로직) ...
-    return canvas
-
-# 2. 렌더링 엔진 내 적용 (하단 렌더링 섹션)
-try:
-    # 캔버스(배경) 생성 파트
     if bg_files:
-        canvas = make_smart_collage(bg_files, (CW, CH))
+        canvas = ImageOps.fit(ImageOps.exif_transpose(Image.open(bg_files[0])).convert("RGBA"), (CW, CH))
     else:
         canvas = Image.new("RGBA", (CW, CH), (20, 20, 20, 255))
+    
+    overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
     
     # [시각화: 지도/그래프]
     vis_layer = None
@@ -230,6 +224,5 @@ try:
 
 except Exception as e:
     with col_main: st.info("활동을 선택하거나 사진을 업로드해 주세요.")
-
 
 
