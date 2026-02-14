@@ -65,8 +65,7 @@ if st.session_state['access_token']:
 
 # --- [5. UI 레이아웃] ---
 col1, col2, col3 = st.columns([1.2, 2, 1], gap="medium")
-# 2. 검정색 폰트 설정 추가
-COLOR_OPTIONS = {"Garmin Yellow": "#FFD700", "Pure White": "#FFFFFF", "Pure Black": "#000000", "Neon Orange": "#FF4500", "Electric Blue": "#00BFFF", "Soft Grey": "#AAAAAA"}
+COLOR_OPTIONS = {"Garmin Yellow": "#FFD700", "Pure White": "#FFFFFF", "Neon Orange": "#FF4500", "Electric Blue": "#00BFFF", "Soft Grey": "#AAAAAA"}
 
 with col2:
     m_col, l_col = st.columns([3, 1])
@@ -83,29 +82,18 @@ with col2:
     v_act, v_date, v_dist, v_time, v_pace, v_hr = "RUNNING", "2026-02-14", "0.00", "00:00:00", "0'00\"", "0"
     a = None
 
-    if mode == "DAILY" or num_pics == 1:
-    img = ImageOps.exif_transpose(Image.open(bg_files[0]))
-    # 캔버스 크기에 1:1로 맞춤 (여백 원천 차단)
-    img = ImageOps.fit(img.convert("RGBA"), (CW, CH), centering=(0.5, 0.5))
-    canvas.paste(img, (0,0))
-else:
-    # WEEKLY 콜라주: 소수점 오차로 인한 실금(여백) 방지
-    cols = 2 if num_pics > 1 else 1
-    rows = math.ceil(num_pics / cols)
-    
-    # 각 유닛의 크기를 정수로 계산
-    w_unit = CW // cols
-    h_unit = CH // rows
-    
-    for i, f in enumerate(bg_files):
-        img = ImageOps.exif_transpose(Image.open(f))
-        # ImageOps.fit이 핵심: 해당 칸에 사진을 꽉 채우고 남는 부분은 자름
-        img = ImageOps.fit(img.convert("RGBA"), (w_unit, h_unit), centering=(0.5, 0.5))
-        
-        # 붙이는 위치 계산
-        curr_col = i % cols
-        curr_row = i // cols
-        canvas.paste(img, (curr_col * w_unit, curr_row * h_unit))
+    if mode == "DAILY" and acts:
+        act_options = [f"{act['start_date_local'][:10]} - {act['name']}" for act in acts]
+        sel_str = st.selectbox("기록 선택 (Strava)", act_options)
+        a = acts[act_options.index(sel_str)]
+        d_km = a.get('distance', 0)/1000
+        m_sec = a.get('moving_time', 0)
+        v_act, v_date = a['name'], a['start_date_local'][:10]
+        v_dist, v_time = f"{d_km:.2f}", f"{m_sec//3600:02d}:{(m_sec%3600)//60:02d}:{m_sec%60:02d}"
+        v_pace = f"{int((m_sec/d_km)//60)}'{int((m_sec/d_km)%60):02d}\"" if d_km > 0 else "0'00\""
+        v_hr = str(int(a.get('average_heartrate', 0))) if a.get('average_heartrate') else "0"
+    elif mode == "WEEKLY" and acts:
+        st.info("업로드한 사진 개수에 따라 콜라주가 자동으로 생성됩니다.")
 
 with col1:
     st.header("📸 DATA INPUT")
@@ -129,16 +117,17 @@ with col3:
     m_color = COLOR_OPTIONS[st.selectbox("포인트 컬러", list(COLOR_OPTIONS.keys()))]
     sub_color = COLOR_OPTIONS[st.selectbox("서브 컬러", list(COLOR_OPTIONS.keys()), index=1)]
     
-    # 지시하신 폰트 크기 고정 적용
+    # [활동명 90, 날짜 30, 숫자 60 고정]
     t_sz, d_sz, n_sz, l_sz = 70, 20, 45, 22
     
+    # 인스타 캔버스 크기 결정
     CW, CH = (1080, 1080) if insta_mode == "1:1 (Square)" else (1080, 1350)
     
-    d_rx, d_ry = (70, CH - 360) if box_orient == "Horizontal" else (70, CH - 720)
+    d_rx, d_ry = (70, CH - 330) if box_orient == "Horizontal" else (70, CH - 670)
     rx = st.number_input("X 위치", 0, CW, d_rx)
     ry = st.number_input("Y 위치", 0, CH, d_ry)
     rw = st.number_input("박스 너비", 100, CW, 940 if box_orient == "Horizontal" else 480)
-    rh = st.number_input("박스 높이", 100, CH, 300 if box_orient == "Horizontal" else 650)
+    rh = st.number_input("박스 높이", 100, CH, 260 if box_orient == "Horizontal" else 600)
     box_alpha = st.slider("박스 투명도", 0, 255, 110)
     map_size = st.slider("지도 크기", 50, CW//2, 100)
 
@@ -147,31 +136,34 @@ if bg_files:
     try:
         f_t, f_d, f_n, f_l = load_font(sel_font, t_sz), load_font(sel_font, d_sz), load_font(sel_font, n_sz), load_font(sel_font, l_sz)
         
-        # 1. 캔버스 생성 및 위클리 여백 없는 사이즈 자동 조정
+        # 1. 캔버스 생성 (여백 없이 꽉 차게)
         canvas = Image.new("RGBA", (CW, CH), (0,0,0,255))
-        num_pics = len(bg_files)
         
-        if mode == "DAILY" or num_pics == 1:
+        if mode == "DAILY":
             img = ImageOps.exif_transpose(Image.open(bg_files[0]))
             img = ImageOps.fit(img.convert("RGBA"), (CW, CH))
             canvas.paste(img, (0,0))
         else:
-            # 위클리 콜라주: 인스타 규격(CW, CH) 내에서 여백 없이 분할
-            cols = 2 if num_pics > 1 else 1
-            rows = math.ceil(num_pics / cols)
-            w_unit, h_unit = CW // cols, CH // rows
-            for i, f in enumerate(bg_files):
-                img = ImageOps.exif_transpose(Image.open(f))
-                img = ImageOps.fit(img.convert("RGBA"), (w_unit, h_unit))
-                canvas.paste(img, ((i % cols) * w_unit, (i // cols) * h_unit))
+            # WEEKLY 콜라주 (여백 없이 자동 분할)
+            num_pics = len(bg_files)
+            if num_pics == 1:
+                img = ImageOps.fit(ImageOps.exif_transpose(Image.open(bg_files[0])), (CW, CH))
+                canvas.paste(img, (0,0))
+            else:
+                cols = 2 if num_pics > 1 else 1
+                rows = math.ceil(num_pics / cols)
+                w_unit, h_unit = CW // cols, CH // rows
+                for i, f in enumerate(bg_files):
+                    img = ImageOps.fit(ImageOps.exif_transpose(Image.open(f)), (w_unit, h_unit))
+                    canvas.paste(img, ((i % cols) * w_unit, (i // cols) * h_unit))
 
         overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
         
         if show_box:
             draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0,0,0,box_alpha))
-            # km, bpm 소문자 유지
             items = [("distance", f"{v_dist} km"), ("time", v_time), ("pace", v_pace), ("avg bpm", f"{v_hr} bpm")]
             
+            # 지도 렌더링
             if mode == "DAILY" and a and a.get('map', {}).get('summary_polyline'):
                 pts = polyline.decode(a['map']['summary_polyline'])
                 lats, lons = zip(*pts)
@@ -183,13 +175,14 @@ if bg_files:
                 m_draw.line([trans(la, lo) for la, lo in pts], fill=hex_to_rgba(m_color, 255), width=4)
                 overlay.paste(m_layer, (rx + (30 if box_orient=="Horizontal" else rw - map_size - 20), ry + 20), m_layer)
 
+            # 텍스트 배치
             if box_orient == "Vertical":
                 draw.text((rx+40, ry+30), v_act, font=f_t, fill=m_color)
                 draw.text((rx+40, ry+30+t_sz+10), v_date, font=f_d, fill="#AAAAAA")
-                y_c = ry + t_sz + d_sz + 100
+                y_c = ry + t_sz + d_sz + 90
                 for lab, val in items:
                     draw.text((rx+40, y_c), lab, font=f_l, fill="#AAAAAA")
-                    draw.text((rx+40, y_c+l_sz+5), val, font=f_n, fill=sub_color); y_c += 115
+                    draw.text((rx+40, y_c+l_sz+5), val, font=f_n, fill=sub_color); y_c += (n_sz + l_sz + 35)
             else:
                 title_w = draw.textlength(v_act, font=f_t)
                 draw.text((rx+(rw//2)-(title_w//2), ry+25), v_act, font=f_t, fill=m_color)
@@ -198,8 +191,8 @@ if bg_files:
                 sec_w = (rw - 80) // 4
                 for i, (lab, val) in enumerate(items):
                     ix = rx + 40 + (i * sec_w)
-                    draw.text((ix, ry+t_sz+d_sz+60), lab, font=f_l, fill="#AAAAAA")
-                    draw.text((ix, ry+t_sz+d_sz+60+l_sz+5), val, font=f_n, fill=sub_color)
+                    draw.text((ix, ry+t_sz+d_sz+50), lab, font=f_l, fill="#AAAAAA")
+                    draw.text((ix, ry+t_sz+d_sz+50+l_sz+5), val, font=f_n, fill=sub_color)
 
             if log_file:
                 l_sz_img = 100 if box_orient == "Vertical" else 80
@@ -215,4 +208,3 @@ if bg_files:
                 
     except Exception as e:
         st.error(f"Error: {e}")
-
