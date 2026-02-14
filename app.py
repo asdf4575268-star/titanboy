@@ -154,12 +154,12 @@ with col_design:
     rh = st.number_input("박스 높이", 100, 1920, 260 if box_orient=="Horizontal" else 630)
     box_alpha = st.slider("박스 투명도", 0, 255, 110)
     vis_sz = st.slider("지도/그래프 크기", 50, 1080, 250 if mode=="DAILY" else 1080)
-    vis_alpha = st.slider("지도/그래프 투명도", 0, 255, 150)
+    vis_alpha = st.slider("지도/그래프 투명도", 0, 255, 230 if mode=="WEEKLY" else 180)
 
 # --- [6. 렌더링 엔진] ---
 try:
     # 폰트 규칙 (활동명 90, 날짜 30, 숫자 60)
-    f_t, f_d, f_n, f_l = load_font(sel_font, 90), load_font(sel_font, 30), load_font(sel_font, 60), load_font(sel_font, 20)
+    f_t, f_d, f_n, f_l = load_font(sel_font, 70), load_font(sel_font, 20), load_font(sel_font, 40), load_font(sel_font, 25)
     
     if bg_files:
         canvas = ImageOps.fit(ImageOps.exif_transpose(Image.open(bg_files[0])).convert("RGBA"), (CW, CH))
@@ -224,3 +224,4 @@ try:
 
 except Exception as e:
     with col_main: st.info("활동을 선택하거나 사진을 업로드해 주세요.")
+
