@@ -129,7 +129,7 @@ with col3:
         if box_orient == "Vertical":
             d_rx, d_ry, d_rw, d_rh = 70, 1320, 480, 540
         else:
-            d_rx, d_ry, d_rw, d_rh = 70, 1580, 940, 280
+            d_rx, d_ry, d_rw, d_rh = 70, 1580, 940, 250
             
         rx = st.number_input("X 위치", 0, 1080, d_rx)
         ry = st.number_input("Y 위치", 0, 1920, d_ry)
@@ -216,4 +216,5 @@ if bg_files:
             st.download_button("📸 DOWNLOAD", buf.getvalue(), "result.jpg", use_container_width=True)
     except Exception as e:
         st.error(f"Error: {e}")
+
 
