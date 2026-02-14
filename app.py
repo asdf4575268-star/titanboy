@@ -4,7 +4,7 @@ import io, os, requests, polyline, math
 
 # --- [1. 기본 설정 및 초기화] ---
 CLIENT_ID = '202274'
-CLIENT_SECRET = '63f6a7007ebe6b405763fc3104e17bb53b468ad0'
+CLIENT_SECRET = '8a68078fdd0ce4fda1ac0b374d98164270206fe8'
 # 리다이렉트 시 발생할 수 있는 URL 불일치 방지 (끝 슬래시 제거 버전)
 ACTUAL_URL = "https://titanboy-kgcnje3tg3hbfpfsp6uwzc.streamlit.app"
 
@@ -220,3 +220,4 @@ if bg_files:
                 
     except Exception as e:
         st.error(f"Error: {e}")
+
