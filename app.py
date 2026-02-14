@@ -41,6 +41,13 @@ def get_circle_logo(img_file, size=(130, 130)):
     img.putalpha(mask)
     return img
 
+# 색상 변환 함수 (지도 투명도 해결용)
+def hex_to_rgba(hex_color, alpha):
+    hex_color = hex_color.lstrip('#')
+    lv = len(hex_color)
+    rgb = tuple(int(hex_color[i:i + lv // 3], 16) for i in range(0, lv, lv // 3))
+    return rgb + (alpha,)
+
 # 인증 처리
 params = st.query_params
 if "code" in params and st.session_state['access_token'] is None:
@@ -103,7 +110,7 @@ if act_res.status_code == 200:
         sel_font = st.selectbox("폰트 선택", ["BlackHanSans", "Jua", "DoHyeon", "NanumBrush", "Sunflower"])
         m_color, sub_color, map_color = st.color_picker("활동명 색상", "#FFD700"), st.color_picker("텍스트 색상", "#FFFFFF"), st.color_picker("지도 색상", "#666666")
         
-        # [고정 디폴트 적용 슬라이더]
+        st.markdown("---")
         t_sz = st.slider("활동명 크기", 10, 200, 90)
         d_sz = st.slider("날짜 크기", 5, 100, 30)
         n_sz = st.slider("숫자 크기", 10, 200, 60)
@@ -113,8 +120,8 @@ if act_res.status_code == 200:
             st.markdown("---")
             box_mode = st.radio("박스 정렬", ["Vertical", "Horizontal"])
             rx, ry = st.slider("X 위치", 0, 1080, 70), st.slider("Y 위치", 0, 1920, 1150)
-            box_alpha, map_alpha = st.slider("박스 투명도", 0, 255, 110), st.slider("지도 투명도", 0, 255, 15)
-            # 수동 조절용 슬라이더 (자동 로직과 연동)
+            box_alpha = st.slider("박스 투명도", 0, 255, 110)
+            map_alpha = st.slider("지도 투명도", 0, 255, 30) # 투명도 조절 버그 해결 포인트
             rw_add = st.number_input("박스 가로 추가 여백", value=0)
             rh_add = st.number_input("박스 세로 추가 여백", value=0)
         
@@ -131,17 +138,16 @@ if act_res.status_code == 200:
             f_t, f_d, f_n, f_l = load_font(sel_font, t_sz), load_font(sel_font, d_sz), load_font(sel_font, n_sz), load_font(sel_font, l_sz)
             items = [("DISTANCE", f"{v_dist} km"), ("TIME", t_val), ("AVG PACE", f"{v_pace} /km"), ("AVG HR", f"{v_hr} bpm")]
 
-            # [자동 박스 크기 계산 로직]
+            # 자동 박스 크기 연동
             if box_mode == "Vertical":
-                rw = 560 + rw_add
-                rh = t_sz + d_sz + (len(items) * (n_sz + l_sz + 35)) + 120 + rh_add
+                rw, rh = 560 + rw_add, t_sz + d_sz + (len(items) * (n_sz + l_sz + 35)) + 120 + rh_add
             else:
-                rw = 1000 + rw_add
-                rh = t_sz + d_sz + n_sz + l_sz + 180 + rh_add
+                rw, rh = 1000 + rw_add, t_sz + d_sz + n_sz + l_sz + 180 + rh_add
 
+            # 1. 박스 배경 렌더링
             draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0, 0, 0, box_alpha))
             
-            # 지도 (초저투명)
+            # 2. 지도 렌더링 (RGBA 변환 로직 적용)
             p_line = a['map']['summary_polyline'] if 'map' in a and a['map'].get('summary_polyline') else None
             if p_line:
                 pts = polyline.decode(p_line); lats, lons = zip(*pts)
@@ -150,10 +156,11 @@ if act_res.status_code == 200:
                     tx = 50 + (lo - min(lons)) / (max(lons) - min(lons) + 0.0001) * (rw - 100)
                     ty = (rh - 50) - (la - min(lats)) / (max(lats) - min(lats) + 0.0001) * (rh - 100)
                     return tx, ty
-                m_draw.line([trans(la, lo) for la, lo in pts], fill=map_color + f"{map_alpha:02x}"[2:], width=7)
+                # 투명도 조절 핵심 부분: hex_to_rgba 함수 사용
+                m_draw.line([trans(la, lo) for la, lo in pts], fill=hex_to_rgba(map_color, map_alpha), width=7)
                 overlay.paste(map_layer, (rx, ry), map_layer)
 
-            # 텍스트 렌더링
+            # 3. 텍스트 렌더링
             if box_mode == "Vertical":
                 draw.text((rx+45, ry+35), v_act, font=f_t, fill=m_color)
                 draw.text((rx+45, ry+35+t_sz+10), v_date, font=f_d, fill=sub_color)
@@ -169,10 +176,11 @@ if act_res.status_code == 200:
                 for i, (lab, val) in enumerate(items):
                     draw.text((rx + x_s*(i+1), ry+rh-n_sz-l_sz-30), lab, font=f_l, fill="#AAAAAA", anchor="ms")
                     draw.text((rx + x_s*(i+1), ry+rh-n_sz-5), val, font=f_n, fill=sub_color, anchor="ms")
+            
             final = Image.alpha_composite(canvas, overlay).convert("RGB")
 
         else:
-            # WEEKLY: 인스타 정사각 1:1
+            # WEEKLY: 1:1
             canvas = Image.new("RGBA", (1080, 1080), (0,0,0,255))
             n = len(bg_files); cols = 2 if n > 1 else 1; rows = math.ceil(n / cols)
             img_h, img_w = 880 // rows, 1080 // cols
