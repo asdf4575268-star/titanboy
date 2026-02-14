@@ -6,8 +6,8 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 
 # --- [1. 기본 설정] ---
-CLIENT_ID = '202275'
-CLIENT_SECRET = '969201cab488e4eaf1398b106de1d4e520dc564c'
+CLIENT_ID = '202274'
+CLIENT_SECRET = '63f6a7007ebe6b405763fc3104e17bb53b468ad0'
 ACTUAL_URL = "https://titanboy-kgcnje3tg3hbfpfsp6uwzc.streamlit.app"
 
 st.set_page_config(page_title="Garmin Dashboard", layout="wide")
@@ -217,6 +217,7 @@ try:
         if st.session_state['access_token']: st.button("🔓 로그아웃", on_click=logout_and_clear)
 except Exception as e:
     st.error(f"Error: {e}")
+
 
 
 
