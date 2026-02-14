@@ -127,7 +127,7 @@ with col3:
         st.subheader("Box Layout")
         # 모드별 디폴트 위치 설정
         if box_orient == "Vertical":
-            d_rx, d_ry, d_rw, d_rh = 70, 1200, 480, 600
+            d_rx, d_ry, d_rw, d_rh = 70, 1200, 400, 560
         else:
             d_rx, d_ry, d_rw, d_rh = 70, 1580, 940, 250
             
@@ -216,6 +216,7 @@ if bg_files:
             st.download_button("📸 DOWNLOAD", buf.getvalue(), "result.jpg", use_container_width=True)
     except Exception as e:
         st.error(f"Error: {e}")
+
 
 
 
