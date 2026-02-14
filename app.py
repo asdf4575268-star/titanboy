@@ -118,7 +118,7 @@ with col3:
     sub_color = COLOR_OPTIONS[st.selectbox("서브 컬러", list(COLOR_OPTIONS.keys()), index=1)]
     
     # [활동명 90, 날짜 30, 숫자 60 고정]
-    t_sz, d_sz, n_sz, l_sz = 90, 30, 60, 22
+    t_sz, d_sz, n_sz, l_sz = 70, 20, 45, 22
     
     # 인스타 캔버스 크기 결정
     CW, CH = (1080, 1080) if insta_mode == "1:1 (Square)" else (1080, 1350)
@@ -208,3 +208,4 @@ if bg_files:
                 
     except Exception as e:
         st.error(f"Error: {e}")
+
