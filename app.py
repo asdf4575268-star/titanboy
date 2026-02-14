@@ -120,14 +120,14 @@ with col3:
     sub_color = COLOR_OPTIONS[st.selectbox("서브 컬러", list(COLOR_OPTIONS.keys()), index=1)]
     
     # 크기 고정 (활동명 90, 날짜 30, 숫자 60)
-    t_sz, d_sz, n_sz, l_sz = 90, 30, 60, 20
+    t_sz, d_sz, n_sz, l_sz = 70, 20, 50, 20
     
     if mode == "DAILY":
         st.divider()
         st.subheader("Box Layout")
         # 모드별 디폴트 위치 설정
         if box_orient == "Vertical":
-            d_rx, d_ry, d_rw, d_rh = 70, 1320, 480, 520
+            d_rx, d_ry, d_rw, d_rh = 70, 1320, 480, 540
         else:
             d_rx, d_ry, d_rw, d_rh = 70, 1580, 940, 280
             
@@ -216,3 +216,4 @@ if bg_files:
             st.download_button("📸 DOWNLOAD", buf.getvalue(), "result.jpg", use_container_width=True)
     except Exception as e:
         st.error(f"Error: {e}")
+
