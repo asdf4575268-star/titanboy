@@ -88,12 +88,12 @@ with st.sidebar:
     route_color = st.selectbox("지도 경로 색상", ["Yellow", "Black", "White"])
     
     st.markdown("---")
-    t_sz, d_sz, n_sz, l_sz = st.slider("활동명", 10, 200, 90), st.slider("날짜", 10, 100, 30), st.slider("숫자", 10, 150, 60), st.slider("라벨", 10, 80, 25)
+    t_sz, d_sz, n_sz, l_sz = st.slider("활동명", 10, 200, 70), st.slider("날짜", 10, 100, 20), st.slider("숫자", 10, 150, 40), st.slider("라벨", 10, 80, 20)
     
     st.markdown("---")
     st.subheader("로그 박스 커스텀")
-    rx, ry, rw, rh = st.slider("X", 0, 1080, 70), st.slider("Y", 0, 1920, 1150), st.slider("Width", 300, 1000, 500), st.slider("Height", 300, 1200, 720)
-    alpha = st.slider("박스 투명도", 0, 255, 60)
+    rx, ry, rw, rh = st.slider("X", 0, 1080, 70), st.slider("Y", 0, 1920, 1150), st.slider("Width", 300, 1000, 360), st.slider("Height", 300, 1150, 720)
+    alpha = st.slider("박스 투명도", 0, 255, 85)
     map_alpha = st.slider("지도 투명도", 0, 255, 100)
 
 # --- [5. 실행 로직] ---
@@ -205,3 +205,4 @@ elif app_mode == "WEEKLY":
                     st.image(collage, use_container_width=True)
                     buf = io.BytesIO(); collage.save(buf, format="JPEG", quality=95)
                     st.download_button("📸 콜라주 저장", buf.getvalue(), "weekly_collage.jpg")
+
