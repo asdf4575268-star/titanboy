@@ -3,73 +3,58 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 import io, os, requests, polyline, time
 from datetime import datetime, timedelta
 
-# --- [1. 기본 설정] ---
+# --- [1. 설정] ---
 CLIENT_ID = '202274'
 CLIENT_SECRET = 'cf2ab22bb9995254e6ea68ac3c942572f7114c9a'
+# 실제 주소 끝에 / 가 붙어있는지 확인해 보세요.
 ACTUAL_URL = "https://titanboy-5fxenvcchdubwx3swjh8ut.streamlit.app"
 
 st.set_page_config(page_title="Garmin Photo Dashboard", layout="wide")
 
-# 세션 초기화 (비상용)
-def full_reset():
-    st.session_state.clear()
-    st.query_params.clear()
-    st.rerun()
-
-# --- [2. 인증 로직 - 먹통/루프 방지] ---
+# --- [2. 핵심: 인증 로직 보강] ---
 if 'access_token' not in st.session_state:
     st.session_state['access_token'] = None
 
+# 현재 주소창의 파라미터 읽기
 params = st.query_params
-if "code" in params and st.session_state['access_token'] is None:
-    try:
-        res = requests.post("https://www.strava.com/oauth/token", data={
-            "client_id": CLIENT_ID, "client_secret": CLIENT_SECRET,
-            "code": params["code"], "grant_type": "authorization_code"
-        })
-        if res.status_code == 200:
-            st.session_state['access_token'] = res.json()['access_token']
-            st.query_params.clear() # 주소창 코드 제거 (먹통 방지 핵심)
-            st.rerun()
-    except:
-        full_reset()
 
-# --- [3. 메인 화면 분기] ---
+# 중요: 코드가 주소창에 들어왔다면
+if "code" in params and st.session_state['access_token'] is None:
+    code = params["code"]
+    # 1. 즉시 토큰 교환 시도
+    res = requests.post("https://www.strava.com/oauth/token", data={
+        "client_id": CLIENT_ID, "client_secret": CLIENT_SECRET,
+        "code": code, "grant_type": "authorization_code"
+    })
+    
+    if res.status_code == 200:
+        # 2. 성공 시 세션에 저장
+        st.session_state['access_token'] = res.json()['access_token']
+        # 3. 주소창을 완전히 비우고 재시작 (코드 찌꺼기 제거)
+        st.query_params.clear()
+        st.rerun()
+    else:
+        st.error(f"인증 실패: {res.text}") # 왜 실패했는지 에러 메시지 출력
+
+# --- [3. 화면 분기] ---
 if not st.session_state['access_token']:
     st.title("🏃 Garmin Photo Dashboard")
-    st.warning("로그인 세션이 만료되었거나 연동 전입니다.")
+    st.warning("로그인이 필요합니다. 아래 버튼을 눌러 승인해 주세요.")
     
+    # 승인 주소 생성
     auth_url = f"https://www.strava.com/oauth/authorize?client_id={CLIENT_ID}&response_type=code&redirect_uri={ACTUAL_URL}&scope=activity:read_all&approval_prompt=force"
+    
     st.link_button("🚀 Strava 연동하기", auth_url)
     
-    if st.button("🔌 앱 강제 초기화 (먹통 시 클릭)"):
-        full_reset()
+    if st.button("🔌 세션 강제 리셋 (무한 반복 시 클릭)"):
+        st.session_state.clear()
+        st.query_params.clear()
+        st.rerun()
     st.stop()
 
-# --- [4. 유틸리티 함수] ---
-@st.cache_resource
-def load_custom_font(font_type, size):
-    fonts = {
-        "Jua": "https://github.com/google/fonts/raw/main/ofl/jua/Jua-Regular.ttf",
-        "DoHyeon": "https://github.com/google/fonts/raw/main/ofl/dohyeon/DoHyeon-Regular.ttf",
-        "GothicA1": "https://github.com/google/fonts/raw/main/ofl/gothica1/GothicA1-Black.ttf",
-        "BlackHanSans": "https://github.com/google/fonts/raw/main/ofl/blackhansans/BlackHanSans-Regular.ttf"
-    }
-    font_url = fonts.get(font_type, fonts["Jua"])
-    font_path = f"font_{font_type}_{size}.ttf"
-    if not os.path.exists(font_path):
-        r = requests.get(font_url)
-        with open(font_path, "wb") as f: f.write(r.content)
-    return ImageFont.truetype(font_path, int(size))
-
-def get_circle_logo(img_file, size=(130, 130)):
-    img = Image.open(img_file).convert("RGBA")
-    img = ImageOps.fit(img, size, centering=(0.5, 0.5))
-    mask = Image.new('L', size, 0)
-    draw = ImageDraw.Draw(mask)
-    draw.ellipse((0, 0) + size, fill=255)
-    img.putalpha(mask)
-    return img
+# --- [4. 이후 기능 로직 (성공 시에만 진입)] ---
+st.success("✅ 인증 완료! 활동 데이터를 불러오는 중...")
+# (이 아래에 이전 대화의 DAILY/WEEKLY 전체 코드를 그대로 붙여넣으세요)
 
 # --- [5. 사이드바 - 디자인 가이드 준수 (80, 20, 50)] ---
 with st.sidebar:
@@ -167,3 +152,4 @@ if app_mode == "DAILY":
             buf = io.BytesIO()
             final.save(buf, format="JPEG", quality=95)
             st.download_button("📸 사진 저장", buf.getvalue(), "garmin.jpg")
+
