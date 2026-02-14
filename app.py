@@ -83,18 +83,29 @@ with col2:
     v_act, v_date, v_dist, v_time, v_pace, v_hr = "RUNNING", "2026-02-14", "0.00", "00:00:00", "0'00\"", "0"
     a = None
 
-    if mode == "DAILY" and acts:
-        act_options = [f"{act['start_date_local'][:10]} - {act['name']}" for act in acts]
-        sel_str = st.selectbox("기록 선택 (Strava)", act_options)
-        a = acts[act_options.index(sel_str)]
-        d_km = a.get('distance', 0)/1000
-        m_sec = a.get('moving_time', 0)
-        v_act, v_date = a['name'], a['start_date_local'][:10]
-        v_dist, v_time = f"{d_km:.2f}", f"{m_sec//3600:02d}:{(m_sec%3600)//60:02d}:{m_sec%60:02d}"
-        v_pace = f"{int((m_sec/d_km)//60)}'{int((m_sec/d_km)%60):02d}\"" if d_km > 0 else "0'00\""
-        v_hr = str(int(a.get('average_heartrate', 0))) if a.get('average_heartrate') else "0"
-    elif mode == "WEEKLY" and acts:
-        st.info("업로드한 사진 개수에 따라 콜라주가 자동으로 생성됩니다.")
+    if mode == "DAILY" or num_pics == 1:
+    img = ImageOps.exif_transpose(Image.open(bg_files[0]))
+    # 캔버스 크기에 1:1로 맞춤 (여백 원천 차단)
+    img = ImageOps.fit(img.convert("RGBA"), (CW, CH), centering=(0.5, 0.5))
+    canvas.paste(img, (0,0))
+else:
+    # WEEKLY 콜라주: 소수점 오차로 인한 실금(여백) 방지
+    cols = 2 if num_pics > 1 else 1
+    rows = math.ceil(num_pics / cols)
+    
+    # 각 유닛의 크기를 정수로 계산
+    w_unit = CW // cols
+    h_unit = CH // rows
+    
+    for i, f in enumerate(bg_files):
+        img = ImageOps.exif_transpose(Image.open(f))
+        # ImageOps.fit이 핵심: 해당 칸에 사진을 꽉 채우고 남는 부분은 자름
+        img = ImageOps.fit(img.convert("RGBA"), (w_unit, h_unit), centering=(0.5, 0.5))
+        
+        # 붙이는 위치 계산
+        curr_col = i % cols
+        curr_row = i // cols
+        canvas.paste(img, (curr_col * w_unit, curr_row * h_unit))
 
 with col1:
     st.header("📸 DATA INPUT")
@@ -204,3 +215,4 @@ if bg_files:
                 
     except Exception as e:
         st.error(f"Error: {e}")
+
