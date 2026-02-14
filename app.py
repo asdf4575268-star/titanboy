@@ -176,7 +176,7 @@ with col_design:
 # --- [6. 렌더링 엔진] ---
 try:
     # 활동명 90, 날짜 30, 숫자 60, 라벨 20
-    f_t, f_d, f_n, f_l = load_font(sel_font, 90), load_font(sel_font, 30), load_font(sel_font, 60), load_font(sel_font, 20)
+    f_t, f_d, f_n, f_l = load_font(sel_font, 70), load_font(sel_font, 20), load_font(sel_font, 40), load_font(sel_font, 23)
     
     # [수정] 콜라주 함수 적용
     if bg_files:
