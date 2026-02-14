@@ -2,7 +2,7 @@ import streamlit as st
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 import io, os, requests, polyline, math
 
-# --- [1. 기본 설정 및 초기화] ---
+# --- [1. 기본 설정] ---
 CLIENT_ID = '202274'
 CLIENT_SECRET = 'cf2ab22bb9995254e6ea68ac3c942572f7114c9a'
 ACTUAL_URL = "https://titanboy-5fxenvcchdubwx3swjh8ut.streamlit.app"
@@ -40,32 +40,32 @@ if st.session_state['access_token'] is None:
     st.link_button("🚀 Strava 연동하기", auth_url)
     st.stop()
 
-# --- [3. 유틸리티 함수 - 폰트 로드 강화] ---
+# --- [3. 유틸리티 함수 - 폰트 주소 및 로드 방식 전면 수정] ---
 @st.cache_resource
 def load_font(font_type, size):
-    # 호환성이 가장 좋은 주소들로 재세팅
+    # 가장 안정적인 공개 CDN 및 구글 저장소 주소 사용
     fonts = {
-        "GmarketSans": "https://github.com/hyeonseok-dev/fonts/raw/main/GmarketSansBold.ttf",
-        "Pretendard": "https://github.com/all-of-vocal/Pretendard-Static/raw/main/Pretendard-Bold.ttf",
-        "Bazzi": "https://github.com/google/fonts/raw/main/ofl/bazzi/Bazzi-Regular.ttf",
-        "KOTRA_BOLD": "https://github.com/dhun-dg/fonts/raw/main/KOTRA_BOLD.ttf",
-        "KyoboHandwriting": "https://github.com/google/fonts/raw/main/ofl/kyobohandwriting2019/KyoboHandwriting2019-Regular.ttf",
-        "BlackHanSans": "https://github.com/google/fonts/raw/main/ofl/blackhansans/BlackHanSans-Regular.ttf",
-        "Jua": "https://github.com/google/fonts/raw/main/ofl/jua/Jua-Regular.ttf"
+        "GmarketSans": "https://raw.githubusercontent.com/hyeonseok-dev/fonts/main/GmarketSansBold.ttf",
+        "Pretendard": "https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.8/dist/public/static/Pretendard-Bold.ttf",
+        "Bazzi": "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/bazzi/Bazzi-Regular.ttf",
+        "KOTRA_BOLD": "https://cdn.jsdelivr.net/gh/dhun-dg/fonts/main/KOTRA_BOLD.ttf",
+        "KyoboHandwriting": "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/kyobohandwriting2019/KyoboHandwriting2019-Regular.ttf",
+        "BlackHanSans": "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/blackhansans/BlackHanSans-Regular.ttf",
+        "Jua": "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/jua/Jua-Regular.ttf"
     }
     f_url = fonts.get(font_type, fonts["GmarketSans"])
-    f_path = f"font_{font_type}_{int(size)}.ttf"
+    f_path = f"{font_type}_{int(size)}.ttf"
     
-    # 폰트 로드 시도
     try:
-        if not os.path.exists(f_path):
+        # 파일이 없거나 크기가 0이면 새로 다운로드
+        if not os.path.exists(f_path) or os.path.getsize(f_path) == 0:
             r = requests.get(f_url, timeout=10)
             if r.status_code == 200:
                 with open(f_path, "wb") as f: f.write(r.content)
-            else: return ImageFont.load_default()
+            else:
+                return ImageFont.load_default()
         return ImageFont.truetype(f_path, int(size))
-    except Exception:
-        # 파일이 깨졌을 경우 삭제 후 기본 폰트 반환
+    except Exception as e:
         if os.path.exists(f_path): os.remove(f_path)
         return ImageFont.load_default()
 
@@ -110,8 +110,7 @@ with col1:
         v_dist, v_pace, v_hr = st.text_input("거리(km)", f"{d_km:.2f}"), st.text_input("페이스(분/km)", p_val), st.text_input("심박(bpm)", h_val)
     elif mode == "WEEKLY" and acts:
         w_acts = acts[:7]
-        t_dist = sum([x.get('distance', 0) for x in w_acts]) / 1000
-        t_time = sum([x.get('moving_time', 0) for x in w_acts])
+        t_dist, t_time = sum([x.get('distance', 0) for x in w_acts]) / 1000, sum([x.get('moving_time', 0) for x in w_acts])
         avg_p_val = f"{int((t_time/t_dist)//60)}'{int((t_time/t_dist)%60):02d}\"" if t_dist > 0 else "0'00\""
         t_hrs = [x.get('average_heartrate', 0) for x in w_acts if x.get('average_heartrate')]
         avg_hr = int(sum(t_hrs)/len(t_hrs)) if t_hrs else 0
@@ -120,11 +119,11 @@ with col1:
 with col3:
     st.header("🎨 DESIGN")
     show_box = st.checkbox("로그 박스 표시", value=True)
-    sel_font = st.selectbox("폰트 선택", ["GmarketSans", "Pretendard", "Bazzi", "KOTRA_BOLD", "KyoboHandwriting", "BlackHanSans", "Jua"])
+    sel_font = st.selectbox("폰트 선택", list(load_font.__wrapped__.func.__defaults__[0].keys()) if hasattr(load_font, '__wrapped__') else ["GmarketSans", "Pretendard", "Bazzi", "KOTRA_BOLD", "KyoboHandwriting", "BlackHanSans", "Jua"])
     m_color = COLOR_OPTIONS[st.selectbox("포인트 컬러", list(COLOR_OPTIONS.keys()))]
     sub_color = COLOR_OPTIONS[st.selectbox("서브 컬러", list(COLOR_OPTIONS.keys()), index=1)]
     
-    t_sz, d_sz, n_sz, l_sz = 70, 20, 40, 20 # 요청하신 고정 크기
+    t_sz, d_sz, n_sz, l_sz = 70, 20, 40, 20 # 고정 크기
     
     if mode == "DAILY":
         st.divider()
@@ -153,6 +152,7 @@ if bg_files:
                         return tx, ty
                     m_draw.line([trans(la, lo) for la, lo in pts], fill=hex_to_rgba(m_color, 255), width=4)
                     overlay.paste(m_layer, (rx + rw - map_size - 20, ry + 20), m_layer)
+                
                 items = [("distance", f"{v_dist} km"), ("time", t_val), ("pace", v_pace), ("avg bpm", f"{v_hr} bpm")]
                 draw.text((rx+40, ry+30), v_act, font=f_t, fill=m_color)
                 draw.text((rx+40, ry+30+t_sz+5), v_date, font=f_d, fill=sub_color)
