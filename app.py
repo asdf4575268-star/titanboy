@@ -125,11 +125,11 @@ with col3:
         st.divider()
         st.subheader("Box Layout")
         rx = st.number_input("X 위치", 0, 1080, 70)
-        ry = st.number_input("Y 위치", 0, 1920, 1150)
-        rw = st.number_input("박스 너비", 100, 1080, 650)
-        rh = st.number_input("박스 높이", 100, 1920, 680)
-        box_alpha = st.slider("박스 투명도", 0, 255, 110)
-        map_size = st.slider("지도 크기", 50, 400, 150)
+        ry = st.number_input("Y 위치", 0, 1920, 1350)
+        rw = st.number_input("박스 너비", 100, 1080, 500)
+        rh = st.number_input("박스 높이", 100, 1920, 500)
+        box_alpha = st.slider("박스 투명도", 0, 255, 100)
+        map_size = st.slider("지도 크기", 50, 400, 110)
 
 # --- [6. 렌더링 엔진] ---
 if bg_files:
@@ -193,3 +193,4 @@ if bg_files:
             st.download_button("📸 DOWNLOAD", buf.getvalue(), "result.jpg", use_container_width=True)
     except Exception as e:
         st.error(f"Error: {e}")
+
