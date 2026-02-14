@@ -104,15 +104,14 @@ with col3:
     m_color = COLOR_OPTIONS[st.selectbox("포인트 컬러", list(COLOR_OPTIONS.keys()))]
     sub_color = COLOR_OPTIONS[st.selectbox("서브 컬러", list(COLOR_OPTIONS.keys()), index=1)]
     
-    # 크기 설정 (활동명 90, 날짜 30, 숫자 60)
-    t_sz, d_sz, n_sz, l_sz = 70, 20, 45, 20
+    t_sz, d_sz, n_sz, l_sz = 70, 20, 40, 20
     
     if mode == "DAILY":
-        if box_orient == "Vertical": d_rx, d_ry, d_rw, d_rh = 70, 1250, 450, 600
-        else: d_rx, d_ry, d_rw, d_rh = 70, 1580, 940, 280
+        if box_orient == "Vertical": d_rx, d_ry, d_rw, d_rh = 70, 1250, 480, 600
+        else: d_rx, d_ry, d_rw, d_rh = 70, 1600, 940, 260
         rx, ry = st.number_input("X 위치", 0, 1080, d_rx), st.number_input("Y 위치", 0, 1920, d_ry)
         rw, rh = st.number_input("박스 너비", 100, 1080, d_rw), st.number_input("박스 높이", 100, 1920, d_rh)
-        box_alpha, map_size = st.slider("박스 투명도", 0, 255, 110), st.slider("지도 크기", 50, 400, 120)
+        box_alpha, map_size = st.slider("박스 투명도", 0, 255, 110), st.slider("지도 크기", 50, 400, 110)
 
 # --- [6. 렌더링 엔진] ---
 if bg_files:
@@ -125,46 +124,71 @@ if bg_files:
             
             if show_box:
                 draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0,0,0,box_alpha))
-                
-                # 1. 활동 제목 및 날짜 배치
-                draw.text((rx+40, ry+30), v_act, font=f_t, fill=m_color)
-                
-                # 2. 지도 배치 (박스 우측 상단)
-                if acts and 'a' in locals():
-                    p_line = a.get('map', {}).get('summary_polyline')
-                    if p_line:
-                        pts = polyline.decode(p_line); lats, lons = zip(*pts)
-                        m_layer = Image.new("RGBA", (map_size, map_size), (0,0,0,0)); m_draw = ImageDraw.Draw(m_layer)
-                        def trans(la, lo):
-                            tx = 10 + (lo - min(lons)) / (max(lons) - min(lons) + 0.00001) * (map_size - 20)
-                            ty = (map_size - 10) - (la - min(lats)) / (max(lats) - min(lats) + 0.00001) * (map_size - 20)
-                            return tx, ty
-                        m_draw.line([trans(la, lo) for la, lo in pts], fill=hex_to_rgba(m_color, 255), width=4)
-                        overlay.paste(m_layer, (rx + rw - map_size - 20, ry + 20), m_layer)
-
-                # 3. 데이터 배치 (km, bpm 소문자 유지)
                 items = [("distance", f"{v_dist} km"), ("time", t_val), ("pace", v_pace), ("avg bpm", f"{v_hr} bpm")]
+                
+                # --- [세로 모드 레이아웃] ---
                 if box_orient == "Vertical":
+                    draw.text((rx+40, ry+30), v_act, font=f_t, fill=m_color)
                     draw.text((rx+40, ry+30+t_sz+10), v_date, font=f_d, fill=sub_color)
                     y_c = ry + t_sz + d_sz + 90
                     for lab, val in items:
                         draw.text((rx+40, y_c), lab, font=f_l, fill="#AAAAAA")
                         draw.text((rx+40, y_c+l_sz+5), val, font=f_n, fill=sub_color); y_c += (n_sz + l_sz + 35)
-                else: # Horizontal
-                    draw.text((rx+40, ry+30+t_sz+5), v_date, font=f_d, fill="#AAAAAA")
-                    data_y, sec_w = ry + t_sz + d_sz + 55, (rw - 80) // 4
+                    # 지도는 우측 상단 고정
+                    if acts and 'a' in locals():
+                        p_line = a.get('map', {}).get('summary_polyline')
+                        if p_line:
+                            pts = polyline.decode(p_line); lats, lons = zip(*pts)
+                            m_layer = Image.new("RGBA", (map_size, map_size), (0,0,0,0)); m_draw = ImageDraw.Draw(m_layer)
+                            def trans(la, lo):
+                                tx = 10 + (lo - min(lons)) / (max(lons) - min(lons) + 0.00001) * (map_size - 20)
+                                ty = (map_size - 10) - (la - min(lats)) / (max(lats) - min(lats) + 0.00001) * (map_size - 20)
+                                return tx, ty
+                            m_draw.line([trans(la, lo) for la, lo in pts], fill=hex_to_rgba(m_color, 255), width=4)
+                            overlay.paste(m_layer, (rx + rw - map_size - 20, ry + 20), m_layer)
+                    # 로고는 우측 하단 고정
+                    if log_file:
+                        l_sz_v = 100
+                        l_img = ImageOps.fit(Image.open(log_file).convert("RGBA"), (l_sz_v, l_sz_v))
+                        mask = Image.new('L', (l_sz_v, l_sz_v), 0); ImageDraw.Draw(mask).ellipse((0, 0, l_sz_v, l_sz_v), fill=255); l_img.putalpha(mask)
+                        overlay.paste(l_img, (rx + rw - l_sz_v - 20, ry + rh - l_sz_v - 20), l_img)
+
+                # --- [가로 모드 레이아웃] ---
+                else: 
+                    # 제목 쓰기
+                    title_w = draw.textlength(v_act, font=f_t)
+                    draw.text((rx+40, ry+25), v_act, font=f_t, fill=m_color)
+                    
+                    # 제목 바로 옆에 지도 배치
+                    if acts and 'a' in locals():
+                        p_line = a.get('map', {}).get('summary_polyline')
+                        if p_line:
+                            pts = polyline.decode(p_line); lats, lons = zip(*pts)
+                            m_layer = Image.new("RGBA", (map_size, map_size), (0,0,0,0)); m_draw = ImageDraw.Draw(m_layer)
+                            def trans(la, lo):
+                                tx = 10 + (lo - min(lons)) / (max(lons) - min(lons) + 0.00001) * (map_size - 20)
+                                ty = (map_size - 10) - (la - min(lats)) / (max(lats) - min(lats) + 0.00001) * (map_size - 20)
+                                return tx, ty
+                            m_draw.line([trans(la, lo) for la, lo in pts], fill=hex_to_rgba(m_color, 255), width=4)
+                            # 제목 끝나는 좌표 + 여백 30px 자리에 지도 배치
+                            overlay.paste(m_layer, (int(rx + 40 + title_w + 30), int(ry + 20)), m_layer)
+                    
+                    # 날짜 (제목 아래)
+                    draw.text((rx+40, ry+25+t_sz+5), v_date, font=f_d, fill="#AAAAAA")
+                    
+                    # 로고 (박스 오른쪽 상단)
+                    if log_file:
+                        l_sz_h = 80
+                        l_img = ImageOps.fit(Image.open(log_file).convert("RGBA"), (l_sz_h, l_sz_h))
+                        mask = Image.new('L', (l_sz_h, l_sz_h), 0); ImageDraw.Draw(mask).ellipse((0, 0, l_sz_h, l_sz_h), fill=255); l_img.putalpha(mask)
+                        overlay.paste(l_img, (rx + rw - l_sz_h - 20, ry + 20), l_img)
+
+                    # 하단 데이터 열 배치 (4등분)
+                    data_y, sec_w = ry + t_sz + d_sz + 50, (rw - 80) // 4
                     for i, (lab, val) in enumerate(items):
                         item_x = rx + 40 + (i * sec_w)
                         draw.text((item_x, data_y), lab, font=f_l, fill="#AAAAAA")
                         draw.text((item_x, data_y + l_sz + 5), val, font=f_n, fill=sub_color)
-
-                # 4. 로고 배치 (박스 오른쪽 아래 구석 고정)
-                if log_file:
-                    logo_sz = 80 
-                    l_img = ImageOps.fit(Image.open(log_file).convert("RGBA"), (logo_sz, logo_sz))
-                    mask = Image.new('L', (logo_sz, logo_sz), 0); ImageDraw.Draw(mask).ellipse((0, 0, logo_sz, logo_sz), fill=255); l_img.putalpha(mask)
-                    # 박스 끝에서 20px 안쪽으로 배치
-                    overlay.paste(l_img, (rx + rw - logo_sz - 20, ry + rh - logo_sz - 20), l_img)
             
             final = Image.alpha_composite(canvas, overlay).convert("RGB")
             with col2:
@@ -174,4 +198,3 @@ if bg_files:
                 
     except Exception as e:
         st.error(f"Error: {e}")
-
