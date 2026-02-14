@@ -5,7 +5,7 @@ import io, os, requests, polyline, math
 # --- [1. 기본 설정 및 초기화] ---
 CLIENT_ID = '202275'
 CLIENT_SECRET = '969201cab488e4eaf1398b106de1d4e520dc564c'
-ACTUAL_URL = "https://titanboy-kgcnje3tg3hbfpfsp6uwzc.streamlit.app"
+ACTUAL_URL = "https://titanboy-5fxenvcchdubwx3swjh8ut.streamlit.app"
 
 st.set_page_config(page_title="Garmin Photo Dashboard", layout="wide")
 
@@ -65,8 +65,7 @@ if st.session_state['access_token']:
 
 # --- [5. UI 레이아웃] ---
 col1, col2, col3 = st.columns([1.2, 2, 1], gap="medium")
-# 2. 검정색 폰트 설정 추가
-COLOR_OPTIONS = {"Garmin Yellow": "#FFD700", "Pure White": "#FFFFFF", "Pure Black": "#000000", "Neon Orange": "#FF4500", "Electric Blue": "#00BFFF", "Soft Grey": "#AAAAAA"}
+COLOR_OPTIONS = {"Garmin Yellow": "#FFD700", "Pure White": "#FFFFFF", "Neon Orange": "#FF4500", "Electric Blue": "#00BFFF", "Soft Grey": "#AAAAAA"}
 
 with col2:
     m_col, l_col = st.columns([3, 1])
@@ -80,6 +79,7 @@ with col2:
                         f"&scope=read,activity:read_all&approval_prompt=force")
             st.link_button("🚀 Strava 연동", auth_url, use_container_width=True)
 
+    # 초기값 설정
     v_act, v_date, v_dist, v_time, v_pace, v_hr = "RUNNING", "2026-02-14", "0.00", "00:00:00", "0'00\"", "0"
     a = None
 
@@ -90,20 +90,20 @@ with col2:
         d_km = a.get('distance', 0)/1000
         m_sec = a.get('moving_time', 0)
         v_act, v_date = a['name'], a['start_date_local'][:10]
-        v_dist, v_time = f"{d_km:.2f}", f"{m_sec//3600:02d}:{(m_sec%3600)//60:02d}:{m_sec%60:02d}"
+        v_dist = f"{d_km:.2f}"
+        v_time = f"{m_sec//3600:02d}:{(m_sec%3600)//60:02d}:{m_sec%60:02d}" if m_sec >= 3600 else f"{m_sec//60:02d}:{m_sec%60:02d}"
         v_pace = f"{int((m_sec/d_km)//60)}'{int((m_sec/d_km)%60):02d}\"" if d_km > 0 else "0'00\""
         v_hr = str(int(a.get('average_heartrate', 0))) if a.get('average_heartrate') else "0"
-    elif mode == "WEEKLY" and acts:
-        st.info("업로드한 사진 개수에 따라 콜라주가 자동으로 생성됩니다.")
 
 with col1:
     st.header("📸 DATA INPUT")
-    bg_files = st.file_uploader("사진 업로드 (Weekly는 여러 장)", type=['jpg','jpeg','png'], accept_multiple_files=True)
+    bg_files = st.file_uploader("배경 사진", type=['jpg','jpeg','png'], accept_multiple_files=True)
     log_file = st.file_uploader("원형 로고", type=['jpg','jpeg','png'])
     
     st.divider()
+    # 수동 입력 칸 (Strava 연동 시 자동 입력됨, 수정 가능)
     v_act = st.text_input("활동명", v_act)
-    v_date = st.text_input("날짜/기간", v_date)
+    v_date = st.text_input("날짜", v_date)
     v_dist = st.text_input("거리(km)", v_dist)
     v_time = st.text_input("시간", v_time)
     v_pace = st.text_input("페이스(분/km)", v_pace)
@@ -111,96 +111,84 @@ with col1:
 
 with col3:
     st.header("🎨 DESIGN")
-    insta_mode = st.selectbox("캔버스 비율", ["1:1 (Square)", "4:5 (Portrait)"])
     show_box = st.checkbox("로그 박스 표시", value=True)
     box_orient = st.radio("박스 방향", ["Vertical", "Horizontal"], horizontal=True)
     sel_font = st.selectbox("폰트", ["BlackHanSans", "Jua", "DoHyeon", "NanumBrush", "Sunflower"])
     m_color = COLOR_OPTIONS[st.selectbox("포인트 컬러", list(COLOR_OPTIONS.keys()))]
     sub_color = COLOR_OPTIONS[st.selectbox("서브 컬러", list(COLOR_OPTIONS.keys()), index=1)]
     
-    # 지시하신 폰트 크기 고정 적용
-    t_sz, d_sz, n_sz, l_sz = 90, 30, 60, 22
+    # [약속된 크기 설정]
+    t_sz, d_sz, n_sz, l_sz = 90, 30, 60, 20
     
-    CW, CH = (1080, 1080) if insta_mode == "1:1 (Square)" else (1080, 1350)
-    
-    d_rx, d_ry = (70, CH - 360) if box_orient == "Horizontal" else (70, CH - 720)
-    rx = st.number_input("X 위치", 0, CW, d_rx)
-    ry = st.number_input("Y 위치", 0, CH, d_ry)
-    rw = st.number_input("박스 너비", 100, CW, 940 if box_orient == "Horizontal" else 480)
-    rh = st.number_input("박스 높이", 100, CH, 300 if box_orient == "Horizontal" else 650)
+    d_rx, d_ry, d_rw, d_rh = (70, 1250, 480, 600) if box_orient == "Vertical" else (70, 1600, 940, 260)
+    rx = st.number_input("X 위치", 0, 1080, d_rx)
+    ry = st.number_input("Y 위치", 0, 1920, d_ry)
+    rw = st.number_input("박스 너비", 100, 1080, d_rw)
+    rh = st.number_input("박스 높이", 100, 1920, d_rh)
     box_alpha = st.slider("박스 투명도", 0, 255, 110)
-    map_size = st.slider("지도 크기", 50, CW//2, 100)
+    map_size = st.slider("지도 크기", 50, 400, 100)
 
 # --- [6. 렌더링 엔진] ---
 if bg_files:
     try:
         f_t, f_d, f_n, f_l = load_font(sel_font, t_sz), load_font(sel_font, d_sz), load_font(sel_font, n_sz), load_font(sel_font, l_sz)
-        
-        # 1. 캔버스 생성 및 위클리 여백 없는 사이즈 자동 조정
-        canvas = Image.new("RGBA", (CW, CH), (0,0,0,255))
-        num_pics = len(bg_files)
-        
-        if mode == "DAILY" or num_pics == 1:
-            img = ImageOps.exif_transpose(Image.open(bg_files[0]))
-            img = ImageOps.fit(img.convert("RGBA"), (CW, CH))
-            canvas.paste(img, (0,0))
-        else:
-            # 위클리 콜라주: 인스타 규격(CW, CH) 내에서 여백 없이 분할
-            cols = 2 if num_pics > 1 else 1
-            rows = math.ceil(num_pics / cols)
-            w_unit, h_unit = CW // cols, CH // rows
-            for i, f in enumerate(bg_files):
-                img = ImageOps.exif_transpose(Image.open(f))
-                img = ImageOps.fit(img.convert("RGBA"), (w_unit, h_unit))
-                canvas.paste(img, ((i % cols) * w_unit, (i // cols) * h_unit))
-
-        overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
+        img = ImageOps.exif_transpose(Image.open(bg_files[0]))
+        canvas = ImageOps.fit(img.convert("RGBA"), (1080, 1920))
+        overlay = Image.new("RGBA", (1080, 1920), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
         
         if show_box:
             draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0,0,0,box_alpha))
-            # km, bpm 소문자 유지
             items = [("distance", f"{v_dist} km"), ("time", v_time), ("pace", v_pace), ("avg bpm", f"{v_hr} bpm")]
             
-            if mode == "DAILY" and a and a.get('map', {}).get('summary_polyline'):
+            # --- [공통: 지도 렌더링 (데이터가 있을 때만)] ---
+            if a and a.get('map', {}).get('summary_polyline'):
                 pts = polyline.decode(a['map']['summary_polyline'])
                 lats, lons = zip(*pts)
                 m_layer = Image.new("RGBA", (map_size, map_size), (0,0,0,0)); m_draw = ImageDraw.Draw(m_layer)
                 def trans(la, lo):
-                    tx = 10 + (lo - min(lons)) / (max(lons) - min(lons) + 1e-7) * (map_size - 20)
-                    ty = (map_size - 10) - (la - min(lats)) / (max(lats) - min(lats) + 1e-7) * (map_size - 20)
+                    tx = 10 + (lo - min(lons)) / (max(lons) - min(lons) + 0.00001) * (map_size - 20)
+                    ty = (map_size - 10) - (la - min(lats)) / (max(lats) - min(lats) + 0.00001) * (map_size - 20)
                     return tx, ty
                 m_draw.line([trans(la, lo) for la, lo in pts], fill=hex_to_rgba(m_color, 255), width=4)
-                overlay.paste(m_layer, (rx + (30 if box_orient=="Horizontal" else rw - map_size - 20), ry + 20), m_layer)
+                
+                if box_orient == "Vertical":
+                    overlay.paste(m_layer, (rx + rw - map_size - 20, ry + 20), m_layer)
+                else:
+                    overlay.paste(m_layer, (rx + 30, ry + 20), m_layer)
 
+            # --- [레이아웃 배치] ---
             if box_orient == "Vertical":
                 draw.text((rx+40, ry+30), v_act, font=f_t, fill=m_color)
                 draw.text((rx+40, ry+30+t_sz+10), v_date, font=f_d, fill="#AAAAAA")
-                y_c = ry + t_sz + d_sz + 100
+                y_c = ry + t_sz + d_sz + 90
                 for lab, val in items:
                     draw.text((rx+40, y_c), lab, font=f_l, fill="#AAAAAA")
-                    draw.text((rx+40, y_c+l_sz+5), val, font=f_n, fill=sub_color); y_c += 115
+                    draw.text((rx+40, y_c+l_sz+5), val, font=f_n, fill=sub_color); y_c += (n_sz + l_sz + 35)
             else:
                 title_w = draw.textlength(v_act, font=f_t)
-                draw.text((rx+(rw//2)-(title_w//2), ry+25), v_act, font=f_t, fill=m_color)
+                draw.text((rx + (rw // 2) - (title_w // 2), ry + 25), v_act, font=f_t, fill=m_color)
                 date_w = draw.textlength(v_date, font=f_d)
-                draw.text((rx+(rw//2)-(date_w//2), ry+25+t_sz+5), v_date, font=f_d, fill="#AAAAAA")
+                draw.text((rx + (rw // 2) - (date_w // 2), ry + 25 + t_sz + 5), v_date, font=f_d, fill="#AAAAAA")
                 sec_w = (rw - 80) // 4
                 for i, (lab, val) in enumerate(items):
-                    ix = rx + 40 + (i * sec_w)
-                    draw.text((ix, ry+t_sz+d_sz+60), lab, font=f_l, fill="#AAAAAA")
-                    draw.text((ix, ry+t_sz+d_sz+60+l_sz+5), val, font=f_n, fill=sub_color)
+                    item_x = rx + 40 + (i * sec_w)
+                    draw.text((item_x, ry + t_sz + d_sz + 50), lab, font=f_l, fill="#AAAAAA")
+                    draw.text((item_x, ry + t_sz + d_sz + 50 + l_sz + 5), val, font=f_n, fill=sub_color)
 
             if log_file:
                 l_sz_img = 100 if box_orient == "Vertical" else 80
                 l_img = ImageOps.fit(Image.open(log_file).convert("RGBA"), (l_sz_img, l_sz_img))
                 mask = Image.new('L', (l_sz_img, l_sz_img), 0); ImageDraw.Draw(mask).ellipse((0, 0, l_sz_img, l_sz_img), fill=255); l_img.putalpha(mask)
-                overlay.paste(l_img, (rx + rw - l_sz_img - 20, ry + (rh - l_sz_img - 20 if box_orient=="Vertical" else 25)), l_img)
+                if box_orient == "Vertical":
+                    overlay.paste(l_img, (rx + rw - l_sz_img - 20, ry + rh - l_sz_img - 20), l_img)
+                else:
+                    overlay.paste(l_img, (rx + rw - l_sz_img - 30, ry + 25), l_img)
 
         final = Image.alpha_composite(canvas, overlay).convert("RGB")
         with col2:
             st.image(final, use_container_width=True)
             buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
-            st.download_button("📸 DOWNLOAD", buf.getvalue(), "insta_result.jpg", use_container_width=True)
+            st.download_button("📸 DOWNLOAD", buf.getvalue(), "result.jpg", use_container_width=True)
                 
     except Exception as e:
         st.error(f"Error: {e}")
