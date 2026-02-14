@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 
-# --- [1. 기본 설정] ---
+# --- [1. 기본 설정 - Strava API 정보 업데이트] ---
 CLIENT_ID = '202274'
 CLIENT_SECRET = '63f6a7007ebe6b405763fc3104e17bb53b468ad0'
 ACTUAL_URL = "https://titanboy-kgcnje3tg3hbfpfsp6uwzc.streamlit.app"
@@ -75,7 +75,7 @@ def get_weekly_stats(activities, target_date_str):
 
 def create_bar_chart(data, color_hex):
     days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-    fig, ax = plt.subplots(figsize=(10, 4), dpi=150) # 더 와이드하게 변경
+    fig, ax = plt.subplots(figsize=(10, 4), dpi=150)
     fig.patch.set_alpha(0); ax.patch.set_alpha(0)
     bars = ax.bar(days, data, color=color_hex, width=0.6)
     for s in ['top', 'right', 'left']: ax.spines[s].set_visible(False)
@@ -147,7 +147,8 @@ with col3:
 
 # --- [6. 렌더링 엔진] ---
 try:
-    f_t, f_d, f_n, f_l = load_font(sel_font, 70), load_font(sel_font, 20), load_font(sel_font, 40), load_font(sel_font, 20)
+    # 폰트 로드 (90/30/60 규칙 준수)
+    f_t, f_d, f_n, f_l = load_font(sel_font, 90), load_font(sel_font, 30), load_font(sel_font, 60), load_font(sel_font, 20)
     canvas = Image.new("RGBA", (CW, CH), (0, 0, 0, 255))
     
     if bg_files:
@@ -176,23 +177,16 @@ try:
         alpha_mask = vis_layer.getchannel('A').point(lambda x: x * (vis_alpha / 255)); vis_layer.putalpha(alpha_mask)
         overlay.paste(vis_layer, ((CW - vis_layer.width)//2, g_y_off), vis_layer)
 
-    # [로그박스]
+    # [로그박스 배경 그리기]
     draw.rectangle([bx, by, bx + bw, by + bh], fill=(0,0,0,box_alpha))
     
-    # [로고] 위치 규칙 적용
-    if log_file:
-        ls = 100; l_img = ImageOps.fit(Image.open(log_file).convert("RGBA"), (ls, ls))
-        mask = Image.new('L', (ls, ls), 0); ImageDraw.Draw(mask).ellipse((0, 0, ls, ls), fill=255); l_img.putalpha(mask)
-        log_pos = (bx + bw - ls - 25, by + bh - ls - 25) if box_orient == "Vertical" else (bx + bw - ls - 25, by + 25)
-        overlay.paste(l_img, log_pos, l_img)
-
-    # [텍스트]
+    # [데이터 항목 정의]
     items = [("distance", f"{v_dist} km"), ("time", v_time), ("pace", v_pace), ("avg bpm", f"{v_hr} bpm")]
-    if mode == "DAILY" and vis_layer:
-        if box_orient == "Vertical": overlay.paste(vis_layer, (bx + bw - vis_layer.width - 20, by + 20), vis_layer)
-        else: overlay.paste(vis_layer, (bx + 20, by + (bh - vis_layer.height)//2), vis_layer)
 
+    # [로그박스 내 텍스트 및 지도 배치]
     if box_orient == "Vertical":
+        if mode == "DAILY" and vis_layer:
+            overlay.paste(vis_layer, (bx + bw - vis_layer.width - 20, by + 20), vis_layer)
         draw.text((bx+40, by+30), v_act, font=f_t, fill=m_color)
         draw.text((bx+40, by+130), v_date, font=f_d, fill="#AAAAAA")
         y_c = by + 200
@@ -200,14 +194,27 @@ try:
             draw.text((bx+40, y_c), lab.lower(), font=f_l, fill="#AAAAAA")
             draw.text((bx+40, y_c+25), val.lower() if "bpm" in val or "km" in val else val, font=f_n, fill=sub_color); y_c += 110
     else:
-        text_x_off = (vis_layer.width + 40) if (mode == "DAILY" and vis_layer) else 40
+        # 가로 모드 (데이터 겹침 해결)
+        text_x_off = (vis_layer.width + 60) if (mode == "DAILY" and vis_layer) else 60
+        if mode == "DAILY" and vis_layer:
+            overlay.paste(vis_layer, (bx + 20, by + (bh - vis_layer.height)//2), vis_layer)
+        
         draw.text((bx + text_x_off, by + 40), v_act, font=f_t, fill=m_color)
         draw.text((bx + text_x_off, by + 130), v_date, font=f_d, fill="#AAAAAA")
-        sec_w = (bw - text_x_off - 40) // 4
+        
+        usable_w = bw - text_x_off - 150 # 로고 영역 제외
+        sec_w = usable_w // 4 
         for i, (lab, val) in enumerate(items):
             item_x = bx + text_x_off + (i * sec_w)
             draw.text((item_x, by + 175), lab.lower(), font=f_l, fill="#AAAAAA")
             draw.text((item_x, by + 205), val.lower() if "bpm" in val or "km" in val else val, font=f_n, fill=sub_color)
+
+    # [로고 배치] - 최상단에 덮어쓰기
+    if log_file:
+        ls = 100; l_img = ImageOps.fit(Image.open(log_file).convert("RGBA"), (ls, ls))
+        mask = Image.new('L', (ls, ls), 0); ImageDraw.Draw(mask).ellipse((0, 0, ls, ls), fill=255); l_img.putalpha(mask)
+        log_pos = (bx + bw - ls - 25, by + bh - ls - 25) if box_orient == "Vertical" else (bx + bw - ls - 25, by + 25)
+        overlay.paste(l_img, log_pos, l_img)
 
     final = Image.alpha_composite(canvas, overlay).convert("RGB")
     with col2:
@@ -217,7 +224,3 @@ try:
         if st.session_state['access_token']: st.button("🔓 로그아웃", on_click=logout_and_clear)
 except Exception as e:
     st.error(f"Error: {e}")
-
-
-
-
