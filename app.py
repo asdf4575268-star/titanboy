@@ -175,7 +175,7 @@ with col_design:
 
 # --- [6. 렌더링 엔진] ---
 try:
-    # 활동명 90, 날짜 30, 숫자 60, 라벨 20
+    # 활동명 70, 날짜 20, 숫자 40, 라벨 23 (사용자 코드 설정 유지)
     f_t, f_d, f_n, f_l = load_font(sel_font, 70), load_font(sel_font, 20), load_font(sel_font, 40), load_font(sel_font, 23)
     
     # [수정] 콜라주 함수 적용
@@ -192,7 +192,16 @@ try:
             vis_layer = Image.new("RGBA", (vis_sz, vis_sz), (0,0,0,0)); m_draw = ImageDraw.Draw(vis_layer)
             def tr(la, lo): return 15+(lo-min(lons))/(max(lons)-min(lons)+1e-5)*(vis_sz-30), (vis_sz-15)-(la-min(lats))/(max(lats)-min(lats)+1e-5)*(vis_sz-30)
             m_draw.line([tr(la, lo) for la, lo in pts], fill=hex_to_rgba(m_color, vis_alpha), width=5)
-            overlay.paste(vis_layer, (30, ry + (rh - vis_layer.height)//2), vis_layer)
+            
+            # [지도 위치 수정] 
+            # 박스 방향에 따라 박스 내부 혹은 설정된 rx, ry 근처에 배치
+            if box_orient == "Vertical":
+                # 수직 박스일 때 박스 안쪽 하단 여백에 배치
+                overlay.paste(vis_layer, (int(rx + 40), int(ry + 230)), vis_layer)
+            else:
+                # 수평 박스일 때 박스 왼쪽 끝에 배치
+                overlay.paste(vis_layer, (30, int(ry + (rh - vis_layer.height)//2)), vis_layer)
+                
         elif mode == "WEEKLY" and weekly_data:
             chart_img = create_bar_chart(weekly_data['dists'], m_color)
             w_p = (vis_sz / float(chart_img.size[0])); vis_layer = chart_img.resize((vis_sz, int(chart_img.size[1]*w_p)), Image.Resampling.LANCZOS)
@@ -237,3 +246,4 @@ try:
 
 except Exception as e:
     with col_main: st.info("활동을 선택하거나 사진을 업로드해 주세요.")
+
