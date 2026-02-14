@@ -95,7 +95,7 @@ with col3:
     m_color = st.color_picker("활동명 색상", "#FFD700")
     
     # [활동명 90, 날짜 30, 숫자 60 고정]
-    t_sz, d_sz, n_sz, l_sz = 90, 30, 60, 22
+    t_sz, d_sz, n_sz, l_sz = 70, 20, 45, 22
     
     d_rx, d_ry, d_rw, d_rh = (70, 1250, 480, 600) if box_orient == "Vertical" else (70, 1600, 940, 260)
     rx = st.number_input("X 위치", 0, 1080, d_rx)
@@ -146,5 +146,6 @@ if bg_files:
             buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
             st.download_button("📸 DOWNLOAD", buf.getvalue(), "result.jpg", use_container_width=True)
     except Exception as e: st.error(f"렌더링 에러: {e}")
+
 
 
