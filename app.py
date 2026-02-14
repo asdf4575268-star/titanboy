@@ -17,25 +17,30 @@ def logout():
     st.query_params.clear()
     st.rerun()
 
-# --- [2. 인증 로직] ---
+# --- [2. 인증 로직 - 토큰 교환 강화] ---
 query_params = st.query_params
 if "code" in query_params and st.session_state['access_token'] is None:
-    try:
-        res = requests.post("https://www.strava.com/oauth/token", data={
-            "client_id": CLIENT_ID, "client_secret": CLIENT_SECRET,
-            "code": query_params["code"], "grant_type": "authorization_code"
-        })
-        if res.status_code == 200:
-            st.session_state['access_token'] = res.json()['access_token']
-            st.query_params.clear()
-            st.rerun()
-    except: pass
+    with st.spinner('Strava와 연결 중입니다...'):
+        try:
+            res = requests.post("https://www.strava.com/oauth/token", data={
+                "client_id": CLIENT_ID, "client_secret": CLIENT_SECRET,
+                "code": query_params["code"], "grant_type": "authorization_code"
+            }, timeout=15)
+            if res.status_code == 200:
+                st.session_state['access_token'] = res.json()['access_token']
+                st.query_params.clear()
+                st.rerun()
+            else:
+                st.error(f"인증 실패: {res.json().get('message', '알 수 없는 오류')}")
+        except Exception as e:
+            st.error(f"서버 연결 오류: {e}")
 
 if st.session_state['access_token'] is None:
     st.title("🏃 Garmin Photo Dashboard")
     auth_url = (f"https://www.strava.com/oauth/authorize?client_id={CLIENT_ID}"
                 f"&response_type=code&redirect_uri={ACTUAL_URL}"
                 f"&scope=activity:read_all&approval_prompt=force")
+    st.info("데이터를 불러오려면 Strava 인증이 필요합니다.")
     st.link_button("🚀 Strava 연동하기", auth_url)
     st.stop()
 
@@ -74,9 +79,12 @@ def hex_to_rgba(hex_color, alpha):
 
 # --- [4. 데이터 로드] ---
 headers = {'Authorization': f"Bearer {st.session_state['access_token']}"}
-act_res = requests.get("https://www.strava.com/api/v3/athlete/activities?per_page=30", headers=headers)
-if act_res.status_code == 401: logout()
-acts = act_res.json() if act_res.status_code == 200 else []
+try:
+    act_res = requests.get("https://www.strava.com/api/v3/athlete/activities?per_page=30", headers=headers, timeout=15)
+    if act_res.status_code == 401: logout()
+    acts = act_res.json() if act_res.status_code == 200 else []
+except:
+    acts = []
 
 # --- [5. UI 레이아웃] ---
 col1, col2, col3 = st.columns([1, 2, 1], gap="medium")
@@ -84,6 +92,9 @@ COLOR_OPTIONS = {"Garmin Yellow": "#FFD700", "Pure White": "#FFFFFF", "Neon Oran
 
 with col2:
     mode = st.radio("작업 모드", ["DAILY", "WEEKLY"], horizontal=True)
+    if not acts:
+        st.warning("불러올 활동 데이터가 없습니다. 스트라바 기록을 확인해주세요.")
+    
     if mode == "DAILY" and acts:
         sel_str = st.selectbox("기록 선택", [f"{a['start_date_local'][:10]} - {a['name']}" for a in acts])
         idx = [f"{x['start_date_local'][:10]} - {x['name']}" for x in acts].index(sel_str)
@@ -122,14 +133,9 @@ with col3:
     sel_font = st.selectbox("폰트 선택", ["BlackHanSans", "Jua", "DoHyeon", "NanumBrush", "Sunflower"])
     m_color = COLOR_OPTIONS[st.selectbox("포인트 컬러", list(COLOR_OPTIONS.keys()), index=0)]
     sub_color = COLOR_OPTIONS[st.selectbox("서브 컬러", list(COLOR_OPTIONS.keys()), index=1)]
-    # 글자 크기 사용자 요청 디폴트값 고정 (슬라이더는 유지하되 초기값 세팅)
-    t_sz = st.slider("활동명 크기", 10, 200, 90)
-    d_sz = st.slider("날짜 크기", 5, 100, 30)
-    n_sz = st.slider("숫자 크기", 10, 200, 60)
+    t_sz, d_sz, n_sz = st.slider("활동명(90)", 10, 200, 90), st.slider("날짜(30)", 5, 100, 30), st.slider("숫자(60)", 10, 200, 60)
     l_sz = st.slider("라벨 크기", 5, 80, 20)
-    
     if mode == "DAILY":
-        # 위치 조절만 남기고 박스 크기 조절은 제거 (디폴트값 고정)
         rx, ry = st.slider("X 위치", 0, 1080, 70), st.slider("Y 위치", 0, 1920, 1150)
         box_alpha = st.slider("박스 투명도", 0, 255, 110)
         map_size, map_alpha = st.slider("지도 크기", 50, 400, 150), st.slider("지도 투명도", 0, 255, 255)
@@ -143,7 +149,6 @@ if bg_files:
             canvas = ImageOps.fit(img.convert("RGBA"), (1080, 1920))
             overlay = Image.new("RGBA", (1080, 1920), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
             if show_box:
-                # 박스 너비/높이는 안정적인 디폴트값(650x680)으로 고정
                 draw.rectangle([rx, ry, rx + 650, ry + 680], fill=(0,0,0,box_alpha))
                 p_line = a.get('map', {}).get('summary_polyline')
                 if p_line:
@@ -192,6 +197,6 @@ if bg_files:
             buf = io.BytesIO(); final.save(buf, format="JPEG", quality=90)
             st.download_button("📸 DOWNLOAD", buf.getvalue(), "garmin_result.jpg", use_container_width=True)
     except Exception as e:
-        st.error(f"이미지 생성 중 오류: {e}")
+        st.error(f"미리보기 생성 오류: {e}")
 
 st.sidebar.button("🔓 로그아웃", on_click=logout)
