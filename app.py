@@ -4,9 +4,9 @@ import io, os, requests, polyline, math
 
 # --- [1. 기본 설정 및 초기화] ---
 CLIENT_ID = '202274'
-CLIENT_SECRET = 'cf2ab22bb9995254e6ea68ac3c942572f7114c9a'
+CLIENT_SECRET = '63f6a7007ebe6b405763fc3104e17bb53b468ad0'
 # 실제 배포 주소 (끝에 /가 없어야 함)
-ACTUAL_URL = "https://titanboy-5fxenvcchdubwx3swjh8ut.streamlit.app"
+ACTUAL_URL = "https://titanboy-kgcnje3tg3hbfpfsp6uwzc.streamlit.app/"
 
 st.set_page_config(page_title="Garmin Photo Dashboard", layout="wide")
 
@@ -199,3 +199,4 @@ if bg_files:
             st.download_button("📸 DOWNLOAD", buf.getvalue(), "result.jpg", use_container_width=True)
     except Exception as e:
         st.error(f"Error: {e}")
+
