@@ -185,28 +185,6 @@ try:
         canvas = Image.new("RGBA", (CW, CH), (20, 20, 20, 255))
     
     overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
-
-    if show_vis:
-        if mode == "DAILY" and a and a.get('map', {}).get('summary_polyline'):
-            pts = polyline.decode(a['map']['summary_polyline']); lats, lons = zip(*pts)
-            vis_layer = Image.new("RGBA", (vis_sz, vis_sz), (0,0,0,0)); m_draw = ImageDraw.Draw(vis_layer)
-            def tr(la, lo): return 15+(lo-min(lons))/(max(lons)-min(lons)+1e-5)*(vis_sz-30), (vis_sz-15)-(la-min(lats))/(max(lats)-min(lats)+1e-5)*(vis_sz-30)
-            m_draw.line([tr(la, lo) for la, lo in pts], fill=hex_to_rgba(m_color, vis_alpha), width=5)
-            
-            # 지도를 박스 내부의 적절한 위치에 배치 (Vertical일 때 rx 좌측, Horizontal일 때 상단 여백 고려)
-            if box_orient == "Vertical":
-                # 수직 박스일 경우 박스 왼쪽 영역에 배치
-                overlay.paste(vis_layer, (rx + 40, ry + 210), vis_layer)
-            else:
-                # 수평 박스일 경우 왼쪽 끝에 배치
-                overlay.paste(vis_layer, (30, ry + (rh - vis_layer.height)//2), vis_layer)
-                
-        elif mode == "WEEKLY" and weekly_data:
-            chart_img = create_bar_chart(weekly_data['dists'], m_color)
-            w_p = (vis_sz / float(chart_img.size[0])); vis_layer = chart_img.resize((vis_sz, int(chart_img.size[1]*w_p)), Image.Resampling.LANCZOS)
-            alpha_mask = vis_layer.getchannel('A').point(lambda x: x * (vis_alpha / 255)); vis_layer.putalpha(alpha_mask)
-            # Weekly 그래프는 하단 중앙 유지
-            overlay.paste(vis_layer, ((CW - vis_layer.width)//2, CH - vis_layer.height - 20), vis_layer)
     
     if show_vis:
         if mode == "DAILY" and a and a.get('map', {}).get('summary_polyline'):
@@ -259,4 +237,3 @@ try:
 
 except Exception as e:
     with col_main: st.info("활동을 선택하거나 사진을 업로드해 주세요.")
-
