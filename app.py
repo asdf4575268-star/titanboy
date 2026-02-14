@@ -9,31 +9,40 @@ ACTUAL_URL = "https://titanboy-5fxenvcchdubwx3swjh8ut.streamlit.app"
 
 st.set_page_config(page_title="Garmin Photo Dashboard", layout="wide")
 
+# 세션 상태 초기화 (연동 끊김 방지의 핵심)
 if 'access_token' not in st.session_state:
     st.session_state['access_token'] = None
 
 def logout_and_clear():
     st.session_state['access_token'] = None
+    st.query_params.clear()
     st.cache_data.clear()
     st.rerun()
 
-# --- [2. Strava OAuth 로직] ---
-query_params = st.query_params
-if "code" in query_params and st.session_state['access_token'] is None:
-    res = requests.post("https://www.strava.com/oauth/token", data={
-        "client_id": CLIENT_ID, "client_secret": CLIENT_SECRET,
-        "code": query_params["code"], "grant_type": "authorization_code"
-    })
-    if res.status_code == 200:
-        st.session_state['access_token'] = res.json()['access_token']
-        st.query_params.clear()
-        st.rerun()
+# --- [2. Strava OAuth 인증] ---
+# URL 파라미터에서 code 확인
+q_params = st.query_params
+if "code" in q_params and st.session_state['access_token'] is None:
+    try:
+        res = requests.post("https://www.strava.com/oauth/token", data={
+            "client_id": CLIENT_ID, "client_secret": CLIENT_SECRET,
+            "code": q_params["code"], "grant_type": "authorization_code"
+        })
+        if res.status_code == 200:
+            st.session_state['access_token'] = res.json()['access_token']
+            # 인증 성공 후 즉시 파라미터 제거 (무한 루프 방지)
+            st.query_params.clear()
+            st.rerun()
+    except Exception as e:
+        st.error(f"인증 오류: {e}")
 
+# 토큰이 없으면 로그인 버튼 표시
 if st.session_state['access_token'] is None:
     st.title("🏃 Garmin Photo Dashboard")
     auth_url = (f"https://www.strava.com/oauth/authorize?client_id={CLIENT_ID}"
                 f"&response_type=code&redirect_uri={ACTUAL_URL}"
                 f"&scope=read,activity:read_all&approval_prompt=auto")
+    st.info("작업을 계속하려면 Strava 계정과 연동해야 합니다.")
     st.link_button("🚀 Strava 연동하기", auth_url)
     st.stop()
 
@@ -61,7 +70,12 @@ def get_activities(token):
     res = requests.get("https://www.strava.com/api/v3/athlete/activities?per_page=30", headers=headers)
     return res.json() if res.status_code == 200 else []
 
-acts = get_activities(st.session_state['access_token'])
+# 데이터 로드 시도
+try:
+    acts = get_activities(st.session_state['access_token'])
+except:
+    st.warning("데이터를 가져오는 중 오류가 발생했습니다. 다시 로그인해주세요.")
+    logout_and_clear()
 
 # --- [4. UI 구성] ---
 col1, col2, col3 = st.columns([1.2, 2, 1], gap="medium")
@@ -93,7 +107,6 @@ with col3:
     st.header("🎨 DESIGN")
     show_box = st.checkbox("로그 박스 표시", value=True)
     box_orient = st.radio("방향", ["Vertical", "Horizontal"], horizontal=True)
-    # [수정된 부분] 복잡한 로직 대신 FONT_LIST 직접 참조
     sel_font = st.selectbox("폰트", FONT_LIST)
     m_color = COLOR_OPTIONS[st.selectbox("포인트 컬러", list(COLOR_OPTIONS.keys()))]
     sub_color = COLOR_OPTIONS[st.selectbox("서브 컬러", list(COLOR_OPTIONS.keys()), index=1)]
@@ -121,10 +134,10 @@ if bg_files:
                 items = [("distance", f"{v_dist} km"), ("time", t_val), ("pace", v_pace), ("avg bpm", f"{v_hr} bpm")]
                 
                 if box_orient == "Horizontal":
+                    # 가로 모드: 지도(좌) - 제목(가운데) - 로고(우)
                     if 'a' in locals() and a.get('map', {}).get('summary_polyline'):
                         pts = polyline.decode(a['map']['summary_polyline'])
-                        lats, lons = zip(*pts)
-                        m_lyr = Image.new("RGBA", (map_size, map_size), (0,0,0,0)); m_draw = ImageDraw.Draw(m_lyr)
+                        lats, lons = zip(*pts); m_lyr = Image.new("RGBA", (map_size, map_size), (0,0,0,0)); m_draw = ImageDraw.Draw(m_lyr)
                         def tr(la, lo):
                             tx = 10 + (lo - min(lons)) / (max(lons) - min(lons) + 0.00001) * (map_size - 20)
                             ty = (map_size - 10) - (la - min(lats)) / (max(lats) - min(lats) + 0.00001) * (map_size - 20)
@@ -147,7 +160,7 @@ if bg_files:
                         draw.text((rx + 40 + i*sw, ry + t_sz + d_sz + 50), lb, font=f_l, fill="#AAAAAA")
                         draw.text((rx + 40 + i*sw, ry + t_sz + d_sz + 50 + l_sz + 5), vl, font=f_n, fill=sub_color)
 
-                else: # Vertical
+                else: # 세로 모드: 기존 레이아웃 유지
                     draw.text((rx+40, ry+30), v_act, font=f_t, fill=m_color)
                     draw.text((rx+40, ry+30+t_sz+10), v_date, font=f_d, fill=sub_color)
                     y_c = ry + t_sz + d_sz + 90
