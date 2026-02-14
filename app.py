@@ -57,7 +57,7 @@ if not st.session_state['access_token']:
     st.link_button("🚀 Strava 연동하기", auth_url)
     st.stop()
 
-# --- [4. 데이터 로드 및 레이아웃] ---
+# --- [4. 데이터 로드 및 3분할] ---
 headers = {'Authorization': f"Bearer {st.session_state['access_token']}"}
 act_res = requests.get("https://www.strava.com/api/v3/athlete/activities?per_page=30", headers=headers)
 
@@ -85,9 +85,8 @@ if act_res.status_code == 200:
 
     with col1:
         st.header("📸 DATA")
-        bg_files = st.file_uploader("사진 업로드", type=['jpg','jpeg','png'], accept_multiple_files=True)
+        bg_files = st.file_uploader("사진 선택", type=['jpg','jpeg','png'], accept_multiple_files=True)
         log_file = st.file_uploader("로고 업로드", type=['jpg','jpeg','png'])
-        st.markdown("---")
         if mode == "DAILY":
             v_act, v_date = st.text_input("활동명", a['name']), st.text_input("날짜", a['start_date_local'][:10])
             v_dist, v_pace, v_hr = st.text_input("거리(km)", f"{d_km:.2f}"), st.text_input("페이스(/km)", p_val), st.text_input("심박(bpm)", h_val)
@@ -101,7 +100,6 @@ if act_res.status_code == 200:
         t_color_sel = st.radio("테마 색상", ["Yellow (#FFD700)", "Black (#000000)"], horizontal=True)
         m_color = "#FFD700" if "Yellow" in t_color_sel else "#000000"
         
-        # 폰트 크기 슬라이더 (제목 제거됨)
         t_sz = st.slider("활동명 크기", 10, 200, 70)
         d_sz = st.slider("날짜 크기", 5, 100, 20)
         n_sz = st.slider("숫자 크기", 10, 200, 40)
@@ -111,78 +109,73 @@ if act_res.status_code == 200:
         box_mode = st.radio("박스 정렬", ["Vertical", "Horizontal"])
         rx = st.slider("X 위치", 0, 1080, 70)
         ry = st.slider("Y 위치", 0, 1920, 1150)
-        
-        # --- [핵심 복구] 박스 크기 수동 조절 슬라이더 ---
-        rw = st.slider("박스 너비", 200, 1080, 500)
-        rh = st.slider("박스 높이", 100, 1000, 450)
-        
-        box_alpha = st.slider("박스 투명도", 0, 255, 120)
-        map_alpha = st.slider("지도 투명도", 0, 255, 80) # 지도 투명도 80
+        box_alpha = st.slider("박스 투명도", 0, 255, 110)
+        map_alpha = st.slider("지도 투명도(낮게 조절)", 0, 255, 45) # 숫자 보호를 위해 낮게 시작
 
-    # --- [5. 이미지 렌더링] ---
+    # --- [5. 이미지 렌더링 엔진] ---
     if bg_files:
         if mode == "DAILY":
             img = ImageOps.exif_transpose(Image.open(bg_files[0]))
             canvas = ImageOps.fit(img.convert("RGBA"), (1080, 1920), centering=(0.5, 0.5))
         else:
             canvas = Image.new("RGBA", (1080, 1920), (0,0,0,255))
-            n = len(bg_files)
-            rows = math.ceil(n / 2) if n > 1 else 1
+            rows = math.ceil(len(bg_files) / 2) if len(bg_files) > 1 else 1
             h_p = 1920 // rows
             for i, f in enumerate(bg_files):
-                w_p = 1080 // (2 if n > 1 else 1)
-                p_i = ImageOps.fit(Image.open(f).convert("RGBA"), (w_p, h_p))
-                canvas.paste(p_i, ((i % 2) * w_p if n > 1 else 0, (i // 2) * h_p))
+                w_p = 1080 // (2 if len(bg_files) > 1 else 1)
+                canvas.paste(ImageOps.fit(Image.open(f).convert("RGBA"), (w_p, h_p)), ((i % 2) * w_p if len(bg_files) > 1 else 0, (i // 2) * h_p))
 
         overlay = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
         draw = ImageDraw.Draw(overlay)
         f_t, f_d, f_n, f_l = load_font(sel_font, t_sz), load_font(sel_font, d_sz), load_font(sel_font, n_sz), load_font(sel_font, l_sz)
-
         items = [("DISTANCE", f"{v_dist} km"), ("TIME", t_val), ("AVG PACE", f"{v_pace} /km"), ("AVG HR", f"{v_hr} bpm")]
 
-        # 박스 그리기 (수동 조절된 rw, rh 사용)
-        draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0, 0, 0, box_alpha))
+        # --- [박스 크기 자동 연동 로직] ---
+        if box_mode == "Vertical":
+            rw = 560
+            rh = t_sz + d_sz + (len(items) * (n_sz + l_sz + 35)) + 120
+        else:
+            rw = 1000
+            rh = t_sz + d_sz + n_sz + l_sz + 180
 
-        # 지도 오버레이 (박스 크기에 맞춤)
+        # 박스 및 지도 오버레이
+        draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0, 0, 0, box_alpha))
         p_line = a['map']['summary_polyline'] if mode == "DAILY" and 'map' in a and a['map'].get('summary_polyline') else None
         if p_line:
             pts = polyline.decode(p_line)
             if pts:
                 lats, lons = zip(*pts)
-                mi_la, ma_la, mi_lo, ma_lo = min(lats), max(lats), min(lons), max(lons)
                 map_layer = Image.new("RGBA", (rw, rh), (0,0,0,0))
                 m_draw = ImageDraw.Draw(map_layer)
-                def transform(la, lo):
-                    tx = 30 + (lo - mi_lo) / (ma_lo - mi_lo + 0.00001) * (rw - 60)
-                    ty = (rh - 30) - (la - mi_la) / (ma_la - mi_la + 0.00001) * (rh - 60)
+                def trans(la, lo):
+                    tx = 40 + (lo - min(lons)) / (max(lons) - min(lons) + 0.0001) * (rw - 80)
+                    ty = (rh - 40) - (la - min(lats)) / (max(lats) - min(lats) + 0.0001) * (rh - 80)
                     return tx, ty
-                m_pts = [transform(la, lo) for la, lo in pts]
-                m_draw.line(m_pts, fill=m_color + f"{map_alpha:02x}"[2:], width=7)
+                m_draw.line([trans(la, lo) for la, lo in pts], fill=m_color + f"{map_alpha:02x}"[2:], width=6)
                 overlay.paste(map_layer, (rx, ry), map_layer)
 
-        # 텍스트 배치
+        # 텍스트 그리기 (가로/세로 정렬 분기)
         if box_mode == "Vertical":
-            draw.text((rx+35, ry+30), v_act, font=f_t, fill=m_color)
-            draw.text((rx+35, ry+30+t_sz+10), v_date, font=f_d, fill="#FFFFFF")
-            y_c = ry + t_sz + d_sz + 80
+            draw.text((rx+40, ry+35), v_act, font=f_t, fill=m_color)
+            draw.text((rx+40, ry+35+t_sz+8), v_date, font=f_d, fill="#FFFFFF")
+            y_curr = ry + t_sz + d_sz + 75
             for lab, val in items:
-                draw.text((rx+35, y_c), lab, font=f_l, fill="#AAAAAA")
-                draw.text((rx+35, y_c+l_sz+5), val, font=f_n, fill="#FFFFFF")
-                y_c += (n_sz + l_sz + 40)
+                draw.text((rx+40, y_curr), lab, font=f_l, fill="#CCCCCC")
+                draw.text((rx+40, y_curr+l_sz+3), val, font=f_n, fill="#FFFFFF")
+                y_curr += (n_sz + l_sz + 38)
         else:
             draw.text((rx+rw//2, ry+40), v_act, font=f_t, fill=m_color, anchor="ms")
             draw.text((rx+rw//2, ry+40+t_sz), v_date, font=f_d, fill="#FFFFFF", anchor="ms")
-            x_s = rw // (len(items) + 1)
+            x_step = rw // (len(items) + 1)
             for i, (lab, val) in enumerate(items):
-                draw.text((rx + x_s*(i+1), ry + rh - n_sz - l_sz - 30), lab, font=f_l, fill="#AAAAAA", anchor="ms")
-                draw.text((rx + x_s*(i+1), ry + rh - n_sz - 10), val, font=f_n, fill="#FFFFFF", anchor="ms")
+                draw.text((rx + x_step*(i+1), ry+rh-n_sz-l_sz-25), lab, font=f_l, fill="#CCCCCC", anchor="ms")
+                draw.text((rx + x_step*(i+1), ry+rh-n_sz-5), val, font=f_n, fill="#FFFFFF", anchor="ms")
 
         if log_file:
-            logo = get_circle_logo(log_file)
-            canvas.paste(logo, (900, 50), logo)
+            canvas.paste(get_circle_logo(log_file), (910, 50), get_circle_logo(log_file))
 
         final = Image.alpha_composite(canvas, overlay).convert("RGB")
         with col2:
             st.image(final, use_container_width=True)
             buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
-            st.download_button("📸 DOWNLOAD", buf.getvalue(), "garmin.jpg", use_container_width=True)
+            st.download_button("📸 DOWNLOAD", buf.getvalue(), "garmin_result.jpg", use_container_width=True)
