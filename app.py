@@ -139,8 +139,8 @@ with col3:
     st.subheader("📦 박스 및 요소 조절")
     bx = st.number_input("박스 X", 0, 1080, 70)
     by = st.number_input("박스 Y", 0, 1920, 1400 if mode=="DAILY" else 750)
-    bw = st.number_input("박스 너비", 100, 1080, 940 if box_orient=="Horizontal" else 480)
-    bh = st.number_input("박스 높이", 100, 1080, 260 if box_orient=="Horizontal" else 550)
+    bw = st.number_input("박스 너비", 100, 1080, 940 if box_orient=="Horizontal" else 450)
+    bh = st.number_input("박스 높이", 100, 1080, 260 if box_orient=="Horizontal" else 620)
     box_alpha = st.slider("박스 투명도", 0, 255, 130)
     vis_sz = st.slider("지도/그래프 크기", 50, 800, 180 if mode=="DAILY" else 800)
     vis_alpha = st.slider("지도/그래프 투명도", 0, 255, 80)
@@ -229,5 +229,6 @@ try:
         overlay.paste(l_img, log_pos, l_img)
 except Exception as e:
     st.error(f"Error: {e}")
+
 
 
