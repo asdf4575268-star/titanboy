@@ -118,7 +118,7 @@ with col3:
     sub_color = COLOR_OPTIONS[st.selectbox("서브 컬러", list(COLOR_OPTIONS.keys()), index=1)]
     
     # [약속된 크기 설정]
-    t_sz, d_sz, n_sz, l_sz = 90, 30, 60, 20
+    t_sz, d_sz, n_sz, l_sz = 70, 20, 45, 23
     
     d_rx, d_ry, d_rw, d_rh = (70, 1250, 480, 600) if box_orient == "Vertical" else (70, 1600, 940, 260)
     rx = st.number_input("X 위치", 0, 1080, d_rx)
