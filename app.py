@@ -133,7 +133,7 @@ with col3:
 # --- [6. 렌더링 엔진] ---
 try:
     # 폰트 로드 (90/30/60 규칙)
-    f_t, f_d, f_n, f_l = load_font(sel_font, 90), load_font(sel_font, 30), load_font(sel_font, 60), load_font(sel_font, 20)
+    f_t, f_d, f_n, f_l = load_font(sel_font, 70), load_font(sel_font, 20), load_font(sel_font, 40), load_font(sel_font, 25)
     
     # 배경 생성: 사진 유무와 관계없이 실행
     if bg_files:
@@ -218,6 +218,7 @@ except Exception as e:
     st.info("데이터를 불러오거나 사진을 업로드하면 대시보드가 생성됩니다.")
     # 개발용 에러 확인이 필요하면 아래 주석 해제
     # st.error(f"Error: {e}")
+
 
 
 
