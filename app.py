@@ -166,7 +166,7 @@ with col_design:
     sub_color = COLOR_OPTS[st.selectbox("서브 컬러", list(COLOR_OPTS.keys()), index=1)]
     CW, CH = (1080, 1920) if mode == "DAILY" else (1080, 800)
     rx = st.number_input("X 위치", 0, 1080, 70)
-    ry = st.number_input("Y 위치", 0, 1920, 1350 if mode=="DAILY" else 480)
+    ry = st.number_input("Y 위치", 0, 1920, 1250 if mode=="DAILY" else 480)
     rw = st.number_input("박스 너비", 100, 1080, 1080 if box_orient=="Horizontal" else 450)
     rh = st.number_input("박스 높이", 100, 1920, 260 if box_orient=="Horizontal" else 630)
     box_alpha = st.slider("박스 투명도", 0, 255, 110)
