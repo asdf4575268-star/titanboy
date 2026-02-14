@@ -2,7 +2,7 @@ import streamlit as st
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 import io, os, requests, polyline, math
 
-# --- [1. 기본 설정] ---
+# --- [1. 기본 설정 및 초기화] ---
 CLIENT_ID = '202274'
 CLIENT_SECRET = 'cf2ab22bb9995254e6ea68ac3c942572f7114c9a'
 ACTUAL_URL = "https://titanboy-5fxenvcchdubwx3swjh8ut.streamlit.app"
@@ -14,6 +14,7 @@ def logout_and_clear():
     st.cache_resource.clear()
     st.session_state.clear()
     st.query_params.clear()
+    st.rerun()
 
 if 'access_token' not in st.session_state:
     st.session_state['access_token'] = None
@@ -40,32 +41,21 @@ if st.session_state['access_token'] is None:
     st.link_button("🚀 Strava 연동하기", auth_url)
     st.stop()
 
-# --- [3. 유틸리티 함수 - 메모리 직접 로드 방식] ---
+# --- [3. 유틸리티 함수] ---
 @st.cache_resource
 def load_font(font_type, size):
-    # 구글 폰트 공식 저장소 주소 (가장 안정적)
-    font_urls = {
-        "GmarketSans": "https://github.com/hyeonseok-dev/fonts/raw/main/GmarketSansBold.ttf",
-        "Pretendard": "https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.8/dist/public/static/Pretendard-Bold.ttf",
-        "Bazzi": "https://fonts.gstatic.com/s/bazzi/v1/rax_Hi1k7QO8wH_j.ttf",
-        "KOTRA_BOLD": "https://github.com/dhun-dg/fonts/raw/main/KOTRA_BOLD.ttf",
-        "KyoboHandwriting": "https://fonts.gstatic.com/s/kyobohandwriting2019/v8/rax_Hi1k7QO8wH_j.ttf",
-        "BlackHanSans": "https://fonts.gstatic.com/s/blackhansans/v17/ea8AadVp8QvS3_U7vO_98S764_vS.ttf",
-        "Jua": "https://fonts.gstatic.com/s/jua/v16/U9MD6p7LIDR_7_O6.ttf"
+    fonts = {
+        "BlackHanSans": "https://github.com/google/fonts/raw/main/ofl/blackhansans/BlackHanSans-Regular.ttf",
+        "Jua": "https://github.com/google/fonts/raw/main/ofl/jua/Jua-Regular.ttf",
+        "DoHyeon": "https://github.com/google/fonts/raw/main/ofl/dohyeon/DoHyeon-Regular.ttf",
+        "NanumBrush": "https://github.com/google/fonts/raw/main/ofl/nanumbrushscript/NanumBrushScript-Regular.ttf",
+        "Sunflower": "https://github.com/google/fonts/raw/main/ofl/sunflower/Sunflower-Bold.ttf"
     }
-    
-    url = font_urls.get(font_type, font_urls["GmarketSans"])
-    
-    try:
-        # 파일을 저장하지 않고 즉시 메모리로 다운로드
-        response = requests.get(url, timeout=10)
-        if response.status_code == 200:
-            font_data = io.BytesIO(response.content)
-            return ImageFont.truetype(font_data, int(size))
-        else:
-            return ImageFont.load_default()
-    except Exception:
-        return ImageFont.load_default()
+    f_url = fonts.get(font_type, fonts["BlackHanSans"])
+    f_path = f"font_{font_type}_{int(size)}.ttf"
+    if not os.path.exists(f_path):
+        r = requests.get(f_url); open(f_path, "wb").write(r.content)
+    return ImageFont.truetype(f_path, int(size))
 
 def hex_to_rgba(hex_color, alpha):
     hex_color = hex_color.lstrip('#')
@@ -78,7 +68,7 @@ headers = {'Authorization': f"Bearer {st.session_state['access_token']}"}
 try:
     act_res = requests.get("https://www.strava.com/api/v3/athlete/activities?per_page=30", headers=headers, timeout=15)
     if act_res.status_code == 200: acts = act_res.json()
-    elif act_res.status_code == 401: logout_and_clear(); st.rerun()
+    elif act_res.status_code == 401: logout_and_clear()
 except: pass
 
 # --- [5. UI 레이아웃] ---
@@ -104,31 +94,42 @@ with col1:
     bg_files = st.file_uploader("배경 사진", type=['jpg','jpeg','png'], accept_multiple_files=True)
     log_file = st.file_uploader("원형 로고", type=['jpg','jpeg','png'])
     if mode == "DAILY" and acts:
-        v_act, v_date = st.text_input("활동명", a['name']), st.text_input("날짜", a['start_date_local'][:10])
-        v_dist, v_pace, v_hr = st.text_input("거리(km)", f"{d_km:.2f}"), st.text_input("페이스(분/km)", p_val), st.text_input("심박(bpm)", h_val)
+        v_act = st.text_input("활동명", a['name'])
+        v_date = st.text_input("날짜", a['start_date_local'][:10])
+        v_dist = st.text_input("거리(km)", f"{d_km:.2f}")
+        v_pace = st.text_input("페이스(분/km)", p_val)
+        v_hr = st.text_input("심박(bpm)", h_val)
     elif mode == "WEEKLY" and acts:
         w_acts = acts[:7]
-        t_dist, t_time = sum([x.get('distance', 0) for x in w_acts]) / 1000, sum([x.get('moving_time', 0) for x in w_acts])
+        t_dist = sum([x.get('distance', 0) for x in w_acts]) / 1000
+        t_time = sum([x.get('moving_time', 0) for x in w_acts])
         avg_p_val = f"{int((t_time/t_dist)//60)}'{int((t_time/t_dist)%60):02d}\"" if t_dist > 0 else "0'00\""
         t_hrs = [x.get('average_heartrate', 0) for x in w_acts if x.get('average_heartrate')]
         avg_hr = int(sum(t_hrs)/len(t_hrs)) if t_hrs else 0
-        v_act_w, v_dist_w, v_pace_w, v_hr_w = st.text_input("제목", "WEEKLY RECAP"), st.text_input("총 거리(km)", f"{t_dist:.2f}"), st.text_input("평균 페이스", avg_p_val), st.text_input("평균 심박", f"{avg_hr}")
+        v_act_w = st.text_input("제목", "WEEKLY RECAP")
+        v_dist_w = st.text_input("총 거리(km)", f"{t_dist:.2f}")
+        v_pace_w = st.text_input("평균 페이스", avg_p_val)
+        v_hr_w = st.text_input("평균 심박", f"{avg_hr}")
 
 with col3:
     st.header("🎨 DESIGN")
     show_box = st.checkbox("로그 박스 표시", value=True)
-    sel_font = st.selectbox("폰트 선택", ["GmarketSans", "Pretendard", "Bazzi", "KOTRA_BOLD", "KyoboHandwriting", "BlackHanSans", "Jua"])
+    sel_font = st.selectbox("폰트", ["BlackHanSans", "Jua", "DoHyeon", "NanumBrush", "Sunflower"])
     m_color = COLOR_OPTIONS[st.selectbox("포인트 컬러", list(COLOR_OPTIONS.keys()))]
     sub_color = COLOR_OPTIONS[st.selectbox("서브 컬러", list(COLOR_OPTIONS.keys()), index=1)]
     
-    t_sz, d_sz, n_sz, l_sz = 70, 20, 40, 20 # 고정 크기
+    # 크기 고정 (사용자 요청)
+    t_sz, d_sz, n_sz, l_sz = 70, 20, 40, 20
     
     if mode == "DAILY":
         st.divider()
         st.subheader("Box Layout")
-        rx, ry = st.number_input("X 위치", 0, 1080, 70), st.number_input("Y 위치", 0, 1920, 1350)
-        rw, rh = st.number_input("박스 너비", 100, 1080, 500), st.number_input("박스 높이", 100, 1920, 500)
-        box_alpha, map_size = st.slider("박스 투명도", 0, 255, 100), st.slider("지도 크기", 50, 400, 160)
+        rx = st.number_input("X 위치", 0, 1080, 70)
+        ry = st.number_input("Y 위치", 0, 1920, 1150)
+        rw = st.number_input("박스 너비", 100, 1080, 650)
+        rh = st.number_input("박스 높이", 100, 1920, 680)
+        box_alpha = st.slider("박스 투명도", 0, 255, 110)
+        map_size = st.slider("지도 크기", 50, 400, 150)
 
 # --- [6. 렌더링 엔진] ---
 if bg_files:
@@ -140,16 +141,17 @@ if bg_files:
             overlay = Image.new("RGBA", (1080, 1920), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
             if show_box:
                 draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0,0,0,box_alpha))
-                p_line = a.get('map', {}).get('summary_polyline')
-                if p_line:
-                    pts = polyline.decode(p_line); lats, lons = zip(*pts)
-                    m_layer = Image.new("RGBA", (map_size, map_size), (0,0,0,0)); m_draw = ImageDraw.Draw(m_layer)
-                    def trans(la, lo):
-                        tx = 10 + (lo - min(lons)) / (max(lons) - min(lons) + 0.00001) * (map_size - 20)
-                        ty = (map_size - 10) - (la - min(lats)) / (max(lats) - min(lats) + 0.00001) * (map_size - 20)
-                        return tx, ty
-                    m_draw.line([trans(la, lo) for la, lo in pts], fill=hex_to_rgba(m_color, 255), width=4)
-                    overlay.paste(m_layer, (rx + rw - map_size - 20, ry + 20), m_layer)
+                if acts and 'a' in locals():
+                    p_line = a.get('map', {}).get('summary_polyline')
+                    if p_line:
+                        pts = polyline.decode(p_line); lats, lons = zip(*pts)
+                        m_layer = Image.new("RGBA", (map_size, map_size), (0,0,0,0)); m_draw = ImageDraw.Draw(m_layer)
+                        def trans(la, lo):
+                            tx = 10 + (lo - min(lons)) / (max(lons) - min(lons) + 0.00001) * (map_size - 20)
+                            ty = (map_size - 10) - (la - min(lats)) / (max(lats) - min(lats) + 0.00001) * (map_size - 20)
+                            return tx, ty
+                        m_draw.line([trans(la, lo) for la, lo in pts], fill=hex_to_rgba(m_color, 255), width=4)
+                        overlay.paste(m_layer, (rx + rw - map_size - 20, ry + 20), m_layer)
                 
                 items = [("distance", f"{v_dist} km"), ("time", t_val), ("pace", v_pace), ("avg bpm", f"{v_hr} bpm")]
                 draw.text((rx+40, ry+30), v_act, font=f_t, fill=m_color)
@@ -161,7 +163,7 @@ if bg_files:
             final = Image.alpha_composite(canvas, overlay).convert("RGB")
         else: # WEEKLY
             canvas = Image.new("RGBA", (1080, 1080), (0,0,0,255)); n = len(bg_files)
-            cols, rows = math.ceil(math.sqrt(n)), math.ceil(n / math.ceil(math.sqrt(n)))
+            cols = math.ceil(math.sqrt(n)); rows = math.ceil(n / cols)
             bh = 880 if show_box else 1080
             iw, ih = 1080 // cols, bh // rows
             for i, f in enumerate(bg_files):
@@ -179,8 +181,10 @@ if bg_files:
             final = canvas.convert("RGB")
 
         if log_file:
-            l_img = ImageOps.fit(Image.open(log_file).convert("RGBA"), (130, 130))
-            mask = Image.new('L', (130, 130), 0); ImageDraw.Draw(mask).ellipse((0, 0, 130, 130), fill=255); l_img.putalpha(mask)
+            l_img = Image.open(log_file).convert("RGBA")
+            l_img = ImageOps.fit(l_img, (130, 130))
+            mask = Image.new('L', (130, 130), 0); ImageDraw.Draw(mask).ellipse((0, 0, 130, 130), fill=255)
+            l_img.putalpha(mask)
             final.paste(l_img, (final.size[0] - 160, 30), l_img)
 
         with col2:
@@ -188,4 +192,4 @@ if bg_files:
             buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
             st.download_button("📸 DOWNLOAD", buf.getvalue(), "result.jpg", use_container_width=True)
     except Exception as e:
-        st.error(f"Render Error: {e}")
+        st.error(f"Error: {e}")
