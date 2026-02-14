@@ -5,6 +5,7 @@ import io, os, requests, polyline, math
 # --- [1. 기본 설정 및 초기화] ---
 CLIENT_ID = '202274'
 CLIENT_SECRET = 'cf2ab22bb9995254e6ea68ac3c942572f7114c9a'
+# 실제 배포 주소 (끝에 /가 없어야 함)
 ACTUAL_URL = "https://titanboy-5fxenvcchdubwx3swjh8ut.streamlit.app"
 
 st.set_page_config(page_title="Garmin Photo Dashboard", layout="wide")
@@ -19,29 +20,48 @@ def logout_and_clear():
 if 'access_token' not in st.session_state:
     st.session_state['access_token'] = None
 
-# --- [2. 인증 로직 - 최상단 배치로 연동 성공률 향상] ---
-query_params = st.query_params
-if "code" in query_params and st.session_state['access_token'] is None:
+# --- [2. 인증 로직: 주소창 code 처리 최우선 순위] ---
+# st.query_params는 딕셔너리처럼 작동하므로 직접 접근합니다.
+current_params = st.query_params
+if "code" in current_params and st.session_state['access_token'] is None:
     try:
+        auth_code = current_params["code"]
         res = requests.post("https://www.strava.com/oauth/token", data={
-            "client_id": CLIENT_ID, "client_secret": CLIENT_SECRET,
-            "code": query_params["code"], "grant_type": "authorization_code"
+            "client_id": CLIENT_ID, 
+            "client_secret": CLIENT_SECRET,
+            "code": auth_code, 
+            "grant_type": "authorization_code"
         }, timeout=15)
+        
         if res.status_code == 200:
             st.session_state['access_token'] = res.json()['access_token']
+            # 중요: 코드를 사용했으므로 주소창에서 파라미터를 완전히 제거하고 새로고침
             st.query_params.clear()
             st.rerun()
-    except: pass
+        else:
+            st.error(f"Strava 인증 실패: {res.json().get('message')}. 다시 시도해주세요.")
+            if st.button("인증 코드 초기화"):
+                st.query_params.clear()
+                st.rerun()
+    except Exception as e:
+        st.error(f"연결 오류: {e}")
 
+# 토큰이 없으면 로그인 화면만 출력
 if st.session_state['access_token'] is None:
     st.title("🏃 Garmin Photo Dashboard")
     auth_url = (f"https://www.strava.com/oauth/authorize?client_id={CLIENT_ID}"
                 f"&response_type=code&redirect_uri={ACTUAL_URL}"
                 f"&scope=read,activity:read_all&approval_prompt=force")
     st.link_button("🚀 Strava 연동하기", auth_url, type="primary")
+    
+    # 디버깅용 (주소창에 코드가 남았을 때 강제 청소)
+    if "code" in current_params:
+        st.warning("주소창에 인증 코드가 남아있습니다. 자동으로 연동되지 않으면 아래 버튼을 눌러주세요.")
+        if st.button("⚠️ 인증 세션 강제 리셋"):
+            logout_and_clear()
     st.stop()
 
-# --- [3. 유틸리티 및 폰트 로드] ---
+# --- [3. 유틸리티 & 폰트 로드] ---
 @st.cache_resource
 def load_font(font_type, size):
     fonts = {
@@ -67,10 +87,13 @@ acts = []
 headers = {'Authorization': f"Bearer {st.session_state['access_token']}"}
 try:
     act_res = requests.get("https://www.strava.com/api/v3/athlete/activities?per_page=30", headers=headers, timeout=15)
-    if act_res.status_code == 200: acts = act_res.json()
+    if act_res.status_code == 200: 
+        acts = act_res.json()
+    elif act_res.status_code == 401: # 토큰 만료 시
+        st.session_state['access_token'] = None
+        st.rerun()
 except: pass
 
-# 변수 초기화 (에러 방지)
 v_act, v_date, v_dist, v_pace, v_hr, t_val = "", "", "0.00", "0'00\"", "0", "00:00"
 a = None
 
@@ -111,7 +134,7 @@ with col3:
     m_color = COLOR_OPTIONS[st.selectbox("포인트 컬러", list(COLOR_OPTIONS.keys()))]
     sub_color = COLOR_OPTIONS[st.selectbox("서브 컬러", list(COLOR_OPTIONS.keys()), index=1)]
     
-    # [사용자 요청] 글자 크기 설정: 활동명 90, 날짜 30, 숫자 60
+    # [설정] 활동명 90, 날짜 30, 숫자 60
     t_sz, d_sz, n_sz, l_sz = 90, 30, 60, 20
     
     if mode == "DAILY":
@@ -124,19 +147,15 @@ with col3:
 if bg_files:
     try:
         f_t, f_d, f_n, f_l = load_font(sel_font, t_sz), load_font(sel_font, d_sz), load_font(sel_font, n_sz), load_font(sel_font, l_sz)
-        
         img = ImageOps.exif_transpose(Image.open(bg_files[0]))
         canvas = ImageOps.fit(img.convert("RGBA"), (1080, 1920))
         overlay = Image.new("RGBA", (1080, 1920), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
         
         if show_box:
             draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0,0,0,box_alpha))
-            # km, bpm 소문자 준수
             items = [("distance", f"{v_dist} km"), ("time", t_val), ("pace", v_pace), ("avg bpm", f"{v_hr} bpm")]
             
-            # --- [가로 모드 (좌지도-중제목-우로고)] ---
             if box_orient == "Horizontal":
-                # 1. 지도 (왼쪽)
                 if a and a.get('map', {}).get('summary_polyline'):
                     pts = polyline.decode(a['map']['summary_polyline'])
                     lats, lons = zip(*pts)
@@ -148,53 +167,35 @@ if bg_files:
                     m_draw.line([trans(la, lo) for la, lo in pts], fill=hex_to_rgba(m_color, 255), width=4)
                     overlay.paste(m_layer, (rx + 30, ry + 20), m_layer)
 
-                # 2. 제목 & 날짜 (중앙 정렬)
                 title_w = draw.textlength(v_act, font=f_t)
                 draw.text((rx + (rw // 2) - (title_w // 2), ry + 25), v_act, font=f_t, fill=m_color)
                 date_w = draw.textlength(v_date, font=f_d)
                 draw.text((rx + (rw // 2) - (date_w // 2), ry + 25 + t_sz + 5), v_date, font=f_d, fill="#AAAAAA")
                 
-                # 3. 로고 (오른쪽)
                 if log_file:
                     l_sz_h = 80
                     l_img = ImageOps.fit(Image.open(log_file).convert("RGBA"), (l_sz_h, l_sz_h))
                     mask = Image.new('L', (l_sz_h, l_sz_h), 0); ImageDraw.Draw(mask).ellipse((0, 0, l_sz_h, l_sz_h), fill=255); l_img.putalpha(mask)
                     overlay.paste(l_img, (rx + rw - l_sz_h - 30, ry + 25), l_img)
 
-                # 4. 데이터 (하단 4열)
                 sec_w = (rw - 80) // 4
                 for i, (lab, val) in enumerate(items):
                     item_x = rx + 40 + (i * sec_w)
                     draw.text((item_x, ry + t_sz + d_sz + 50), lab, font=f_l, fill="#AAAAAA")
                     draw.text((item_x, ry + t_sz + d_sz + 50 + l_sz + 5), val, font=f_n, fill=sub_color)
-
-            # --- [세로 모드] ---
             else:
+                # 세로 모드 (기존 유지)
                 draw.text((rx+40, ry+30), v_act, font=f_t, fill=m_color)
                 draw.text((rx+40, ry+30+t_sz+10), v_date, font=f_d, fill=sub_color)
                 y_c = ry + t_sz + d_sz + 90
                 for lab, val in items:
                     draw.text((rx+40, y_c), lab, font=f_l, fill="#AAAAAA")
                     draw.text((rx+40, y_c+l_sz+5), val, font=f_n, fill=sub_color); y_c += (n_sz + l_sz + 35)
-                
-                if a and a.get('map', {}).get('summary_polyline'):
-                    pts = polyline.decode(a['map']['summary_polyline'])
-                    lats, lons = zip(*pts)
-                    m_layer = Image.new("RGBA", (map_size, map_size), (0,0,0,0)); m_draw = ImageDraw.Draw(m_layer)
-                    m_draw.line([trans(la, lo) for la, lo in pts], fill=hex_to_rgba(m_color, 255), width=4)
-                    overlay.paste(m_layer, (rx + rw - map_size - 20, ry + 20), m_layer)
 
-                if log_file:
-                    l_sz_v = 100
-                    l_img = ImageOps.fit(Image.open(log_file).convert("RGBA"), (l_sz_v, l_sz_v))
-                    mask = Image.new('L', (l_sz_v, l_sz_v), 0); ImageDraw.Draw(mask).ellipse((0, 0, l_sz_v, l_sz_v), fill=255); l_img.putalpha(mask)
-                    overlay.paste(l_img, (rx + rw - l_sz_v - 20, ry + rh - l_sz_v - 20), l_img)
-        
         final = Image.alpha_composite(canvas, overlay).convert("RGB")
         with col2:
             st.image(final, use_container_width=True)
             buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
             st.download_button("📸 DOWNLOAD", buf.getvalue(), "result.jpg", use_container_width=True)
-                
     except Exception as e:
         st.error(f"Error: {e}")
