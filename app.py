@@ -25,6 +25,31 @@ def hex_to_rgba(hex_color, alpha):
     hex_color = hex_color.lstrip('#')
     return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4)) + (alpha,)
 
+# [추가] 스마트 콜라주 함수 (최대 10장, 무여백)
+def make_smart_collage(files, target_size):
+    tw, th = target_size
+    imgs = [ImageOps.exif_transpose(Image.open(f).convert("RGBA")) for f in files[:10]]
+    n = len(imgs)
+    if n == 0: return Image.new("RGBA", (tw, th), (30, 30, 30, 255))
+    if n == 1: return ImageOps.fit(imgs[0], (tw, th))
+    
+    if n == 2: cols, rows = 2, 1
+    elif n <= 4: cols, rows = 2, 2
+    elif n <= 6: cols, rows = 3, 2
+    elif n <= 9: cols, rows = 3, 3
+    else: cols, rows = 5, 2
+
+    canvas = Image.new("RGBA", (tw, th), (0, 0, 0, 255))
+    w_step, h_step = tw / cols, th / rows
+    for i, img in enumerate(imgs):
+        r, c = divmod(i, cols)
+        x1, y1 = int(c * w_step), int(r * h_step)
+        x2 = int((c + 1) * w_step) if (c + 1) < cols else tw
+        y2 = int((r + 1) * h_step) if (r + 1) < rows else th
+        sub_img = ImageOps.fit(img, (x2 - x1, y2 - y1))
+        canvas.paste(sub_img, (x1, y1))
+    return canvas
+
 def get_weekly_stats(activities, target_date_str):
     try:
         target_date = datetime.strptime(target_date_str, "%Y-%m-%d")
@@ -96,7 +121,6 @@ col_main, col_design = st.columns([2, 1], gap="medium")
 
 with col_main:
     st.title("TITAN BOY")
-    # 인증 버튼 영역
     c_auth, c_log = st.columns([3, 1])
     with c_auth:
         if st.session_state['access_token']: st.success("✅ Strava 연결됨")
@@ -106,7 +130,6 @@ with col_main:
 
     st.subheader("📝 ACTIVITY & PREVIEW")
     mode = st.radio("모드 선택", ["DAILY", "WEEKLY"], horizontal=True, label_visibility="collapsed")
-    
     bg_files = st.file_uploader("📸 배경 사진", type=['jpg','jpeg','png'], accept_multiple_files=True)
     log_file = st.file_uploader("🔘 원형 로고", type=['jpg','jpeg','png'])
     
@@ -125,7 +148,6 @@ with col_main:
             weekly_data = get_weekly_stats(acts, a['start_date_local'][:10])
             if weekly_data: v_act, v_date, v_dist, v_time, v_pace, v_hr = "WEEKLY RUN", weekly_data['range'], weekly_data['total_dist'], weekly_data['total_time'], weekly_data['avg_pace'], weekly_data['avg_hr']
 
-    # 수기 입력 반영
     v_act = v_act_in if v_act_in else v_act
     v_date = v_date_in if v_date_in else v_date
     v_dist = v_dist_in if v_dist_in else v_dist
@@ -136,18 +158,13 @@ with col_main:
 with col_design:
     st.header("🎨 DESIGN")
     box_orient = st.radio("박스 방향", ["Vertical", "Horizontal"], horizontal=True)
-    
-    # On/Off 버튼
     show_box = st.toggle("데이터 박스 표시", value=True)
     show_vis = st.toggle("지도/그래프 표시", value=True)
-    
     sel_font = st.selectbox("폰트 선택", ["BlackHanSans", "Jua", "DoHyeon", "NanumBrush", "Sunflower"])
-    
     COLOR_OPTS = {"Yellow": "#FFD700", "White": "#FFFFFF", "Orange": "#FF4500", "Blue": "#00BFFF", "Grey": "#AAAAAA"}
     m_color = COLOR_OPTS[st.selectbox("포인트 컬러", list(COLOR_OPTS.keys()))]
     sub_color = COLOR_OPTS[st.selectbox("서브 컬러", list(COLOR_OPTS.keys()), index=1)]
-    
-    CW, CH = (1080, 1920) if mode == "DAILY" else (1080, 800) # Weekly 800 고정
+    CW, CH = (1080, 1920) if mode == "DAILY" else (1080, 800)
     rx = st.number_input("X 위치", 0, 1080, 70)
     ry = st.number_input("Y 위치", 0, 1920, 1350 if mode=="DAILY" else 480)
     rw = st.number_input("박스 너비", 100, 1080, 1080 if box_orient=="Horizontal" else 450)
@@ -158,18 +175,17 @@ with col_design:
 
 # --- [6. 렌더링 엔진] ---
 try:
-    # 폰트 규칙 (활동명 90, 날짜 30, 숫자 60)
-    f_t, f_d, f_n, f_l = load_font(sel_font, 70), load_font(sel_font, 20), load_font(sel_font, 40), load_font(sel_font, 25)
+    # 활동명 90, 날짜 30, 숫자 60, 라벨 20
+    f_t, f_d, f_n, f_l = load_font(sel_font, 90), load_font(sel_font, 30), load_font(sel_font, 60), load_font(sel_font, 20)
     
+    # [수정] 콜라주 함수 적용
     if bg_files:
-        canvas = ImageOps.fit(ImageOps.exif_transpose(Image.open(bg_files[0])).convert("RGBA"), (CW, CH))
+        canvas = make_smart_collage(bg_files, (CW, CH))
     else:
         canvas = Image.new("RGBA", (CW, CH), (20, 20, 20, 255))
     
     overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
     
-    # [시각화: 지도/그래프]
-    vis_layer = None
     if show_vis:
         if mode == "DAILY" and a and a.get('map', {}).get('summary_polyline'):
             pts = polyline.decode(a['map']['summary_polyline']); lats, lons = zip(*pts)
@@ -181,10 +197,8 @@ try:
             chart_img = create_bar_chart(weekly_data['dists'], m_color)
             w_p = (vis_sz / float(chart_img.size[0])); vis_layer = chart_img.resize((vis_sz, int(chart_img.size[1]*w_p)), Image.Resampling.LANCZOS)
             alpha_mask = vis_layer.getchannel('A').point(lambda x: x * (vis_alpha / 255)); vis_layer.putalpha(alpha_mask)
-            # Weekly 그래프 하단 배치
             overlay.paste(vis_layer, ((CW - vis_layer.width)//2, CH - vis_layer.height - 20), vis_layer)
 
-    # [데이터 박스]
     if show_box:
         items = [("distance", f"{v_dist} km"), ("time", v_time), ("pace", v_pace), ("avg bpm", f"{v_hr} bpm")]
         if box_orient == "Vertical":
@@ -197,7 +211,6 @@ try:
                 draw.text((rx+40, y_c+25), val.lower() if any(x in val for x in ["km","bpm"]) else val, font=f_n, fill=sub_color)
                 y_c += 115
         else:
-            # 가로모드: 너비 1080 고정 및 가운데 정렬
             draw.rectangle([0, ry, 1080, ry + rh], fill=(0,0,0,box_alpha))
             t_w = draw.textlength(v_act, font=f_t); d_w = draw.textlength(v_date, font=f_d)
             draw.text(((1080 - t_w)//2, ry + 35), v_act, font=f_t, fill=m_color)
@@ -224,5 +237,3 @@ try:
 
 except Exception as e:
     with col_main: st.info("활동을 선택하거나 사진을 업로드해 주세요.")
-
-
