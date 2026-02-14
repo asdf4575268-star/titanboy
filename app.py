@@ -44,6 +44,7 @@ if st.session_state['access_token'] is None:
 # --- [3. 유틸리티 함수] ---
 @st.cache_resource
 def load_font(font_type, size):
+    # 안정적인 폰트 로드를 위해 원본 주소 유지
     fonts = {
         "BlackHanSans": "https://github.com/google/fonts/raw/main/ofl/blackhansans/BlackHanSans-Regular.ttf",
         "Jua": "https://github.com/google/fonts/raw/main/ofl/jua/Jua-Regular.ttf",
@@ -114,22 +115,29 @@ with col1:
 with col3:
     st.header("🎨 DESIGN")
     show_box = st.checkbox("로그 박스 표시", value=True)
+    box_orient = st.radio("박스 방향", ["Vertical", "Horizontal"], horizontal=True)
     sel_font = st.selectbox("폰트", ["BlackHanSans", "Jua", "DoHyeon", "NanumBrush", "Sunflower"])
     m_color = COLOR_OPTIONS[st.selectbox("포인트 컬러", list(COLOR_OPTIONS.keys()))]
     sub_color = COLOR_OPTIONS[st.selectbox("서브 컬러", list(COLOR_OPTIONS.keys()), index=1)]
     
-    # 크기 고정 (사용자 요청)
-    t_sz, d_sz, n_sz, l_sz = 70, 20, 40, 20
+    # 크기 설정 (활동명 90, 날짜 30, 숫자 60 유지)
+    t_sz, d_sz, n_sz, l_sz = 90, 30, 60, 20
     
     if mode == "DAILY":
         st.divider()
         st.subheader("Box Layout")
-        rx = st.number_input("X 위치", 0, 1080, 70)
-        ry = st.number_input("Y 위치", 0, 1920, 1350)
-        rw = st.number_input("박스 너비", 100, 1080, 450)
-        rh = st.number_input("박스 높이", 100, 1920, 500)
+        # 모드별 디폴트 값 설정
+        if box_orient == "Vertical":
+            d_rx, d_ry, d_rw, d_rh = 70, 1350, 450, 500
+        else: # Horizontal
+            d_rx, d_ry, d_rw, d_rh = 70, 1650, 940, 220
+            
+        rx = st.number_input("X 위치", 0, 1080, d_rx)
+        ry = st.number_input("Y 위치", 0, 1920, d_ry)
+        rw = st.number_input("박스 너비", 100, 1080, d_rw)
+        rh = st.number_input("박스 높이", 100, 1920, d_rh)
         box_alpha = st.slider("박스 투명도", 0, 255, 110)
-        map_size = st.slider("지도 크기", 50, 400, 150)
+        map_size = st.slider("지도 크기", 50, 400, 150 if box_orient == "Vertical" else 100)
 
 # --- [6. 렌더링 엔진] ---
 if bg_files:
@@ -154,12 +162,22 @@ if bg_files:
                         overlay.paste(m_layer, (rx + rw - map_size - 20, ry + 20), m_layer)
                 
                 items = [("distance", f"{v_dist} km"), ("time", t_val), ("pace", v_pace), ("avg bpm", f"{v_hr} bpm")]
-                draw.text((rx+40, ry+30), v_act, font=f_t, fill=m_color)
-                draw.text((rx+40, ry+30+t_sz+5), v_date, font=f_d, fill=sub_color)
-                y_c = ry + t_sz + d_sz + 60
-                for lab, val in items:
-                    draw.text((rx+40, y_c), lab, font=f_l, fill="#AAAAAA")
-                    draw.text((rx+40, y_c+l_sz+2), val, font=f_n, fill=sub_color); y_c += (n_sz + l_sz + 25)
+                
+                if box_orient == "Vertical":
+                    draw.text((rx+40, ry+30), v_act, font=f_t, fill=m_color)
+                    draw.text((rx+40, ry+30+t_sz+10), v_date, font=f_d, fill=sub_color)
+                    y_c = ry + t_sz + d_sz + 80
+                    for lab, val in items:
+                        draw.text((rx+40, y_c), lab, font=f_l, fill="#AAAAAA")
+                        draw.text((rx+40, y_c+l_sz+5), val, font=f_n, fill=sub_color); y_c += (n_sz + l_sz + 35)
+                else: # Horizontal 모드 텍스트 배치
+                    draw.text((rx+40, ry+20), v_act, font=f_t, fill=m_color)
+                    draw.text((rx+40, ry+20+t_sz+5), v_date, font=f_d, fill="#AAAAAA")
+                    x_c = rx + 300
+                    for lab, val in items:
+                        draw.text((x_c, ry+40), lab, font=f_l, fill="#AAAAAA")
+                        draw.text((x_c, ry+40+l_sz+5), val, font=f_n, fill=sub_color); x_c += 180
+            
             final = Image.alpha_composite(canvas, overlay).convert("RGB")
         else: # WEEKLY
             canvas = Image.new("RGBA", (1080, 1080), (0,0,0,255)); n = len(bg_files)
@@ -193,4 +211,3 @@ if bg_files:
             st.download_button("📸 DOWNLOAD", buf.getvalue(), "result.jpg", use_container_width=True)
     except Exception as e:
         st.error(f"Error: {e}")
-
