@@ -45,16 +45,24 @@ if st.session_state['access_token'] is None:
 @st.cache_resource
 def load_font(font_type, size):
     fonts = {
+        "GmarketSans": "https://github.com/hyeonseok-dev/fonts/raw/main/GmarketSansBold.ttf",
+        "Pretendard": "https://github.com/orioncactus/pretendard/raw/main/packages/pretendard/dist/public/static/Pretendard-Bold.otf",
+        "Bazzi": "https://github.com/google/fonts/raw/main/ofl/bazzi/Bazzi-Regular.ttf",
+        "KOTRA_BOLD": "https://github.com/dhun-dg/fonts/raw/main/KOTRA_BOLD.ttf",
+        "KyoboHandwriting": "https://github.com/google/fonts/raw/main/ofl/kyobohandwriting2019/KyoboHandwriting2019-Regular.ttf",
         "BlackHanSans": "https://github.com/google/fonts/raw/main/ofl/blackhansans/BlackHanSans-Regular.ttf",
-        "Jua": "https://github.com/google/fonts/raw/main/ofl/jua/Jua-Regular.ttf",
-        "DoHyeon": "https://github.com/google/fonts/raw/main/ofl/dohyeon/DoHyeon-Regular.ttf",
-        "NanumBrush": "https://github.com/google/fonts/raw/main/ofl/nanumbrushscript/NanumBrushScript-Regular.ttf",
-        "Sunflower": "https://github.com/google/fonts/raw/main/ofl/sunflower/Sunflower-Bold.ttf"
+        "Jua": "https://github.com/google/fonts/raw/main/ofl/jua/Jua-Regular.ttf"
     }
-    f_url = fonts.get(font_type, fonts["BlackHanSans"])
-    f_path = f"font_{font_type}_{int(size)}.ttf"
+    f_url = fonts.get(font_type, fonts["GmarketSans"])
+    # 파일 확장자에 따른 처리
+    ext = ".otf" if "Pretendard" in font_type else ".ttf"
+    f_path = f"font_{font_type}_{int(size)}{ext}"
+    
     if not os.path.exists(f_path):
-        r = requests.get(f_url); open(f_path, "wb").write(r.content)
+        try:
+            r = requests.get(f_url, timeout=10)
+            with open(f_path, "wb") as f: f.write(r.content)
+        except: return ImageFont.load_default()
     return ImageFont.truetype(f_path, int(size))
 
 def hex_to_rgba(hex_color, alpha):
@@ -193,4 +201,5 @@ if bg_files:
             st.download_button("📸 DOWNLOAD", buf.getvalue(), "result.jpg", use_container_width=True)
     except Exception as e:
         st.error(f"Error: {e}")
+
 
