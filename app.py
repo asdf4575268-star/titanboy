@@ -5,6 +5,16 @@ from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 
+# --- [1. 기본 설정 및 제목 변경] ---
+st.set_page_config(page_title="TITAN BOY DASHBOARD", layout="wide")
+
+# ... (API 설정 및 유틸리티 생략) ...
+
+with col1:
+    st.title("⚡ TITAN BOY")  # 대시보드 상단 메인 타이틀
+    st.header("📸 DATA INPUT")
+    # ... (기존 입력창 로직) ...
+
 # --- [1. Strava API 설정] ---
 API_CONFIGS = {
     "PRIMARY": {"ID": '202275', "SECRET": '969201cab488e4eaf1398b106de1d4e520dc564c'},
