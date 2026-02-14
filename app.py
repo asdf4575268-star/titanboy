@@ -97,7 +97,7 @@ with col2:
         v_hr = str(int(a.get('average_heartrate', 0))) if a.get('average_heartrate') else "0"
 
 with col1:
-    st.header("📸 DATA INPUT")
+    st.header("📸DATA")
     bg_files = st.file_uploader("배경 사진", type=['jpg','jpeg','png'], accept_multiple_files=True)
     log_file = st.file_uploader("원형 로고", type=['jpg','jpeg','png'])
     
@@ -111,7 +111,7 @@ with col1:
     v_hr = st.text_input("심박(bpm)", v_hr)
 
 with col3:
-    st.header("🎨 DESIGN")
+    st.header("🎨DESIGN")
     show_box = st.checkbox("로그 박스 표시", value=True)
     box_orient = st.radio("박스 방향", ["Vertical", "Horizontal"], horizontal=True)
     sel_font = st.selectbox("폰트", ["BlackHanSans", "Jua", "DoHyeon", "NanumBrush", "Sunflower"])
@@ -211,4 +211,5 @@ if bg_files:
                 
     except Exception as e:
         st.error(f"Error: {e}")
+
 
