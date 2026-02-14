@@ -13,7 +13,6 @@ st.set_page_config(page_title="Garmin Photo Dashboard", layout="wide")
 # --- [2. 유틸리티 함수] ---
 @st.cache_resource
 def load_custom_font(font_type, size):
-    # 요청하신 구글 폰트 리스트 확장
     fonts = {
         "BlackHanSans": "https://github.com/google/fonts/raw/main/ofl/blackhansans/BlackHanSans-Regular.ttf",
         "NanumBrush": "https://github.com/google/fonts/raw/main/ofl/nanumbrushscript/NanumBrushScript-Regular.ttf",
@@ -78,7 +77,7 @@ if not st.session_state['access_token']:
     st.link_button("🚀 Strava 연동하기", auth_url)
     st.stop()
 
-# --- [4. 사이드바 (업데이트된 폰트 리스트)] ---
+# --- [4. 사이드바] ---
 with st.sidebar:
     app_mode = st.radio("🚀 작업 모드", ["DAILY", "WEEKLY"])
     st.markdown("---")
@@ -92,14 +91,15 @@ with st.sidebar:
     t_sz, d_sz, n_sz, l_sz = st.slider("활동명", 10, 200, 90), st.slider("날짜", 10, 100, 30), st.slider("숫자", 10, 150, 60), st.slider("라벨", 10, 80, 25)
     
     st.markdown("---")
+    st.subheader("로그 박스 커스텀")
     rx, ry, rw, rh = st.slider("X", 0, 1080, 70), st.slider("Y", 0, 1920, 1150), st.slider("Width", 300, 1000, 500), st.slider("Height", 300, 1200, 720)
-    alpha = st.slider("투명도", 0, 255, 60)
+    alpha = st.slider("박스 투명도", 0, 255, 60)
+    map_alpha = st.slider("지도 투명도", 0, 255, 100)
 
 # --- [5. 실행 로직] ---
 headers = {'Authorization': f"Bearer {st.session_state['access_token']}"}
 
 if app_mode == "DAILY":
-    # ... (DAILY 모드 기존 로직 동일)
     act_res = requests.get("https://www.strava.com/api/v3/athlete/activities?per_page=10", headers=headers)
     if act_res.status_code == 200:
         acts = act_res.json()
@@ -129,29 +129,60 @@ if app_mode == "DAILY":
             draw = ImageDraw.Draw(overlay)
             f_t, f_d, f_n, f_l = load_custom_font(selected_font, t_sz), load_custom_font(selected_font, d_sz), load_custom_font(selected_font, n_sz), load_custom_font(selected_font, l_sz)
 
+            # 1. 로그박스 배경
             draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0, 0, 0, alpha))
+            
+            # 2. 지도 오버레이 (배경 느낌)
+            poly = a.get('map', {}).get('summary_polyline', "")
+            if poly:
+                try:
+                    pts = polyline.decode(poly)
+                    lats, lons = [p[0] for p in pts], [p[1] for p in pts]
+                    mi_la, ma_la, mi_lo, ma_lo = min(lats), max(lats), min(lons), max(lons)
+                    
+                    # 박스 크기에 맞춘 지도 캔버스
+                    m_w, m_h = rw, rh
+                    r_img = Image.new("RGBA", (m_w, m_h), (0, 0, 0, 0))
+                    dr_r = ImageDraw.Draw(r_img)
+                    
+                    def sc(p):
+                        # 여백 15% 적용하여 박스 안에 꽉 차게
+                        x = (p[1] - mi_lo) / (ma_lo - mi_lo + 1e-9) * (m_w * 0.7) + (m_w * 0.15)
+                        y = (m_h * 0.7) - ((p[0] - mi_la) / (ma_la - mi_la + 1e-9) * (m_h * 0.7)) + (m_h * 0.15)
+                        return (x, y)
+                    
+                    r_f = {"Yellow": (255, 215, 0, map_alpha), "Black": (0, 0, 0, map_alpha), "White": (255, 255, 255, map_alpha)}.get(route_color, (255, 215, 0, map_alpha))
+                    dr_r.line([sc(p) for p in pts], fill=r_f, width=8)
+                    canvas.paste(r_img, (rx, ry), r_img)
+                except: pass
+
+            # 3. 텍스트 배치 (지도 위에 그려짐)
             draw.text((rx + 50, ry + 40), v_act, font=f_t, fill=main_color)
             draw.text((rx + rw - 50, ry + 40 + t_sz + 5), v_date, font=f_d, fill=num_color, anchor="ra")
             
             items = [("DISTANCE", f"{v_dist} km"), ("TIME", v_time), ("AVG PACE", f"{v_pace} /km"), ("AVG HR", f"{v_hr} bpm")]
             if v_weather: items.append(("WEATHER", v_weather))
-
-            spacing = ((ry + rh - 50) - (ry + t_sz + d_sz + 100)) / len(items)
+            
+            line_y_start = ry + t_sz + d_sz + 100
+            spacing = ((ry + rh - 50) - line_y_start) / len(items)
             for i, (lab, val) in enumerate(items):
-                py = (ry + t_sz + d_sz + 100) + (i * spacing)
+                py = line_y_start + (i * spacing)
                 draw.text((rx + 60, py), lab, font=f_l, fill="#AAAAAA")
                 draw.text((rx + 60, py + l_sz + 5), val, font=f_n, fill=num_color)
 
-            # 지도 & 로고 로직 생략 (기존과 동일)
-            # ... [후략] ...
+            if log_file:
+                logo = get_circle_logo(log_file)
+                canvas.paste(logo, (900, 60), logo)
+
             final = Image.alpha_composite(canvas, overlay).convert("RGB")
             st.image(final, use_container_width=True)
+            buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
+            st.download_button("📸 DOWNLOAD", buf.getvalue(), "garmin_final.jpg")
 
 elif app_mode == "WEEKLY":
-    st.title("📅 이번 주 활동 요약 (Weekly)")
+    st.title("📅 Weekly Recap")
     after_ts = int((datetime.now() - timedelta(days=7)).timestamp())
     act_res = requests.get(f"https://www.strava.com/api/v3/athlete/activities?after={after_ts}", headers=headers)
-    
     if act_res.status_code == 200:
         w_acts = act_res.json()
         if w_acts:
@@ -167,14 +198,10 @@ elif app_mode == "WEEKLY":
             m3.metric("평균 심박수", f"{int(avg_hr)} bpm")
             
             st.markdown("---")
-            # 🌟 WEEKLY 사진 업로드 및 콜라주 복구
-            w_files = st.file_uploader("주간 콜라주용 사진 선택 (여러 장)", type=['jpg', 'jpeg', 'png'], accept_multiple_files=True, key="weekly_upload")
+            w_files = st.file_uploader("콜라주 사진 선택", type=['jpg', 'jpeg', 'png'], accept_multiple_files=True, key="weekly_upload")
             if w_files:
-                with st.spinner("콜라주 생성 중..."):
-                    collage = create_collage(w_files)
-                    if collage:
-                        st.image(collage, use_container_width=True)
-                        buf = io.BytesIO(); collage.save(buf, format="JPEG", quality=95)
-                        st.download_button("📸 콜라주 저장", buf.getvalue(), "weekly_collage.jpg")
-        else:
-            st.info("최근 7일간 기록이 없습니다.")
+                collage = create_collage(w_files)
+                if collage:
+                    st.image(collage, use_container_width=True)
+                    buf = io.BytesIO(); collage.save(buf, format="JPEG", quality=95)
+                    st.download_button("📸 콜라주 저장", buf.getvalue(), "weekly_collage.jpg")
