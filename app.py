@@ -5,12 +5,12 @@ from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 
-# --- [1. 기본 설정 및 초기화] ---
+# --- [1. 기본 설정] ---
 CLIENT_ID = '202275'
 CLIENT_SECRET = '969201cab488e4eaf1398b106de1d4e520dc564c'
 ACTUAL_URL = "https://titanboy-kgcnje3tg3hbfpfsp6uwzc.streamlit.app"
 
-st.set_page_config(page_title="Garmin Photo Dashboard", layout="wide")
+st.set_page_config(page_title="Garmin Dashboard", layout="wide")
 mpl.use('Agg')
 
 def logout_and_clear():
@@ -23,7 +23,7 @@ def logout_and_clear():
 if 'access_token' not in st.session_state:
     st.session_state['access_token'] = None
 
-# --- [2. 인증 로직] ---
+# --- [2. Strava 인증] ---
 query_params = st.query_params
 if "code" in query_params and st.session_state['access_token'] is None:
     try:
@@ -37,7 +37,7 @@ if "code" in query_params and st.session_state['access_token'] is None:
             st.rerun()
     except: pass
 
-# --- [3. 유틸리티 함수] ---
+# --- [3. 유틸리티] ---
 @st.cache_resource
 def load_font(font_type, size):
     fonts = {
@@ -52,11 +52,6 @@ def load_font(font_type, size):
     if not os.path.exists(f_path):
         r = requests.get(f_url); open(f_path, "wb").write(r.content)
     return ImageFont.truetype(f_path, int(size))
-
-def hex_to_rgba(hex_color, alpha):
-    hex_color = hex_color.lstrip('#')
-    rgb = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
-    return rgb + (alpha,)
 
 def get_weekly_stats(activities, target_date_str):
     try:
@@ -85,15 +80,15 @@ def get_weekly_stats(activities, target_date_str):
 
 def create_bar_chart(data, color_hex):
     days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-    fig, ax = plt.subplots(figsize=(6, 3), dpi=150)
+    fig, ax = plt.subplots(figsize=(8, 4), dpi=150)
     fig.patch.set_alpha(0); ax.patch.set_alpha(0)
-    bars = ax.bar(days, data, color=color_hex, width=0.5)
+    bars = ax.bar(days, data, color=color_hex, width=0.6)
     for s in ['top', 'right', 'left']: ax.spines[s].set_visible(False)
-    ax.spines['bottom'].set_color('#DDDDDD')
-    ax.tick_params(axis='x', colors='gray', labelsize=10); ax.tick_params(axis='y', left=False, labelleft=False)
+    ax.spines['bottom'].set_color('#AAAAAA')
+    ax.tick_params(axis='x', colors='white', labelsize=12); ax.tick_params(axis='y', left=False, labelleft=False)
     for bar in bars:
         h = bar.get_height()
-        if h > 0: ax.text(bar.get_x() + bar.get_width()/2., h + 0.1, f'{h:.1f}', ha='center', va='bottom', color='gray', fontsize=9, fontweight='bold')
+        if h > 0: ax.text(bar.get_x() + bar.get_width()/2., h + 0.1, f'{h:.1f}', ha='center', va='bottom', color='white', fontsize=11, fontweight='bold')
     plt.tight_layout()
     buf = io.BytesIO(); plt.savefig(buf, format='png', transparent=True); buf.seek(0); plt.close(fig)
     return Image.open(buf)
@@ -116,23 +111,15 @@ weekly_data = None
 a = None
 
 with col2:
-    m_col, l_col = st.columns([3, 1])
-    with m_col: mode = st.radio("모드", ["DAILY", "WEEKLY"], horizontal=True, label_visibility="collapsed")
-    with l_col: 
-        if st.session_state['access_token']: st.button("🔓 로그아웃", on_click=logout_and_clear, use_container_width=True)
-        else:
-            auth_url = f"https://www.strava.com/oauth/authorize?client_id={CLIENT_ID}&response_type=code&redirect_uri={ACTUAL_URL}&scope=read,activity:read_all&approval_prompt=force"
-            st.link_button("🚀 Strava 연동", auth_url, use_container_width=True)
-
+    mode = st.radio("모드 선택", ["DAILY", "WEEKLY"], horizontal=True, label_visibility="collapsed")
     if acts:
         act_options = [f"{act['start_date_local'][:10]} - {act['name']}" for act in acts]
-        sel_str = st.selectbox("기준 기록 선택", act_options)
-        a = acts[act_options.index(sel_str)]
-        v_date = a['start_date_local'][:10]
+        sel_str = st.selectbox("기록 선택", act_options)
+        a = acts[act_options.index(sel_str)]; v_date = a['start_date_local'][:10]
         if mode == "DAILY":
             d_km = a.get('distance', 0)/1000; m_sec = a.get('moving_time', 0)
             v_act, v_dist = a['name'], f"{d_km:.2f}"
-            v_time = f"{m_sec//3600:02d}:{(m_sec%3600)//60:02d}:{m_sec%60:02d}" if m_sec >= 3600 else f"{m_sec//60:02d}:{m_sec%60:02d}"
+            v_time = f"{m_sec//3600:02d}:{(m_sec%3600)//60:02d}:{m_sec%60:02d}"
             v_pace = f"{int((m_sec/d_km)//60)}'{int((m_sec/d_km)%60):02d}\"" if d_km > 0 else "0'00\""
             v_hr = str(int(a.get('average_heartrate', 0))) if a.get('average_heartrate') else "0"
         else:
@@ -142,98 +129,94 @@ with col2:
 
 with col1:
     st.header("📸 DATA INPUT")
-    bg_files = st.file_uploader("배경 사진", type=['jpg','jpeg','png'], accept_multiple_files=True)
+    bg_files = st.file_uploader("사진", type=['jpg','jpeg','png'], accept_multiple_files=True)
     log_file = st.file_uploader("원형 로고", type=['jpg','jpeg','png'])
-    st.divider()
     v_act = st.text_input("활동명", v_act)
     v_date = st.text_input("날짜", v_date)
-    v_dist = st.text_input("거리 km", v_dist)
-    v_time = st.text_input("시간", v_time)
-    v_pace = st.text_input("페이스 분/km", v_pace)
-    v_hr = st.text_input("심박 bpm", v_hr)
+    v_dist = st.text_input("거리 km", v_dist); v_time = st.text_input("시간", v_time)
+    v_pace = st.text_input("페이스 분/km", v_pace); v_hr = st.text_input("심박 bpm", v_hr)
 
 with col3:
     st.header("🎨 DESIGN")
-    show_box = st.checkbox("로그 박스 표시", value=True)
-    box_orient = st.radio("박스 방향", ["Vertical", "Horizontal"], horizontal=True)
+    box_orient = st.radio("레이아웃", ["Horizontal", "Vertical"], horizontal=True)
     sel_font = st.selectbox("폰트", ["BlackHanSans", "Jua", "DoHyeon", "NanumBrush", "Sunflower"])
-    m_color = COLOR_OPTIONS[st.selectbox("포인트 컬러", list(COLOR_OPTIONS.keys()), index=4)]
+    m_color = COLOR_OPTIONS[st.selectbox("포인트 컬러", list(COLOR_OPTIONS.keys()), index=0)]
     sub_color = COLOR_OPTIONS[st.selectbox("서브 컬러", list(COLOR_OPTIONS.keys()), index=1)]
-    t_sz, d_sz, n_sz, l_sz = 90, 30, 60, 20
-    d_rx, d_ry, d_rw, d_rh = (70, 480, 480, 550) if box_orient == "Vertical" else (70, 750, 940, 260)
-    rx = st.number_input("X 위치", 0, 1080, d_rx); ry = st.number_input("Y 위치", 0, 1080, d_ry)
-    rw = st.number_input("박스 너비", 100, 1080, d_rw); rh = st.number_input("박스 높이", 100, 1080, d_rh)
-    box_alpha = st.slider("박스 투명도", 0, 255, 110)
-    map_size = st.slider("지도/그래프 크기", 50, 800, 300)
+    
+    # 모드별 가변 캔버스 사이즈 설정
+    CW, CH = (1080, 1920) if mode == "DAILY" else (1080, 1080)
+    
+    st.subheader("📊 시각화 요소")
+    g_y = st.slider("상단 요소 Y", 0, 1000, 200 if mode=="DAILY" else 100)
+    g_size = st.slider("크기", 300, 1000, 400 if mode=="DAILY" else 850)
+    
+    st.subheader("📦 로그박스")
+    bx = st.number_input("박스 X", 0, 1080, 70)
+    by = st.number_input("박스 Y", 0, 1920, 1400 if mode=="DAILY" else 750)
+    bw = st.number_input("박스 너비", 100, 1080, 940 if box_orient=="Horizontal" else 480)
+    bh = st.number_input("박스 높이", 100, 1080, 260 if box_orient=="Horizontal" else 480)
+    box_alpha = st.slider("투명도", 0, 255, 130)
 
 # --- [6. 렌더링 엔진] ---
 try:
-    f_t, f_d, f_n, f_l = load_font(sel_font, t_sz), load_font(sel_font, d_sz), load_font(sel_font, n_sz), load_font(sel_font, l_sz)
-    CW, CH = 1080, 1080
-    canvas = Image.new("RGBA", (CW, CH), (0, 0, 0, 255)) # 사진 없으면 검정 배경
+    # 요청된 글자 크기: 활동명 90, 날짜 30, 숫자 60
+    f_t, f_d, f_n, f_l = load_font(sel_font, 90), load_font(sel_font, 30), load_font(sel_font, 60), load_font(sel_font, 20)
     
-    # 사진이 있을 때만 콜라주
+    canvas = Image.new("RGBA", (CW, CH), (0, 0, 0, 255))
+    
     if bg_files:
         num_pics = len(bg_files)
         if mode == "DAILY" or num_pics == 1:
-            img = ImageOps.exif_transpose(Image.open(bg_files[0]))
-            canvas = ImageOps.fit(img.convert("RGBA"), (CW, CH))
+            canvas = ImageOps.fit(ImageOps.exif_transpose(Image.open(bg_files[0])).convert("RGBA"), (CW, CH))
         else:
             cols, rows = (1, num_pics) if num_pics <= 3 else ((2, 2) if num_pics == 4 else (2, math.ceil(num_pics/2)))
-            w_unit, h_unit = CW // cols, CH // rows
+            w_u, h_u = CW // cols, CH // rows
             for i, f in enumerate(bg_files):
-                img = ImageOps.exif_transpose(Image.open(f))
-                if i == num_pics - 1 and num_pics % 2 == 1 and cols == 2:
-                    img = ImageOps.fit(img.convert("RGBA"), (CW, h_unit)); canvas.paste(img, (0, (i//cols)*h_unit))
-                else:
-                    img = ImageOps.fit(img.convert("RGBA"), (w_unit, h_unit)); canvas.paste(img, ((i%cols)*w_unit, (i//cols)*h_unit))
+                img = ImageOps.fit(ImageOps.exif_transpose(Image.open(f)).convert("RGBA"), (CW if (i==num_pics-1 and num_pics%2==1 and cols==2) else w_u, h_u))
+                canvas.paste(img, (0 if (i==num_pics-1 and num_pics%2==1 and cols==2) else (i%cols)*w_u, (i//cols)*h_u))
 
     overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
-    if show_box:
-        draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0,0,0,box_alpha))
-        items = [("distance", f"{v_dist} km"), ("time", v_time), ("pace", v_pace), ("avg bpm", f"{v_hr} bpm")]
-        vis_layer = None
-        if mode == "DAILY" and a and a.get('map', {}).get('summary_polyline'):
-            pts = polyline.decode(a['map']['summary_polyline']); lats, lons = zip(*pts)
-            vis_layer = Image.new("RGBA", (map_size, map_size), (0,0,0,0)); m_draw = ImageDraw.Draw(vis_layer)
-            def trans(la, lo):
-                tx = 10 + (lo - min(lons)) / (max(lons) - min(lons) + 0.00001) * (map_size - 20)
-                ty = (map_size - 10) - (la - min(lats)) / (max(lats) - min(lats) + 0.00001) * (map_size - 20)
-                return tx, ty
-            m_draw.line([trans(la, lo) for la, lo in pts], fill=hex_to_rgba(m_color, 255), width=4)
-        elif mode == "WEEKLY" and weekly_data:
-            chart_img = create_bar_chart(weekly_data['dists'], m_color)
-            w_p = (map_size / float(chart_img.size[0])); vis_layer = chart_img.resize((map_size, int(chart_img.size[1]*w_p)), Image.Resampling.LANCZOS)
-        
-        if vis_layer:
-            if box_orient == "Vertical": overlay.paste(vis_layer, (rx + rw - vis_layer.width - 20, ry + 20), vis_layer)
-            else: overlay.paste(vis_layer, (rx + 30, ry + 20), vis_layer)
+    
+    vis_layer = None
+    if mode == "DAILY" and a and a.get('map', {}).get('summary_polyline'):
+        pts = polyline.decode(a['map']['summary_polyline']); lats, lons = zip(*pts)
+        vis_layer = Image.new("RGBA", (g_size, g_size), (0,0,0,0)); m_draw = ImageDraw.Draw(vis_layer)
+        def tr(la, lo): return (lo-min(lons))/(max(lons)-min(lons)+1e-5)*(g_size-40)+20, (g_size-20)-(la-min(lats))/(max(lats)-min(lats)+1e-5)*(g_size-40)
+        m_draw.line([tr(la, lo) for la, lo in pts], fill=m_color, width=6)
+    elif mode == "WEEKLY" and weekly_data:
+        chart_img = create_bar_chart(weekly_data['dists'], m_color)
+        w_p = (g_size / float(chart_img.size[0])); vis_layer = chart_img.resize((g_size, int(chart_img.size[1]*w_p)), Image.Resampling.LANCZOS)
+    
+    if vis_layer:
+        overlay.paste(vis_layer, ((CW - vis_layer.width)//2, g_y), vis_layer)
 
-        if box_orient == "Vertical":
-            draw.text((rx+40, ry+30), v_act, font=f_t, fill=m_color)
-            draw.text((rx+40, ry+30+t_sz+10), v_date, font=f_d, fill="#AAAAAA")
-            y_c = ry + t_sz + d_sz + 90
-            for lab, val in items:
-                draw.text((rx+40, y_c), lab, font=f_l, fill="#AAAAAA")
-                draw.text((rx+40, y_c+l_sz+5), val, font=f_n, fill=sub_color); y_c += (n_sz + l_sz + 35)
-        else:
-            draw.text((rx + (rw//2) - (draw.textlength(v_act, font=f_t)//2), ry + 25), v_act, font=f_t, fill=m_color)
-            draw.text((rx + (rw//2) - (draw.textlength(v_date, font=f_d)//2), ry + 25 + t_sz + 5), v_date, font=f_d, fill="#AAAAAA")
-            sec_w = (rw - 80) // 4
-            for i, (lab, val) in enumerate(items):
-                draw.text((rx + 40 + (i*sec_w), ry + t_sz + d_sz + 50), lab, font=f_l, fill="#AAAAAA")
-                draw.text((rx + 40 + (i*sec_w), ry + t_sz + d_sz + 50 + l_sz + 5), val, font=f_n, fill=sub_color)
+    draw.rectangle([bx, by, bx + bw, by + bh], fill=(0,0,0,box_alpha))
+    items = [("distance", f"{v_dist} km"), ("time", v_time), ("pace", v_pace), ("avg bpm", f"{v_hr} bpm")]
+    
+    if box_orient == "Vertical":
+        draw.text((bx+40, by+30), v_act, font=f_t, fill=m_color)
+        draw.text((bx+40, by+130), v_date, font=f_d, fill="#AAAAAA")
+        y_c = by + 180
+        for lab, val in items:
+            draw.text((bx+40, y_c), lab.lower(), font=f_l, fill="#AAAAAA")
+            draw.text((bx+40, y_c+25), val.lower() if "bpm" in val or "km" in val else val, font=f_n, fill=sub_color); y_c += 100
+    else:
+        draw.text((bx+(bw//2)-(draw.textlength(v_act, font=f_t)//2), by+25), v_act, font=f_t, fill=m_color)
+        draw.text((bx+(bw//2)-(draw.textlength(v_date, font=f_d)//2), by+115), v_date, font=f_d, fill="#AAAAAA")
+        sec_w = (bw - 80) // 4
+        for i, (lab, val) in enumerate(items):
+            draw.text((bx+40+(i*sec_w), by+160), lab.lower(), font=f_l, fill="#AAAAAA")
+            draw.text((bx+40+(i*sec_w), by+185), val.lower() if "bpm" in val or "km" in val else val, font=f_n, fill=sub_color)
 
-        if log_file:
-            ls = 100 if box_orient == "Vertical" else 80
-            l_img = ImageOps.fit(Image.open(log_file).convert("RGBA"), (ls, ls))
-            mask = Image.new('L', (ls, ls), 0); ImageDraw.Draw(mask).ellipse((0, 0, ls, ls), fill=255); l_img.putalpha(mask)
-            if box_orient == "Vertical": overlay.paste(l_img, (rx + rw - ls - 20, ry + rh - ls - 20), l_img)
-            else: overlay.paste(l_img, (rx + rw - ls - 30, ry + 25), l_img)
+    if log_file:
+        ls = 100; l_img = ImageOps.fit(Image.open(log_file).convert("RGBA"), (ls, ls))
+        mask = Image.new('L', (ls, ls), 0); ImageDraw.Draw(mask).ellipse((0, 0, ls, ls), fill=255); l_img.putalpha(mask)
+        overlay.paste(l_img, (bx + bw - ls - 20, by + bh - ls - 20 if box_orient=="Vertical" else by + 25), l_img)
 
     final = Image.alpha_composite(canvas, overlay).convert("RGB")
     with col2:
         st.image(final, use_container_width=True)
         buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
-        st.download_button("📸 DOWNLOAD", buf.getvalue(), "result.jpg", use_container_width=True)
+        st.download_button(f"📸 {mode} DOWNLOAD", buf.getvalue(), f"{mode.lower()}_result.jpg", use_container_width=True)
+        if st.session_state['access_token']: st.button("🔓 로그아웃", on_click=logout_and_clear)
 except Exception as e: st.error(f"Error: {e}")
