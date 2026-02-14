@@ -68,7 +68,6 @@ headers = {'Authorization': f"Bearer {st.session_state['access_token']}"}
 try:
     act_res = requests.get("https://www.strava.com/api/v3/athlete/activities?per_page=30", headers=headers, timeout=15)
     if act_res.status_code == 200: acts = act_res.json()
-    elif act_res.status_code == 401: logout_and_clear()
 except: pass
 
 # --- [5. UI 레이아웃] ---
@@ -94,22 +93,8 @@ with col1:
     bg_files = st.file_uploader("배경 사진", type=['jpg','jpeg','png'], accept_multiple_files=True)
     log_file = st.file_uploader("원형 로고", type=['jpg','jpeg','png'])
     if mode == "DAILY" and acts:
-        v_act = st.text_input("활동명", a['name'])
-        v_date = st.text_input("날짜", a['start_date_local'][:10])
-        v_dist = st.text_input("거리(km)", f"{d_km:.2f}")
-        v_pace = st.text_input("페이스(분/km)", p_val)
-        v_hr = st.text_input("심박(bpm)", h_val)
-    elif mode == "WEEKLY" and acts:
-        w_acts = acts[:7]
-        t_dist = sum([x.get('distance', 0) for x in w_acts]) / 1000
-        t_time = sum([x.get('moving_time', 0) for x in w_acts])
-        avg_p_val = f"{int((t_time/t_dist)//60)}'{int((t_time/t_dist)%60):02d}\"" if t_dist > 0 else "0'00\""
-        t_hrs = [x.get('average_heartrate', 0) for x in w_acts if x.get('average_heartrate')]
-        avg_hr = int(sum(t_hrs)/len(t_hrs)) if t_hrs else 0
-        v_act_w = st.text_input("제목", "WEEKLY RECAP")
-        v_dist_w = st.text_input("총 거리(km)", f"{t_dist:.2f}")
-        v_pace_w = st.text_input("평균 페이스", avg_p_val)
-        v_hr_w = st.text_input("평균 심박", f"{avg_hr}")
+        v_act, v_date = st.text_input("활동명", a['name']), st.text_input("날짜", a['start_date_local'][:10])
+        v_dist, v_pace, v_hr = st.text_input("거리(km)", f"{d_km:.2f}"), st.text_input("페이스(분/km)", p_val), st.text_input("심박(bpm)", h_val)
 
 with col3:
     st.header("🎨 DESIGN")
@@ -119,24 +104,14 @@ with col3:
     m_color = COLOR_OPTIONS[st.selectbox("포인트 컬러", list(COLOR_OPTIONS.keys()))]
     sub_color = COLOR_OPTIONS[st.selectbox("서브 컬러", list(COLOR_OPTIONS.keys()), index=1)]
     
-    # 크기 고정 (활동명 90, 날짜 30, 숫자 60)
-    t_sz, d_sz, n_sz, l_sz = 70, 20, 40, 20
+    t_sz, d_sz, n_sz, l_sz = 90, 30, 60, 20
     
     if mode == "DAILY":
-        st.divider()
-        st.subheader("Box Layout")
-        # 모드별 디폴트 위치 설정
-        if box_orient == "Vertical":
-            d_rx, d_ry, d_rw, d_rh = 70, 1200, 400, 560
-        else:
-            d_rx, d_ry, d_rw, d_rh = 70, 1580, 940, 250
-            
-        rx = st.number_input("X 위치", 0, 1080, d_rx)
-        ry = st.number_input("Y 위치", 0, 1920, d_ry)
-        rw = st.number_input("박스 너비", 100, 1080, d_rw)
-        rh = st.number_input("박스 높이", 100, 1920, d_rh)
-        box_alpha = st.slider("박스 투명도", 0, 255, 110)
-        map_size = st.slider("지도 크기", 50, 400, 150)
+        if box_orient == "Vertical": d_rx, d_ry, d_rw, d_rh = 70, 1320, 480, 520
+        else: d_rx, d_ry, d_rw, d_rh = 70, 1580, 940, 280
+        rx, ry = st.number_input("X 위치", 0, 1080, d_rx), st.number_input("Y 위치", 0, 1920, d_ry)
+        rw, rh = st.number_input("박스 너비", 100, 1080, d_rw), st.number_input("박스 높이", 100, 1920, d_rh)
+        box_alpha, map_size = st.slider("박스 투명도", 0, 255, 110), st.slider("지도 크기", 50, 400, 120)
 
 # --- [6. 렌더링 엔진] ---
 if bg_files:
@@ -146,8 +121,23 @@ if bg_files:
             img = ImageOps.exif_transpose(Image.open(bg_files[0]))
             canvas = ImageOps.fit(img.convert("RGBA"), (1080, 1920))
             overlay = Image.new("RGBA", (1080, 1920), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
+            
             if show_box:
                 draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0,0,0,box_alpha))
+                
+                # 1. 활동 제목 쓰기 (위치 파악을 위해 텍스트 길이 측정)
+                title_w = draw.textlength(v_act, font=f_t)
+                draw.text((rx+40, ry+30), v_act, font=f_t, fill=m_color)
+                
+                # 2. 로고 배치 (제목 바로 옆)
+                if log_file:
+                    logo_size = 70 # 축소된 크기
+                    l_img = ImageOps.fit(Image.open(log_file).convert("RGBA"), (logo_size, logo_size))
+                    mask = Image.new('L', (logo_size, logo_size), 0); ImageDraw.Draw(mask).ellipse((0, 0, logo_size, logo_size), fill=255); l_img.putalpha(mask)
+                    # 제목 끝나는 지점 + 여백 20px
+                    overlay.paste(l_img, (int(rx + 40 + title_w + 20), int(ry + 45)), l_img)
+
+                # 3. 지도 배치 (박스 우측 상단 고정)
                 if acts and 'a' in locals():
                     p_line = a.get('map', {}).get('summary_polyline')
                     if p_line:
@@ -158,64 +148,29 @@ if bg_files:
                             ty = (map_size - 10) - (la - min(lats)) / (max(lats) - min(lats) + 0.00001) * (map_size - 20)
                             return tx, ty
                         m_draw.line([trans(la, lo) for la, lo in pts], fill=hex_to_rgba(m_color, 255), width=4)
-                        # 지도는 박스 우상단 고정
                         overlay.paste(m_layer, (rx + rw - map_size - 20, ry + 20), m_layer)
-                
-                # 기록 항목 (km, bpm 소문자 준수)
+
+                # 4. 데이터 배치
                 items = [("distance", f"{v_dist} km"), ("time", t_val), ("pace", v_pace), ("avg bpm", f"{v_hr} bpm")]
-                
                 if box_orient == "Vertical":
-                    draw.text((rx+40, ry+35), v_act, font=f_t, fill=m_color)
-                    draw.text((rx+40, ry+35+t_sz+10), v_date, font=f_d, fill=sub_color)
+                    draw.text((rx+40, ry+30+t_sz+10), v_date, font=f_d, fill=sub_color)
                     y_c = ry + t_sz + d_sz + 90
                     for lab, val in items:
                         draw.text((rx+40, y_c), lab, font=f_l, fill="#AAAAAA")
                         draw.text((rx+40, y_c+l_sz+5), val, font=f_n, fill=sub_color); y_c += (n_sz + l_sz + 35)
-                else: # Horizontal 모드: 제목 하단에 데이터 1열 배치
-                    draw.text((rx+40, ry+30), v_act, font=f_t, fill=m_color)
+                else: # Horizontal
                     draw.text((rx+40, ry+30+t_sz+5), v_date, font=f_d, fill="#AAAAAA")
-                    
-                    # 하단 데이터 열 배치 (4등분 균형)
-                    data_y = ry + t_sz + d_sz + 55
-                    sec_w = (rw - 80) // 4
+                    data_y, sec_w = ry + t_sz + d_sz + 55, (rw - 80) // 4
                     for i, (lab, val) in enumerate(items):
                         item_x = rx + 40 + (i * sec_w)
                         draw.text((item_x, data_y), lab, font=f_l, fill="#AAAAAA")
                         draw.text((item_x, data_y + l_sz + 5), val, font=f_n, fill=sub_color)
             
             final = Image.alpha_composite(canvas, overlay).convert("RGB")
-        
-        # --- [WEEKLY 및 공통 마무리] ---
-        else: # WEEKLY
-            canvas = Image.new("RGBA", (1080, 1080), (0,0,0,255)); n = len(bg_files)
-            cols = math.ceil(math.sqrt(n)); rows = math.ceil(n / cols)
-            bh = 880 if show_box else 1080
-            iw, ih = 1080 // cols, bh // rows
-            for i, f in enumerate(bg_files):
-                x, y = (i % cols) * iw, (i // cols) * ih
-                cw, ch = (iw if (i+1)%cols != 0 else 1080-x), (ih if (i+cols) < n else bh-y)
-                canvas.paste(ImageOps.fit(Image.open(f).convert("RGBA"), (cw, ch)), (x, y))
-            if show_box:
-                draw = ImageDraw.Draw(canvas)
-                draw.rectangle([0, 880, 1080, 1080], fill=(15,15,15,255))
-                draw.text((40, 900), v_act_w, font=load_font(sel_font, 45), fill=m_color)
-                w_items = [("dist", f"{v_dist_w} km"), ("pace", v_pace_w), ("bpm", f"{v_hr_w} bpm")]
-                for i, (lab, val) in enumerate(w_items):
-                    draw.text((40+i*340, 970), lab, font=f_l, fill="#AAAAAA")
-                    draw.text((40+i*340, 995), val, font=f_n, fill=sub_color)
-            final = canvas.convert("RGB")
-
-        if log_file:
-            l_img = ImageOps.fit(Image.open(log_file).convert("RGBA"), (130, 130))
-            mask = Image.new('L', (130, 130), 0); ImageDraw.Draw(mask).ellipse((0, 0, 130, 130), fill=255); l_img.putalpha(mask)
-            final.paste(l_img, (final.size[0] - 160, 30), l_img)
-
-        with col2:
-            st.image(final, use_container_width=True)
-            buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
-            st.download_button("📸 DOWNLOAD", buf.getvalue(), "result.jpg", use_container_width=True)
+            with col2:
+                st.image(final, use_container_width=True)
+                buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
+                st.download_button("📸 DOWNLOAD", buf.getvalue(), "result.jpg", use_container_width=True)
+                
     except Exception as e:
         st.error(f"Error: {e}")
-
-
-
