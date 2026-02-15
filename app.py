@@ -285,11 +285,12 @@ with col_main:
             overlay.paste(l_img, l_pos, l_img)
 
         final = Image.alpha_composite(canvas, overlay).convert("RGB")
-        st.image(final, width=500)
+        st.image(final, width=400)
         
         buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
         st.download_button(f"📸 {mode} DOWNLOAD", buf.getvalue(), f"{mode.lower()}.jpg", use_container_width=True, key="down_btn")
     except Exception as e:
         st.info("데이터와 사진을 선택하면 매거진 미리보기가 나타납니다.")
+
 
 
