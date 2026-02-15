@@ -54,6 +54,8 @@ def load_font(font_type, size):
             f.write(r.content)
             
     return ImageFont.truetype(f_path, int(size))
+            
+    return ImageFont.truetype(f_path, int(size))
 
 def get_weekly_stats(activities, target_date_str):
     try:
@@ -290,6 +292,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
