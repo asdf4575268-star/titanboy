@@ -190,7 +190,7 @@ with col_design:
 
     with st.expander("📍 위치/크기 조절"):
         rx, ry = st.number_input("박스 X", 0, 1080, 70), st.number_input("박스 Y", 0, 1920, 1250 if mode=="DAILY" else 850)
-        rw, rh = st.number_input("박스 너비", 100, 1080, 1080 if box_orient=="Horizontal" else 450), st.number_input("박스 높이", 100, 1920, 600 if box_orient=="Horizontal" else 300)
+        rw, rh = st.number_input("박스 너비", 100, 1080, 1080 if box_orient=="Horizontal" else 450), st.number_input("박스 높이", 100, 1920, 600)
         box_alpha = st.slider("박스 투명도", 0, 255, 110)
         vis_sz_adj = st.slider("지도/그래프 크기", 50, 1080, 180 if mode=="DAILY" else 950)
         vis_alpha = st.slider("지도/그래프 투명도", 0, 255, 180)
@@ -265,6 +265,7 @@ with col_main:
         st.download_button(f"📸 {mode} DOWNLOAD", buf.getvalue(), f"{mode.lower()}.jpg", use_container_width=True)
     except Exception as e:
         st.info("데이터와 사진을 선택하면 미리보기가 나타납니다.")
+
 
 
 
