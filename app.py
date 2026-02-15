@@ -247,7 +247,7 @@ with col_main:
             draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0,0,0,box_alpha))
             if box_orient == "Vertical":
                 draw_styled_text(draw, (rx+40, ry+30), v_act, f_t, m_color)
-                draw_styled_text(draw, (rx+40, ry+125), v_date, f_d, "#AAAAAA")
+                draw_styled_text(draw, (rx+40, ry+110), v_date, f_d, "#AAAAAA")
                 y_c = ry + 190
                 for lab, val in items:
                     draw_styled_text(draw, (rx+40, y_c), lab.lower(), f_l, "#AAAAAA")
@@ -311,6 +311,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
