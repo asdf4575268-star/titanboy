@@ -5,12 +5,17 @@ import numpy as np
 from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
 
-# --- [1. 설정 및 API] ---
-CLIENT_ID = '202275'
-CLIENT_SECRET = '969201cab488e4eaf1398b106de1d4e520dc564c'
-REDIRECT_URI = "https://titanboy-kgcnje3tg3hbfpfsp6uwzc.streamlit.app"
+# --- [1. 기본 설정 및 API] ---
+API_CONFIGS = {
+    "PRIMARY": {"ID": '202275', "SECRET": '969201cab488e4eaf1398b106de1d4e520dc564c'},
+    "SECONDARY": {"ID": '202274', "SECRET": '63f6a7007ebe6b405763fc3104e17bb53b468ad0'}
+}
+CURRENT_CFG = API_CONFIGS["PRIMARY"] 
+CLIENT_ID, CLIENT_SECRET = CURRENT_CFG["ID"], CURRENT_CFG["SECRET"]
+ACTUAL_URL = "https://titanboy-kgcnje3tg3hbfpfsp6uwzc.streamlit.app"
 
 st.set_page_config(page_title="TITAN BOY", layout="wide")
+mpl.use('Agg')
 
 # --- [2. 핵심 유틸리티 함수 (캐싱 적용으로 속도 최적화)] ---
 def logout():
@@ -226,7 +231,7 @@ with col_main:
         CW, CH = (1080, 1920) if mode == "DAILY" else (1080, 1350)
         
         # 폰트 로드 (가이드: 활동명 90, 날짜 30, 숫자 60)
-        ft, fd, fn, fl = [load_font(font_name, s) for s in [90, 30, 60, 23]]
+        ft, fd, fn, fl = [load_font(font_name, s) for s in [80, 30, 50, 23]]
         
         canvas = make_collage(bg_files, (CW, CH))
         over = Image.new("RGBA", (CW, CH), (0,0,0,0))
@@ -291,6 +296,7 @@ with col_main:
         st.image(final, width=350)
         buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
         st.download_button("📸 DOWNLOAD", buf.getvalue(), "titan.jpg", use_container_width=True)
+
 
 
 
