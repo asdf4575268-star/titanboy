@@ -152,7 +152,33 @@ with col_main:
     v_act, v_date, v_dist, v_time, v_pace, v_hr = "RUNNING", "2026-02-15", "0.00", "00:00:00", "0'00\"", "0"
     weekly_data, monthly_data, a = None, None, None
     if not st.session_state['access_token']:
-        st.link_button("🚀 Strava 연동", f"https://www.strava.com/oauth/authorize?client_id={CLIENT_ID}&response_type=code&redirect_uri={ACTUAL_URL}&scope=read,activity:read_all&approval_prompt=force", use_container_width=True)
+    auth_url = f"https://www.strava.com/oauth/authorize?client_id={CLIENT_ID}&response_type=code&redirect_uri={ACTUAL_URL}&scope=read,activity:read_all&approval_prompt=force"
+    
+    # HTML을 사용하여 현재 창(_self)에서 리다이렉트
+    st.markdown(
+        f"""
+        <a href="{auth_url}" target="_self" style="text-decoration: none;">
+            <div style="
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background-color: #FC4C02;
+                color: white;
+                padding: 10px;
+                border-radius: 8px;
+                font-weight: bold;
+                cursor: pointer;
+                border: none;
+                text-align: center;
+                width: 100%;
+                margin-bottom: 10px;
+            ">
+                🚀 현재 창에서 Strava 연동하기
+            </div>
+        </a>
+        """,
+        unsafe_allow_html=True
+    )
     else:
         st.button("🔓 로그아웃", on_click=logout_and_clear, use_container_width=True)
         bg_files = st.file_uploader("📸 배경 사진", type=['jpg','jpeg','png'], accept_multiple_files=True)
@@ -292,6 +318,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
