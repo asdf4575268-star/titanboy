@@ -190,7 +190,7 @@ with col_design:
     if box_orient == "Horizontal":
         def_rx, def_ry, def_rw, def_rh = 0, 1000, 1080, 350
     else:
-        def_rx, def_ry, def_rw, def_rh = 70, 1250, 450, 550
+        def_rx, def_ry, def_rw, def_rh = 70, 1250, 450, 600
 
     with st.expander("✍️ 텍스트 수정"):
         v_act = st.text_input("활동명", v_act, key="ti_act")
@@ -225,8 +225,8 @@ with col_main:
     try:
         CW, CH = (1080, 1920) if mode == "DAILY" else (1080, 1350)
         # 설정된 값들 (90, 30, 60) 적용
-        f_t, f_d, f_n, f_l = load_font(sel_font, 90), load_font(sel_font, 30), load_font(sel_font, 60), load_font(sel_font, 23)
-        f_path = f"font_{sel_font}_90.ttf"
+        f_t, f_d, f_n, f_l = load_font(sel_font, 70), load_font(sel_font, 20), load_font(sel_font, 45), load_font(sel_font, 23)
+        f_path = f"font_{sel_font}_70.ttf"
         
         canvas = make_smart_collage(bg_files, (CW, CH)) if bg_files else Image.new("RGBA", (CW, CH), (20, 20, 20, 255))
         overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
@@ -289,3 +289,4 @@ with col_main:
         st.download_button(f"📸 {mode} DOWNLOAD", buf.getvalue(), f"{mode.lower()}.jpg", use_container_width=True, key="down_btn")
     except Exception as e:
         st.info("데이터와 사진을 선택하면 매거진 미리보기가 나타납니다.")
+
