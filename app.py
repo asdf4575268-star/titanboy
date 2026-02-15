@@ -147,7 +147,7 @@ with col_main:
     st.title("TITAN BOY")
     
     # --- [여기에 초기화 배치] ---
-    v_act, v_date, v_dist, v_time, v_pace, v_hr = "RUNNING", "2026-02-15", "0.00", "00:00:00", "0'00\"", "0"
+    v_act, v_date, v_dist, v_time, v_pace, v_hr = "RUNNING", "2026-02-15", "0.00", "00:00", "0'00\"", "0"
     weekly_data, monthly_data, a = None, None, None
     if not st.session_state['access_token']:
         st.link_button("🚀 Strava 연동", f"https://www.strava.com/oauth/authorize?client_id={CLIENT_ID}&response_type=code&redirect_uri={ACTUAL_URL}&scope=read,activity:read_all&approval_prompt=force", use_container_width=True)
@@ -291,6 +291,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
