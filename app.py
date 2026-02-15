@@ -246,9 +246,6 @@ try:
         st.image(final, use_container_width=True)
         buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
         st.download_button(f"📸 {mode} DOWNLOAD", buf.getvalue(), f"{mode.lower()}.jpg", use_container_width=True)
-
-except Exception as e:
-    with col_main: st.info("활동을 선택하거나 사진을 업로드해 주세요.")
         # --- [5. 디자인 설정 부분] ---
 # 캔버스 사이즈 규격 변경
 if mode == "DAILY":
@@ -289,6 +286,11 @@ if show_vis:
         chart_x = (CW - vis_layer.width) // 2
         chart_y = CH - vis_layer.height - 80 
         overlay.paste(vis_layer, (chart_x, chart_y), vis_layer)
+
+except Exception as e:
+    with col_main: st.info("활동을 선택하거나 사진을 업로드해 주세요.")
+
+
 
 
 
