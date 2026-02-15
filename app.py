@@ -212,7 +212,7 @@ with col_design:
         sub_color = COLOR_OPTS[st.selectbox("서브 컬러", list(COLOR_OPTS.keys()), index=1, key="s_col_sel")]
 
     with st.expander("📍 위치/크기 조절"):
-        rx, ry = st.number_input("박스 X", 0, 1080, 40 if box_orient=="Horizontal" else 70), st.number_input("박스 Y", 0, 1920, 450 if box_orient=="Horizontal" else 1250)
+        rx, ry = st.number_input("박스 X", 0, 1080, 40 if box_orient=="Horizontal" else 70), st.number_input("박스 Y", 0, 1920, 350 if box_orient=="Horizontal" else 1250)
         rw, rh = st.number_input("박스 너비", 100, 1000, 1000 if box_orient=="Horizontal" else 450), st.number_input("박스 높이", 100, 1920, 300 if box_orient=="Horizontal" else 600)
         box_alpha = st.slider("박스 투명도", 0, 255, 110)
         vis_sz_adj = st.slider("지도/그래프 크기", 50, 1080, 180 if mode=="DAILY" else 950)
@@ -238,8 +238,8 @@ with col_main:
             draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0,0,0,box_alpha))
             if box_orient == "Vertical":
                 draw_styled_text(draw, (rx+40, ry+30), v_act, f_t, m_color, shadow=use_shadow)
-                draw_styled_text(draw, (rx+40, ry+140), v_date, f_d, "#AAAAAA", shadow=use_shadow)
-                y_c = ry + 210
+                draw_styled_text(draw, (rx+40, ry+100), v_date, f_d, "#AAAAAA", shadow=use_shadow)
+                y_c = ry + 150
                 for lab, val in items:
                     draw_styled_text(draw, (rx+40, y_c), lab.lower(), f_l, "#AAAAAA", shadow=use_shadow)
                     draw_styled_text(draw, (rx+40, y_c+35), val.lower(), f_n, sub_color, shadow=use_shadow)
@@ -297,6 +297,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
