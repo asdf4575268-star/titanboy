@@ -220,7 +220,7 @@ with col_main:
                 draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0,0,0,box_alpha))
                 draw.text((rx+40, ry+30), v_act, font=f_t, fill=m_color)
                 draw.text((rx+40, ry+145), v_date, font=f_d, fill="#AAAAAA")
-                y_c = ry + 150
+                y_c = ry + 220
                 for lab, val in items:
                     draw.text((rx+40, y_c), lab.lower(), font=f_l, fill="#AAAAAA")
                     v_s = val.lower() if any(x in val for x in ["km","bpm"]) else val
@@ -271,5 +271,6 @@ with col_main:
         st.download_button(f"📸 {mode} DOWNLOAD", buf.getvalue(), f"{mode.lower()}.jpg", use_container_width=True)
     except Exception as e:
         st.info("데이터를 선택하고 이미지를 업로드하면 미리보기가 나타납니다.")
+
 
 
