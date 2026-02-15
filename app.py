@@ -249,14 +249,6 @@ with col_main:
             # [규칙 2] km, bpm 소문자 고정
             items = [("distance", f"{v_dist} km"), ("time", v_time), ("pace", v_pace), ("avg bpm", f"{v_hr} bpm")]
             
-            # 1. 데이터 박스 렌더링 (show_box가 True일 때만)
-            if show_box:
-                draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0,0,0,box_alpha))
-                if box_orient == "Vertical":
-                    # ... (세로형 텍스트 그리기 코드) ...
-                else:
-                    # ... (가로형 텍스트 그리기 코드) ...
-
             # 2. 지도 및 그래프 (show_vis가 True일 때만)
             if show_vis:
                 if mode == "DAILY" and a and a.get('map', {}).get('summary_polyline'):
@@ -334,6 +326,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
