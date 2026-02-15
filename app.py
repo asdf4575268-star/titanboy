@@ -227,25 +227,27 @@ acts = st.session_state['cached_acts']
 with col_main:
     st.title("TITAN BOY")
     
-    # 기본값 설정
+    # 1. 변수 초기화 (에러 방지: bg_files를 미리 빈 리스트로 선언)
+    bg_files = [] 
+    log_file = None
     v_act, v_date, v_dist, v_time, v_pace, v_hr = "RUNNING", "2026.02.16", "0.00", "00:00:00", "0'00\"", "0"
-    
-    # 연동 여부에 따른 버튼 표시
+    weekly_data, monthly_data, a = None, None, None
+
     if not st.session_state['access_token']:
-        # 연동 버튼
         auth_url = (f"https://www.strava.com/oauth/authorize?client_id={CLIENT_ID}"
                     f"&response_type=code&redirect_uri={ACTUAL_URL}"
                     f"&scope=read,activity:read_all&approval_prompt=force")
         st.link_button("🚀 Strava 연동하기", auth_url, use_container_width=True)
-        st.info("💡 모바일은 카카오톡 브라우저 대신 '사파리'나 '크롬'을 추천합니다.")
     else:
-        # 로그아웃 버튼 (no-op 에러 방지를 위해 if 문 내에서 처리)
-        if st.button("🔓 로그아웃 및 세션 초기화", use_container_width=True):
+        if st.button("🔓 로그아웃", use_container_width=True):
             st.session_state.clear()
             st.query_params.clear()
             st.rerun()
+            
+        # 2. 파일 업로더 (여기서 변수가 정의됩니다)
+        bg_files = st.file_uploader("📸 배경 사진", type=['jpg','jpeg','png'], accept_multiple_files=True)
+        log_file = st.file_uploader("🔘 로고", type=['jpg','jpeg','png'])
         
-        # [수정] 라디오 버튼은 여기서 딱 한 번만 선언합니다.
         mode = st.radio("모드 선택", ["DAILY", "WEEKLY", "MONTHLY"], horizontal=True, key="main_mode_sel")
         
         if acts:
@@ -253,14 +255,11 @@ with col_main:
                 act_opts = [f"{ac['start_date_local'][:10]} - {ac['name']}" for ac in acts]
                 sel_act = st.selectbox("🏃 활동 선택", act_opts)
                 a = acts[act_opts.index(sel_act)]
-                
                 if a:
-                    # DAILY: 스트라바 원래 이름 유지
-                    v_act = a['name'] 
-                    v_date = a['start_date_local'][:10]
+                    v_act = a['name'].upper()
+                    v_date = a['start_date_local'][:10].replace('-', '.')
                     d_km = a.get('distance', 0)/1000; m_s = a.get('moving_time', 0)
-                    v_dist = f"{d_km:.2f}"
-                    v_time = f"{m_s//3600:02d}:{(m_s%3600)//60:02d}:{m_s%60:02d}"
+                    v_dist, v_time = f"{d_km:.2f}", f"{m_s//3600:02d}:{(m_s%3600)//60:02d}:{m_s%60:02d}"
                     v_pace = f"{int((m_s/d_km)//60)}'{int((m_s/d_km)%60):02d}\"" if d_km > 0 else "0'00\""
                     v_hr = str(int(a.get('average_heartrate', 0))) if a.get('average_heartrate') else "0"
                 
@@ -391,5 +390,6 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
