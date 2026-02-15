@@ -104,7 +104,7 @@ def load_font(font_type, size):
 def create_bar_chart(data, color_hex, mode="WEEKLY", labels=None, font_path=None):
     if mode == "WEEKLY": labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
     prop = font_manager.FontProperties(fname=font_path) if font_path else None
-    fig, ax = plt.subplots(figsize=(10, 4.0), dpi=150) # 그래프 높이 소폭 조정
+    fig, ax = plt.subplots(figsize=(10, 4.0), dpi=150)
     fig.patch.set_alpha(0); ax.patch.set_alpha(0)
     bars = ax.bar(labels, data, color=color_hex, width=0.6)
     for s in ['top', 'right', 'left']: ax.spines[s].set_visible(False)
@@ -132,8 +132,12 @@ if st.session_state['access_token']:
     r = requests.get("https://www.strava.com/api/v3/athlete/activities?per_page=50", headers=headers)
     if r.status_code == 200: acts = r.json()
 
-# --- [4. 레이아웃] ---
+# --- [4. 레이아웃 & 초기화] ---
 col_main, col_design = st.columns([1.6, 1], gap="medium")
+
+# 세션 상태 초기화 (데이터 꼬임 방지)
+if "txt" not in st.session_state:
+    st.session_state.txt = {"act": "RUNNING", "date": "2026-02-15", "dist": "0.00", "time": "00:00:00", "pace": "0'00\"", "hr": "0"}
 
 with col_main:
     st.title("TITAN BOY")
@@ -147,7 +151,7 @@ with col_main:
             log_file = col_img2.file_uploader("🔘 원형 로고", type=['jpg','jpeg','png'])
 
     mode = st.radio("모드 선택", ["DAILY", "WEEKLY", "MONTHLY"], horizontal=True, key="mode_radio")
-    v_act, v_date, v_dist, v_time, v_pace, v_hr = "RUNNING", "2026-02-15", "0.00", "00:00:00", "0'00\"", "0"
+    
     weekly_data, monthly_data, a = None, None, None
     if acts:
         with st.container(border=True):
@@ -156,19 +160,19 @@ with col_main:
                 sel_act = st.selectbox("🏃 활동 선택", act_opts)
                 a = acts[act_opts.index(sel_act)]
                 d_km = a.get('distance', 0)/1000; m_s = a.get('moving_time', 0)
-                v_act, v_date, v_dist, v_time = a['name'], a['start_date_local'][:10], f"{d_km:.2f}", f"{m_s//3600:02d}:{(m_s%3600)//60:02d}:{m_s%60:02d}"
-                v_pace = f"{int((m_s/d_km)//60)}'{int((m_s/d_km)%60):02d}\"" if d_km > 0 else "0'00\""
-                v_hr = str(int(a.get('average_heartrate', 0))) if a.get('average_heartrate') else "0"
+                st.session_state.txt.update({"act": a['name'], "date": a['start_date_local'][:10], "dist": f"{d_km:.2f}", "time": f"{m_s//3600:02d}:{(m_s%3600)//60:02d}:{m_s%60:02d}"})
+                st.session_state.txt["pace"] = f"{int((m_s/d_km)//60)}'{int((m_s/d_km)%60):02d}\"" if d_km > 0 else "0'00\""
+                st.session_state.txt["hr"] = str(int(a.get('average_heartrate', 0))) if a.get('average_heartrate') else "0"
             elif mode == "WEEKLY":
                 weeks = sorted(list(set([(datetime.strptime(ac['start_date_local'][:10], "%Y-%m-%d") - timedelta(days=datetime.strptime(ac['start_date_local'][:10], "%Y-%m-%d").weekday())).strftime('%Y.%m.%d') for ac in acts])), reverse=True)
                 sel_week = st.selectbox("📅 주차 선택", weeks)
                 weekly_data = get_weekly_stats(acts, sel_week.replace('.','-'))
-                if weekly_data: v_act, v_date, v_dist, v_time, v_pace, v_hr = "WEEKLY RUN", weekly_data['range'], weekly_data['total_dist'], weekly_data['total_time'], weekly_data['avg_pace'], weekly_data['avg_hr']
+                if weekly_data: st.session_state.txt.update({"act": "WEEKLY RUN", "date": weekly_data['range'], "dist": weekly_data['total_dist'], "time": weekly_data['total_time'], "pace": weekly_data['avg_pace'], "hr": weekly_data['avg_hr']})
             elif mode == "MONTHLY":
                 months = sorted(list(set([ac['start_date_local'][:7] for ac in acts])), reverse=True)
                 sel_month = st.selectbox("🗓️ 월 선택", months)
                 monthly_data = get_monthly_stats(acts, f"{sel_month}-01")
-                if monthly_data: v_act, v_date, v_dist, v_time, v_pace, v_hr = "MONTHLY RUN", monthly_data['range'], monthly_data['total_dist'], monthly_data['total_time'], monthly_data['avg_pace'], monthly_data['avg_hr']
+                if monthly_data: st.session_state.txt.update({"act": "MONTHLY RUN", "date": monthly_data['range'], "dist": monthly_data['total_dist'], "time": monthly_data['total_time'], "pace": monthly_data['avg_pace'], "hr": monthly_data['avg_hr']})
 
 # --- [5. 디자인 설정] ---
 with col_design:
@@ -179,39 +183,37 @@ with col_design:
 
     box_orient = st.radio("박스 방향", ["Vertical", "Horizontal"], horizontal=True, key="orient_radio")
 
-    # 모드나 방향이 바뀌면 리셋
+    # 리셋 조건: 방향이 바뀌거나 모드가 바뀔 때
     if st.session_state.prev_orient != box_orient or st.session_state.prev_mode != mode:
         st.session_state.prev_orient = box_orient
         st.session_state.prev_mode = mode
         st.rerun()
 
-    # 모드/방향별 좌표 자동 계산 로직
+    # 모드별 기본 좌표
     if mode == "DAILY":
-        if box_orient == "Horizontal": def_rx, def_ry, def_rw, def_rh = 0, 1400, 1080, 350
-        else: def_rx, def_ry, def_rw, def_rh = 70, 1250, 450, 550
-    else: # WEEKLY, MONTHLY (1350 높이)
-        if box_orient == "Horizontal": def_rx, def_ry, def_rw, def_rh = 0, 100, 1080, 350 # 상단 배치 추천
-        else: def_rx, def_ry, def_rw, def_rh = 70, 70, 450, 550
+        def_rx, def_ry, def_rw, def_rh = (0, 1400, 1080, 350) if box_orient == "Horizontal" else (70, 1250, 450, 550)
+    else:
+        def_rx, def_ry, def_rw, def_rh = (0, 80, 1080, 350) if box_orient == "Horizontal" else (70, 80, 450, 550)
 
     with st.expander("✍️ 텍스트 수정"):
-        v_act = st.text_input("활동명", v_act, key="ti_act")
-        v_date = st.text_input("날짜", v_date, key="ti_date")
-        v_dist = st.text_input("거리 km", v_dist, key="ti_dist")
-        v_time = st.text_input("시간", v_time, key="ti_time")
-        v_pace = st.text_input("페이스", v_pace, key="ti_pace")
-        v_hr = st.text_input("심박 bpm", v_hr, key="ti_hr")
+        # 세션 상태값을 value로 사용해 꼬임 방지
+        v_act = st.text_input("활동명", st.session_state.txt["act"], key="ti_act")
+        v_date = st.text_input("날짜", st.session_state.txt["date"], key="ti_date")
+        v_dist = st.text_input("거리 km", st.session_state.txt["dist"], key="ti_dist")
+        v_time = st.text_input("시간", st.session_state.txt["time"], key="ti_time")
+        v_pace = st.text_input("페이스", st.session_state.txt["pace"], key="ti_pace")
+        v_hr = st.text_input("심박 bpm", st.session_state.txt["hr"], key="ti_hr")
 
     sel_font = st.selectbox("폰트", ["BlackHanSans", "Jua", "DoHyeon", "NanumBrush", "Sunflower"], key="font_sel")
     
     with st.expander("💄 매거진 스타일", expanded=True):
         use_shadow = st.toggle("글자 그림자 효과", value=True, key="shadow_tg")
         border_thick = st.slider("프레임 테두리 두께", 0, 50, 0, key="border_sl")
-        COLOR_OPTS = {"Yellow": "#FFD700", "White": "#FFFFFF", "Orange": "#FF4500", "Blue": "#00BFFF", "Grey": "#AAAAAA", "Black": "#000000"}
+        COLOR_OPTS = {"Yellow": "#FFD700", "White": "#FFFFFF", "Black": "#000000", "Orange": "#FF4500", "Blue": "#00BFFF", "Grey": "#AAAAAA"}
         m_color = COLOR_OPTS[st.selectbox("포인트 컬러", list(COLOR_OPTS.keys()), key="m_col_sel")]
         sub_color = COLOR_OPTS[st.selectbox("서브 컬러", list(COLOR_OPTS.keys()), index=1, key="s_col_sel")]
 
     with st.expander("📍 위치/크기 조절", expanded=True):
-        # key에 모드와 방향을 합쳐서 리셋 유도
         k_suf = f"{mode}_{box_orient}"
         rx = st.number_input("박스 X", 0, 1080, def_rx, key=f"rx_{k_suf}")
         ry = st.number_input("박스 Y", 0, 1920, def_ry, key=f"ry_{k_suf}")
@@ -226,7 +228,7 @@ with col_main:
     st.subheader("🖼️ PREVIEW")
     try:
         CW, CH = (1080, 1920) if mode == "DAILY" else (1080, 1350)
-        f_t, f_d, f_n, f_l = load_font(sel_font, 70), load_font(sel_font, 20), load_font(sel_font, 45), load_font(sel_font, 23)
+        f_t, f_d, f_n, f_l = load_font(sel_font, 90), load_font(sel_font, 30), load_font(sel_font, 60), load_font(sel_font, 23)
         f_path = f"font_{sel_font}_90.ttf"
         
         canvas = make_smart_collage(bg_files, (CW, CH)) if bg_files else Image.new("RGBA", (CW, CH), (20, 20, 20, 255))
@@ -238,6 +240,7 @@ with col_main:
         title_w = draw.textlength(v_act, font=f_t)
 
         if st.checkbox("데이터 박스 보기", value=True, key="show_box_cb"):
+            # km, bpm은 항상 소문자로 처리 (KM -> km)
             items = [("distance", f"{v_dist} km"), ("time", v_time), ("pace", v_pace), ("avg bpm", f"{v_hr} bpm")]
             if box_orient == "Vertical":
                 draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0,0,0,box_alpha))
@@ -246,8 +249,7 @@ with col_main:
                 y_c = ry + 200
                 for lab, val in items:
                     draw_styled_text(draw, (rx+40, y_c), lab.lower(), f_l, "#AAAAAA", use_shadow)
-                    v_s = val.lower() if any(x in val for x in ["km","bpm"]) else val
-                    draw_styled_text(draw, (rx+40, y_c+30), v_s, f_n, sub_color, use_shadow)
+                    draw_styled_text(draw, (rx+40, y_c+30), val.lower(), f_n, sub_color, use_shadow)
                     y_c += 95
             else:
                 draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0,0,0,box_alpha))
@@ -256,9 +258,9 @@ with col_main:
                 draw_styled_text(draw, (rx + (rw - draw.textlength(v_date, font=f_d))//2, ry + 140), v_date, f_d, "#AAAAAA", use_shadow)
                 sec_w = rw // 4
                 for i, (lab, val) in enumerate(items):
-                    cx = rx + (i * sec_w) + (sec_w // 2); v_s = val.lower() if any(x in val for x in ["km","bpm"]) else val
+                    cx = rx + (i * sec_w) + (sec_w // 2)
                     draw_styled_text(draw, (cx - draw.textlength(lab.lower(), font=f_l)//2, ry + 195), lab.lower(), f_l, "#AAAAAA", use_shadow)
-                    draw_styled_text(draw, (cx - draw.textlength(v_s, font=f_n)//2, ry + 235), v_s, f_n, sub_color, use_shadow)
+                    draw_styled_text(draw, (cx - draw.textlength(val.lower(), font=f_n)//2, ry + 235), val.lower(), f_n, sub_color, use_shadow)
 
         if st.checkbox("지도/그래프 보기", value=True, key="show_vis_cb"):
             if mode == "DAILY" and a and a.get('map', {}).get('summary_polyline'):
@@ -275,8 +277,7 @@ with col_main:
                 vis_sz = vis_sz_adj
                 v_l = chart_img.resize((vis_sz, int(chart_img.size[1]*(vis_sz/chart_img.size[0]))), Image.Resampling.LANCZOS)
                 v_l.putalpha(v_l.getchannel('A').point(lambda x: x * (vis_alpha / 255)))
-                # 통계 그래프 위치 최적화: 캔버스 하단 중앙
-                overlay.paste(v_l, ((CW - v_l.width)//2, CH - v_l.height - 50), v_l)
+                overlay.paste(v_l, ((CW - v_l.width)//2, CH - v_l.height - 80), v_l)
 
         if log_file:
             ls = 100; l_img = ImageOps.fit(Image.open(log_file).convert("RGBA"), (ls, ls))
@@ -285,12 +286,9 @@ with col_main:
             overlay.paste(l_img, l_pos, l_img)
 
         final = Image.alpha_composite(canvas, overlay).convert("RGB")
-        st.image(final, width=400)
+        st.image(final, use_container_width=True)
         
         buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
         st.download_button(f"📸 {mode} DOWNLOAD", buf.getvalue(), f"{mode.lower()}.jpg", use_container_width=True, key="down_btn")
     except Exception as e:
         st.info("데이터와 사진을 선택하면 매거진 미리보기가 나타납니다.")
-
-
-
