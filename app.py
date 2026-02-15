@@ -152,11 +152,6 @@ with col_main:
         
         if acts:
             if mode == "DAILY":
-                act_opts = [f"{ac['start_date_local'][:10]} - {ac['name']}" for ac in acts]
-                sel_act = st.selectbox("🏃 활동 선택", act_opts)
-                a = acts[act_opts.index(sel_act)]
-                
-                # 주차 및 월 계산 (DAILY)
                 dt_obj = datetime.strptime(a['start_date_local'][:10], "%Y-%m-%d")
                 month_name = dt_obj.strftime("%B").upper()
                 first_day = dt_obj.replace(day=1)
@@ -164,31 +159,27 @@ with col_main:
                 week_num = (adj_dom - 1) // 7 + 1
                 suffix = "TH" if 11 <= week_num <= 13 else {1: "ST", 2: "ND", 3: "RD"}.get(week_num % 10, "TH")
                 
+                # DAILY는 기존처럼 상세하게 유지하거나 아래 중 선택 가능
                 v_act = f"{week_num}{suffix} WEEK, {month_name}"
-                v_date = a['start_date_local'][:10]
-                d_km = a.get('distance', 0)/1000; m_s = a.get('moving_time', 0)
-                v_dist = f"{d_km:.2f}"
-                v_time = f"{m_s//3600:02d}:{(m_s%3600)//60:02d}:{m_s%60:02d}"
-                v_pace = f"{int((m_s/d_km)//60)}'{int((m_s/d_km)%60):02d}\"" if d_km > 0 else "0'00\""
-                v_hr = str(int(a.get('average_heartrate', 0))) if a.get('average_heartrate') else "0"
                 
             elif mode == "WEEKLY":
-                weeks = sorted(list(set([(datetime.strptime(ac['start_date_local'][:10], "%Y-%m-%d") - timedelta(days=datetime.strptime(ac['start_date_local'][:10], "%Y-%m-%d").weekday())).strftime('%Y.%m.%d') for ac in acts])), reverse=True)
-                sel_week = st.selectbox("📅 주차 선택", weeks)
-                weekly_data = get_weekly_stats(acts, sel_week.replace('.','-'))
                 if weekly_data:
                     dt_temp = datetime.strptime(sel_week.replace('.','-'), "%Y-%m-%d")
-                    v_act = f"{dt_temp.strftime('%B').upper()} WEEKLY"
-                    v_date, v_dist, v_time, v_pace, v_hr = weekly_data['range'], weekly_data['total_dist'], weekly_data['total_time'], weekly_data['avg_pace'], weekly_data['avg_hr']
+                    first_day = dt_temp.replace(day=1)
+                    adj_dom = dt_temp.day + first_day.weekday()
+                    week_num = (adj_dom - 1) // 7 + 1
+                    suffix = "TH" if 11 <= week_num <= 13 else {1: "ST", 2: "ND", 3: "RD"}.get(week_num % 10, "TH")
                     
+                    # 요청하신 대로 "6TH WEEK" 형식만 출력
+                    v_act = f"{week_num}{suffix} WEEK"
+                    v_date = weekly_data['range']
+
             elif mode == "MONTHLY":
-                months = sorted(list(set([ac['start_date_local'][:7] for ac in acts])), reverse=True)
-                sel_month = st.selectbox("🗓️ 월 선택", months)
-                monthly_data = get_monthly_stats(acts, f"{sel_month}-01")
                 if monthly_data:
                     dt_temp = datetime.strptime(f"{sel_month}-01", "%Y-%m-%d")
-                    v_act = f"{dt_temp.strftime('%B').upper()} MONTHLY"
-                    v_date, v_dist, v_time, v_pace, v_hr = monthly_data['range'], monthly_data['total_dist'], monthly_data['total_time'], monthly_data['avg_pace'], monthly_data['avg_hr']
+                    # 요청하신 대로 "FEBRUARY" 형식만 출력
+                    v_act = dt_temp.strftime("%B").upper()
+                    v_date = monthly_data['range']
 
 # --- [6. 디자인 창 구성] ---
 with col_design:
@@ -294,3 +285,4 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
