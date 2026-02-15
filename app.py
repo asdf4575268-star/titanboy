@@ -191,7 +191,7 @@ with col_design:
         v_pace = st.text_input("페이스", v_pace); v_hr = st.text_input("심박 bpm", v_hr)
 
     box_orient = st.radio("박스 방향", ["Vertical", "Horizontal"], horizontal=True)
-    sel_font = st.selectbox("폰트", ["BlackHanSans", "Jua", "DoHyeon", "NanumBrush", "Sunflower"])
+    sel_font = st.selectbox("폰트", ["BlackHanSans", "Jua", "DoHyeon", "NanumBrush", "Sunflower", "Orbit", "GothicA1"])
     
     with st.expander("💄 매거진 스타일", expanded=True):
         use_shadow = st.toggle("글자 그림자 효과", value=True)
@@ -292,3 +292,4 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
