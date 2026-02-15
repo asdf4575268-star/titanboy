@@ -212,7 +212,8 @@ with col_main:
                 overlay.paste(vis_layer, ((CW - vis_layer.width)//2, CH - vis_layer.height - 80), vis_layer)
 
             final = Image.alpha_composite(canvas, overlay).convert("RGB")
-            st.image(final, width=300)
+            st.image(final, width=500)
         except Exception as e:
             st.error(f"렌더링 오류: {e}")
+
 
