@@ -272,11 +272,20 @@ with col_main:
                 def tr(la, lo): return 15+(lo-min(lons))/(max(lons)-min(lons)+1e-5)*(vis_sz-30), (vis_sz-15)-(la-min(lats))/(max(lats)-min(lats)+1e-5)*(vis_sz-30)
                 m_draw.line([tr(la, lo) for la, lo in pts], fill=hex_to_rgba(m_color, vis_alpha), width=6)
                 
-                # 지도 위치: Vertical일 땐 우측 상단 여백, Horizontal일 땐 상단 배치
                 if box_orient == "Vertical":
-                    m_pos = (rx, ry - vis_sz - 10)
+                    # 박스 왼쪽 라인(rx)에 맞추고, 박스 위쪽(ry)에서 지도 크기만큼 위로
+                    target_x = int(rx)
+                    target_y = int(ry - vis_sz - 20) # 여백을 20으로 살짝 늘렸어요
                 else:
-                    m_pos = (rx + 40, ry + (rh - vis_sz) // 2)
+                    # 가로형: 박스 내부 좌측 상단 여백
+                    target_x = int(rx + 40)
+                    target_y = int(ry + (rh - vis_sz) // 2)
+
+                # 2. 지도가 캔버스 밖으로 나가지 않도록 최소값 보정 (0보다 작으면 5로 고정)
+                target_y = max(5, target_y)
+                
+                # 3. 붙이기
+                overlay.paste(vis_layer, (target_x, target_y), vis_layer)
                 
             elif mode in ["WEEKLY", "MONTHLY"] and (weekly_data or monthly_data):
                 d_obj = weekly_data if mode == "WEEKLY" else monthly_data
@@ -311,6 +320,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
