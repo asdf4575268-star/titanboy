@@ -223,7 +223,25 @@ with col_design:
         vis_sz_adj = st.slider("지도/그래프 크기", 50, 1000, 450 if mode=="WEEKLY" "MONTHLY" else 1080)
         vis_alpha = st.slider("지도/그래프 투명도", 0, 255, 245)
 
-# --- [6. 미리보기 렌더링] ---
+# --- [렌더링 로직 수정 예시] ---
+
+# 1. 그림자 효과 함수
+def draw_text_with_shadow(draw, pos, text, font, fill, shadow_color=(0,0,0,150), offset=(3,3)):
+    # 그림자 먼저 그리기
+    draw.text((pos[0]+offset[0], pos[1]+offset[1]), text, font=font, fill=shadow_color)
+    # 메인 글자 그리기
+    draw.text(pos, text, font=font, fill=fill)
+
+# 2. 테두리 그리기 로직 (Canvas 하단에 추가)
+def draw_border(draw, width, height, color, thickness):
+    if thickness > 0:
+        draw.rectangle([0, 0, width, height], outline=color, width=thickness)
+
+# --- [디자인 탭 UI 추가] ---
+with col_design:
+    with st.expander("🖼️ 매거진 디테일 설정"):
+        use_shadow = st.checkbox("텍스트 그림자 사용", value=True)
+        border_thick = st.slider("테두리 두께", 0, 50, 0) # 0이면 안 보임
 with col_main:
     st.subheader("🖼️ PREVIEW")
     try:
@@ -294,6 +312,7 @@ with col_main:
         st.download_button(f"📸 {mode} DOWNLOAD", buf.getvalue(), f"{mode.lower()}.jpg", use_container_width=True)
     except Exception as e:
         st.info("데이터를 선택하고 이미지를 업로드하면 미리보기가 나타납니다.")
+
 
 
 
