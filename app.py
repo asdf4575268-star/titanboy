@@ -241,9 +241,6 @@ def draw_border(draw, width, height, color, thickness):
 with col_design:
     with col_main:
         st.subheader("🖼️ PREVIEW")
-    with st.expander("🖼️ 매거진 디테일 설정"):
-        use_shadow = st.checkbox("텍스트 그림자 사용", value=True)
-        border_thick = st.slider("테두리 두께", 0, 50, 0) # 0이면 안 보임
     try:
         CW, CH = (1080, 1920) if mode == "DAILY" else (1080, 1350)
         f_t, f_d, f_n, f_l = load_font(sel_font, 70), load_font(sel_font, 20), load_font(sel_font, 40), load_font(sel_font, 23)
@@ -312,6 +309,7 @@ with col_design:
         st.download_button(f"📸 {mode} DOWNLOAD", buf.getvalue(), f"{mode.lower()}.jpg", use_container_width=True)
     except Exception as e:
         st.info("데이터를 선택하고 이미지를 업로드하면 미리보기가 나타납니다.")
+
 
 
 
