@@ -229,7 +229,7 @@ try:
         else:
             draw.rectangle([0, ry, 1080, ry + rh], fill=(0,0,0,box_alpha))
             t_x = (1080 - title_w)//2
-            draw_styled_text(draw, (t_x, ry + 35), v_act, f_t, m_color, use_shadow)
+            draw_styled_text(draw, (t_x, ry + 30), v_act, f_t, m_color, use_shadow)
             draw_styled_text(draw, ((1080 - draw.textlength(v_date, font=f_d))//2, ry + 140), v_date, f_d, "#AAAAAA", use_shadow)
             sec_w = 1080 // 4
             for i, (lab, val) in enumerate(items):
@@ -266,4 +266,5 @@ try:
     st.download_button(f"📸 {mode} DOWNLOAD", buf.getvalue(), f"{mode.lower()}.jpg", use_container_width=True)
 except Exception as e:
     st.info("데이터를 선택하고 이미지를 업로드하면 미리보기가 나타납니다.")
+
 
