@@ -247,10 +247,10 @@ with col_main:
 
             # 3. 로고 로직 (복구 완료)
             if log_file:
-                ls = 120 # 로고 크기
+                ls = 80 # 로고 크기
                 l_img = ImageOps.fit(Image.open(log_file).convert("RGBA"), (ls, ls))
                 mask = Image.new('L', (ls, ls), 0); ImageDraw.Draw(mask).ellipse((0, 0, ls, ls), fill=255); l_img.putalpha(mask)
-                l_pos = (rx + rw - ls - 30, ry + 30) if box_orient == "Horizontal" else (rx + rw - ls - 25, ry + rh - ls - 25)
+                l_pos = (rx + rw - ls - 30, ry + 0) if box_orient == "Horizontal" else (rx + rw - ls - 25, ry + rh - ls - 25)
                 overlay.paste(l_img, (int(l_pos[0]), int(l_pos[1])), l_img)
 
             final = Image.alpha_composite(canvas, overlay).convert("RGB")
@@ -261,6 +261,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
