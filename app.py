@@ -9,9 +9,11 @@ from matplotlib import font_manager
 
 # --- [1. 기본 설정 및 API] ---
 API_CONFIGS = {
-    "PRIMARY": {"ID": '202275', "SECRET": '969201cab488e4eaf1398b106de1d4e520dc564c'}
+    "PRIMARY": {"ID": '202275', "SECRET": '969201cab488e4eaf1398b106de1d4e520dc564c'},
+    "SECONDARY": {"ID": '202274', "SECRET": '63f6a7007ebe6b405763fc3104e17bb53b468ad0'}
 }
-CLIENT_ID, CLIENT_SECRET = API_CONFIGS["PRIMARY"]["ID"], API_CONFIGS["PRIMARY"]["SECRET"]
+CURRENT_CFG = API_CONFIGS["PRIMARY"] 
+CLIENT_ID, CLIENT_SECRET = CURRENT_CFG["ID"], CURRENT_CFG["SECRET"]
 ACTUAL_URL = "https://titanboy-kgcnje3tg3hbfpfsp6uwzc.streamlit.app"
 
 st.set_page_config(page_title="TITAN BOY", layout="wide")
@@ -215,5 +217,6 @@ with col_main:
             st.image(final, width=500)
         except Exception as e:
             st.error(f"렌더링 오류: {e}")
+
 
 
