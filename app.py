@@ -4,7 +4,6 @@ import io, os, requests, polyline, math
 from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-from matplotlib import font_manager
 
 # --- [1. Strava API 및 기본 설정] ---
 API_CONFIGS = {
@@ -19,8 +18,6 @@ st.set_page_config(page_title="TITAN BOY", layout="wide")
 mpl.use('Agg')
 
 # --- [2. 유틸리티 함수] ---
-
-# 로그아웃 함수 (NameError 방지를 위해 상단 배치)
 def logout_and_clear():
     st.cache_data.clear(); st.cache_resource.clear(); st.session_state.clear(); st.query_params.clear(); st.rerun()
 
@@ -96,30 +93,17 @@ def get_monthly_stats(activities, target_date_str):
         return {"dists": monthly_dist, "total_dist": f"{total_dist:.2f}", "total_time": fmt_time, "avg_pace": avg_pace, "avg_hr": str(avg_hr), "range": first_day.strftime('%Y.%m'), "labels": [str(i+1) for i in range(num_days)]}
     except: return None
 
-# [폰트 적용 차트 생성 함수]
-def create_bar_chart(data, color_hex, mode="WEEKLY", labels=None, font_path=None):
+def create_bar_chart(data, color_hex, mode="WEEKLY", labels=None):
     if mode == "WEEKLY": labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-    prop = font_manager.FontProperties(fname=font_path) if font_path else None
-    
     fig, ax = plt.subplots(figsize=(10, 3.5), dpi=150)
     fig.patch.set_alpha(0); ax.patch.set_alpha(0)
     bars = ax.bar(labels, data, color=color_hex, width=0.6)
     for s in ['top', 'right', 'left']: ax.spines[s].set_visible(False)
-    
-    ax.tick_params(axis='x', colors='white')
-    if prop:
-        for label in ax.get_xticklabels():
-            label.set_fontproperties(prop)
-            label.set_fontsize(10 if mode=="MONTHLY" else 14)
-    ax.tick_params(axis='y', left=False, labelleft=False)
-    
+    ax.tick_params(axis='x', colors='white', labelsize=10 if mode=="MONTHLY" else 14); ax.tick_params(axis='y', left=False, labelleft=False)
     if mode == "WEEKLY":
         for bar in bars:
             h = bar.get_height()
-            if h > 0: 
-                ax.text(bar.get_x() + bar.get_width()/2., h + 0.1, f'{h:.1f}', 
-                        ha='center', va='bottom', color='white', 
-                        fontproperties=prop, fontsize=12, fontweight='bold')
+            if h > 0: ax.text(bar.get_x() + bar.get_width()/2., h + 0.1, f'{h:.1f}', ha='center', va='bottom', color='white', fontsize=12, fontweight='bold')
     plt.tight_layout(); buf = io.BytesIO(); plt.savefig(buf, format='png', transparent=True); buf.seek(0); plt.close(fig)
     return Image.open(buf)
 
@@ -204,17 +188,13 @@ with col_design:
     rx = st.number_input("X 위치", 0, 1080, 70)
     ry = st.number_input("Y 위치", 0, 1920, 1250 if mode=="DAILY" else 850)
     rw, rh = st.number_input("박스 너비", 100, 1080, 1080 if box_orient=="Horizontal" else 450), st.number_input("박스 높이", 100, 1920, 260 if box_orient=="Horizontal" else 630)
-    box_alpha = st.slider("박스 투명도", 0, 255, 110)
-    vis_sz = st.slider("지도/그래프 크기", 50, 1080, 250 if mode=="DAILY" else 1000)
-    vis_alpha = st.slider("지도/그래프 투명도", 0, 255, 180)
+    box_alpha = st.slider("박스 투명도", 0, 255, 80)
+    vis_sz = st.slider("지도/그래프 크기", 50, 1080, 250 if mode=="DAILY" else 1080)
+    vis_alpha = st.slider("지도/그래프 투명도", 0, 255, 255)
 
 # --- [6. 렌더링 엔진] ---
 try:
-    # 폰트 로드 (메인 텍스트용)
-    f_t, f_d, f_n, f_l = load_font(sel_font, 70), load_font(sel_font, 20), load_font(sel_font, 45), load_font(sel_font, 23)
-    # 차트용 폰트 경로 확보
-    f_path = f"font_{sel_font}_{90}.ttf"
-    
+    f_t, f_d, f_n, f_l = load_font(sel_font, 70), load_font(sel_font, 20), load_font(sel_font, 40), load_font(sel_font, 23)
     canvas = make_smart_collage(bg_files, (CW, CH)) if bg_files else Image.new("RGBA", (CW, CH), (20, 20, 20, 255))
     overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
     
@@ -223,22 +203,22 @@ try:
         if box_orient == "Vertical":
             draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0,0,0,box_alpha))
             draw.text((rx+40, ry+30), v_act, font=f_t, fill=m_color)
-            draw.text((rx+40, ry+145), v_date, font=f_d, fill="#AAAAAA")
-            y_c = ry + 240
+            draw.text((rx+40, ry+130), v_date, font=f_d, fill="#AAAAAA")
+            y_c = ry + 210
             for lab, val in items:
                 draw.text((rx+40, y_c), lab.lower(), font=f_l, fill="#AAAAAA")
                 v_s = val.lower() if any(x in val for x in ["km","bpm"]) else val
-                draw.text((rx+40, y_c+30), v_s, font=f_n, fill=sub_color); y_c += 130
+                draw.text((rx+40, y_c+25), v_s, font=f_n, fill=sub_color); y_c += 115
         else:
             draw.rectangle([0, ry, 1080, ry + rh], fill=(0,0,0,box_alpha))
             t_w = draw.textlength(v_act, font=f_t); draw.text(((1080 - t_w)//2, ry + 35), v_act, font=f_t, fill=m_color)
-            d_w = draw.textlength(v_date, font=f_d); draw.text(((1080 - d_w)//2, ry + 140), v_date, font=f_d, fill="#AAAAAA")
+            d_w = draw.textlength(v_date, font=f_d); draw.text(((1080 - d_w)//2, ry + 125), v_date, font=f_d, fill="#AAAAAA")
             sec_w = 1080 // 4
             for i, (lab, val) in enumerate(items):
                 cx = (i * sec_w) + (sec_w // 2); v_s = val.lower() if any(x in val for x in ["km","bpm"]) else val
                 lw, vw = draw.textlength(lab.lower(), font=f_l), draw.textlength(v_s, font=f_n)
-                draw.text((cx - lw//2, ry + 195), lab.lower(), font=f_l, fill="#AAAAAA")
-                draw.text((cx - vw//2, ry + 235), v_s, font=f_n, fill=sub_color)
+                draw.text((cx - lw//2, ry + 175), lab.lower(), font=f_l, fill="#AAAAAA")
+                draw.text((cx - vw//2, ry + 205), v_s, font=f_n, fill=sub_color)
 
     if show_vis:
         if mode == "DAILY" and a and a.get('map', {}).get('summary_polyline'):
@@ -252,7 +232,7 @@ try:
         elif mode in ["WEEKLY", "MONTHLY"]:
             data_obj = weekly_data if mode == "WEEKLY" else monthly_data
             if data_obj:
-                chart_img = create_bar_chart(data_obj['dists'], m_color, mode=mode, labels=data_obj.get('labels'), font_path=f_path)
+                chart_img = create_bar_chart(data_obj['dists'], m_color, mode=mode, labels=data_obj.get('labels'))
                 w_p = (vis_sz / float(chart_img.size[0])); vis_layer = chart_img.resize((vis_sz, int(chart_img.size[1]*w_p)), Image.Resampling.LANCZOS)
                 alpha_mask = vis_layer.getchannel('A').point(lambda x: x * (vis_alpha / 255)); vis_layer.putalpha(alpha_mask)
                 overlay.paste(vis_layer, ((CW - vis_layer.width)//2, CH - vis_layer.height - 80), vis_layer)
@@ -271,4 +251,3 @@ try:
 
 except Exception as e:
     with col_main: st.info(f"데이터를 선택해 주세요.")
-
