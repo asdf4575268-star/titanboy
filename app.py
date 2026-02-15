@@ -273,16 +273,9 @@ with col_main:
                 m_draw.line([tr(la, lo) for la, lo in pts], fill=hex_to_rgba(m_color, vis_alpha), width=6)
                 
                 if box_orient == "Vertical":
-                    target_x = int(rx)
-                    target_y = int(ry - vis_sz - 10)
+                    m_pos = (rx, ry - vis_sz - 10)
                 else:
-                    title_center_x = rx + (rw // 2)
-                    left_space_center = (rx + title_center_x) // 2
-                    target_x = int(left_space_center - (vis_sz // 2))
-                    target_y = int(ry + (rh - vis_sz) // 2)
-                m_pos = (target_x, target_y)
-             
-                overlay.paste(vis_layer, (int(m_pos[0]), int(m_pos[1])), vis_layer)
+                    m_pos = (rx + 40, ry + (rh - vis_sz) // 2)
                 
             elif mode in ["WEEKLY", "MONTHLY"] and (weekly_data or monthly_data):
                 d_obj = weekly_data if mode == "WEEKLY" else monthly_data
@@ -317,6 +310,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
