@@ -32,14 +32,36 @@ def make_smart_collage(files, target_size):
     n = len(imgs)
     if n == 0: return Image.new("RGBA", (tw, th), (30, 30, 30, 255))
     if n == 1: return ImageOps.fit(imgs[0], (tw, th))
+
     canvas = Image.new("RGBA", (tw, th), (0, 0, 0, 255))
-    cols, rows = (2,1) if n==2 else (2,2) if n<=4 else (3,2) if n<=6 else (3,3) if n<=9 else (5,2)
+    
+    # 사진 수에 따른 최적 그리드 설정 (cols, rows)
+    if n == 2: grid = (2, 1)
+    elif n <= 4: grid = (2, 2)
+    elif n <= 6: grid = (3, 2)
+    elif n <= 9: grid = (3, 3)
+    else: grid = (5, 2)
+
+    cols, rows = grid
     w_step, h_step = tw / cols, th / rows
+
     for i, img in enumerate(imgs):
         r, c = divmod(i, cols)
-        x1, y1 = int(c * w_step), int(r * h_step)
-        x2, y2 = (int((c+1)*w_step) if (c+1)<cols else tw), (int((r+1)*h_step) if (r+1)<rows else th)
-        canvas.paste(ImageOps.fit(img, (x2-x1, y2-y1)), (x1, y1))
+        
+        # 마지막 줄에 사진이 모자랄 경우를 대비해 너비를 자동으로 채우는 로직
+        remaining_in_row = n - (r * cols)
+        current_cols = cols if (r + 1) * cols <= n else remaining_in_row
+        current_w_step = tw / current_cols
+        
+        x1 = int(c * current_w_step)
+        y1 = int(r * h_step)
+        x2 = int((c + 1) * current_w_step) if (c + 1) < current_cols else tw
+        y2 = int((r + 1) * h_step) if (r + 1) < rows else th
+
+        # 여백 없이 꽉 채우기 위해 fit 사용
+        cropped_img = ImageOps.fit(img, (x2 - x1, y2 - y1))
+        canvas.paste(cropped_img, (x1, y1))
+        
     return canvas
 
 def get_weekly_stats(activities, target_date_str):
@@ -272,6 +294,7 @@ with col_main:
         st.download_button(f"📸 {mode} DOWNLOAD", buf.getvalue(), f"{mode.lower()}.jpg", use_container_width=True)
     except Exception as e:
         st.info("데이터를 선택하고 이미지를 업로드하면 미리보기가 나타납니다.")
+
 
 
 
