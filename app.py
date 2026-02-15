@@ -132,12 +132,12 @@ if st.session_state['access_token']:
     r = requests.get("https://www.strava.com/api/v3/athlete/activities?per_page=50", headers=headers)
     if r.status_code == 200: acts = r.json()
 
-# --- [4. 레이아웃 & 초기화] ---
+# --- [4. 레이아웃 & 상태 관리] ---
 col_main, col_design = st.columns([1.6, 1], gap="medium")
 
-# 세션 상태 초기화 (데이터 꼬임 방지)
-if "txt" not in st.session_state:
-    st.session_state.txt = {"act": "RUNNING", "date": "2026-02-15", "dist": "0.00", "time": "00:00:00", "pace": "0'00\"", "hr": "0"}
+# 중요: 사용자가 명시적으로 활동을 바꿨을 때만 텍스트를 초기화하는 함수
+def update_texts():
+    st.session_state.user_edited = False
 
 with col_main:
     st.title("TITAN BOY")
@@ -150,43 +150,58 @@ with col_main:
             bg_files = col_img1.file_uploader("📸 배경 사진", type=['jpg','jpeg','png'], accept_multiple_files=True)
             log_file = col_img2.file_uploader("🔘 원형 로고", type=['jpg','jpeg','png'])
 
-    mode = st.radio("모드 선택", ["DAILY", "WEEKLY", "MONTHLY"], horizontal=True, key="mode_radio")
+    mode = st.radio("모드 선택", ["DAILY", "WEEKLY", "MONTHLY"], horizontal=True, key="mode_radio", on_change=update_texts)
     
-    weekly_data, monthly_data, a = None, None, None
+    a = None
+    # 데이터 강제 덮어쓰기 방지 플래그
+    if "user_edited" not in st.session_state: st.session_state.user_edited = False
+
     if acts:
         with st.container(border=True):
             if mode == "DAILY":
                 act_opts = [f"{ac['start_date_local'][:10]} - {ac['name']}" for ac in acts]
-                sel_act = st.selectbox("🏃 활동 선택", act_opts)
+                sel_act = st.selectbox("🏃 활동 선택", act_opts, on_change=update_texts)
                 a = acts[act_opts.index(sel_act)]
-                d_km = a.get('distance', 0)/1000; m_s = a.get('moving_time', 0)
-                st.session_state.txt.update({"act": a['name'], "date": a['start_date_local'][:10], "dist": f"{d_km:.2f}", "time": f"{m_s//3600:02d}:{(m_s%3600)//60:02d}:{m_s%60:02d}"})
-                st.session_state.txt["pace"] = f"{int((m_s/d_km)//60)}'{int((m_s/d_km)%60):02d}\"" if d_km > 0 else "0'00\""
-                st.session_state.txt["hr"] = str(int(a.get('average_heartrate', 0))) if a.get('average_heartrate') else "0"
+                if not st.session_state.user_edited:
+                    d_km = a.get('distance', 0)/1000; m_s = a.get('moving_time', 0)
+                    st.session_state.ti_act = a['name']
+                    st.session_state.ti_date = a['start_date_local'][:10]
+                    st.session_state.ti_dist = f"{d_km:.2f}"
+                    st.session_state.ti_time = f"{m_s//3600:02d}:{(m_s%3600)//60:02d}:{m_s%60:02d}"
+                    st.session_state.ti_pace = f"{int((m_s/d_km)//60)}'{int((m_s/d_km)%60):02d}\"" if d_km > 0 else "0'00\""
+                    st.session_state.ti_hr = str(int(a.get('average_heartrate', 0))) if a.get('average_heartrate') else "0"
             elif mode == "WEEKLY":
                 weeks = sorted(list(set([(datetime.strptime(ac['start_date_local'][:10], "%Y-%m-%d") - timedelta(days=datetime.strptime(ac['start_date_local'][:10], "%Y-%m-%d").weekday())).strftime('%Y.%m.%d') for ac in acts])), reverse=True)
-                sel_week = st.selectbox("📅 주차 선택", weeks)
+                sel_week = st.selectbox("📅 주차 선택", weeks, on_change=update_texts)
                 weekly_data = get_weekly_stats(acts, sel_week.replace('.','-'))
-                if weekly_data: st.session_state.txt.update({"act": "WEEKLY RUN", "date": weekly_data['range'], "dist": weekly_data['total_dist'], "time": weekly_data['total_time'], "pace": weekly_data['avg_pace'], "hr": weekly_data['avg_hr']})
+                if weekly_data and not st.session_state.user_edited:
+                    st.session_state.ti_act = "WEEKLY RUN"
+                    st.session_state.ti_date = weekly_data['range']
+                    st.session_state.ti_dist = weekly_data['total_dist']
+                    st.session_state.ti_time = weekly_data['total_time']
+                    st.session_state.ti_pace = weekly_data['avg_pace']
+                    st.session_state.ti_hr = weekly_data['avg_hr']
             elif mode == "MONTHLY":
                 months = sorted(list(set([ac['start_date_local'][:7] for ac in acts])), reverse=True)
-                sel_month = st.selectbox("🗓️ 월 선택", months)
+                sel_month = st.selectbox("🗓️ 월 선택", months, on_change=update_texts)
                 monthly_data = get_monthly_stats(acts, f"{sel_month}-01")
-                if monthly_data: st.session_state.txt.update({"act": "MONTHLY RUN", "date": monthly_data['range'], "dist": monthly_data['total_dist'], "time": monthly_data['total_time'], "pace": monthly_data['avg_pace'], "hr": monthly_data['avg_hr']})
+                if monthly_data and not st.session_state.user_edited:
+                    st.session_state.ti_act = "MONTHLY RUN"
+                    st.session_state.ti_date = monthly_data['range']
+                    st.session_state.ti_dist = monthly_data['total_dist']
+                    st.session_state.ti_time = monthly_data['total_time']
+                    st.session_state.ti_pace = monthly_data['avg_pace']
+                    st.session_state.ti_hr = monthly_data['avg_hr']
 
 # --- [5. 디자인 설정] ---
 with col_design:
     st.header("🎨 DESIGN")
     
     if "prev_orient" not in st.session_state: st.session_state.prev_orient = "Vertical"
-    if "prev_mode" not in st.session_state: st.session_state.prev_mode = "DAILY"
-
     box_orient = st.radio("박스 방향", ["Vertical", "Horizontal"], horizontal=True, key="orient_radio")
 
-    # 리셋 조건: 방향이 바뀌거나 모드가 바뀔 때
-    if st.session_state.prev_orient != box_orient or st.session_state.prev_mode != mode:
+    if st.session_state.prev_orient != box_orient:
         st.session_state.prev_orient = box_orient
-        st.session_state.prev_mode = mode
         st.rerun()
 
     # 모드별 기본 좌표
@@ -196,13 +211,15 @@ with col_design:
         def_rx, def_ry, def_rw, def_rh = (0, 80, 1080, 350) if box_orient == "Horizontal" else (70, 80, 450, 550)
 
     with st.expander("✍️ 텍스트 수정"):
-        # 세션 상태값을 value로 사용해 꼬임 방지
-        v_act = st.text_input("활동명", st.session_state.txt["act"], key="ti_act")
-        v_date = st.text_input("날짜", st.session_state.txt["date"], key="ti_date")
-        v_dist = st.text_input("거리 km", st.session_state.txt["dist"], key="ti_dist")
-        v_time = st.text_input("시간", st.session_state.txt["time"], key="ti_time")
-        v_pace = st.text_input("페이스", st.session_state.txt["pace"], key="ti_pace")
-        v_hr = st.text_input("심박 bpm", st.session_state.txt["hr"], key="ti_hr")
+        # 사용자가 여기서 타이핑을 시작하면 user_edited를 True로 바꿔 덮어쓰기 방지
+        def on_edit(): st.session_state.user_edited = True
+        
+        v_act = st.text_input("활동명", key="ti_act", on_change=on_edit)
+        v_date = st.text_input("날짜", key="ti_date", on_change=on_edit)
+        v_dist = st.text_input("거리 km", key="ti_dist", on_change=on_edit)
+        v_time = st.text_input("시간", key="ti_time", on_change=on_edit)
+        v_pace = st.text_input("페이스", key="ti_pace", on_change=on_edit)
+        v_hr = st.text_input("심박 bpm", key="ti_hr", on_change=on_edit)
 
     sel_font = st.selectbox("폰트", ["BlackHanSans", "Jua", "DoHyeon", "NanumBrush", "Sunflower"], key="font_sel")
     
@@ -237,10 +254,7 @@ with col_main:
         if border_thick > 0:
             draw.rectangle([0, 0, CW, CH], outline=m_color, width=border_thick)
 
-        title_w = draw.textlength(v_act, font=f_t)
-
         if st.checkbox("데이터 박스 보기", value=True, key="show_box_cb"):
-            # km, bpm은 항상 소문자로 처리 (KM -> km)
             items = [("distance", f"{v_dist} km"), ("time", v_time), ("pace", v_pace), ("avg bpm", f"{v_hr} bpm")]
             if box_orient == "Vertical":
                 draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0,0,0,box_alpha))
@@ -253,8 +267,7 @@ with col_main:
                     y_c += 95
             else:
                 draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0,0,0,box_alpha))
-                t_x = rx + (rw - title_w)//2
-                draw_styled_text(draw, (t_x, ry + 35), v_act, f_t, m_color, use_shadow)
+                draw_styled_text(draw, (rx + (rw - draw.textlength(v_act, font=f_t))//2, ry + 35), v_act, f_t, m_color, use_shadow)
                 draw_styled_text(draw, (rx + (rw - draw.textlength(v_date, font=f_d))//2, ry + 140), v_date, f_d, "#AAAAAA", use_shadow)
                 sec_w = rw // 4
                 for i, (lab, val) in enumerate(items):
@@ -269,15 +282,14 @@ with col_main:
                 vis_layer = Image.new("RGBA", (vis_sz, vis_sz), (0,0,0,0)); m_draw = ImageDraw.Draw(vis_layer)
                 def tr(la, lo): return 15+(lo-min(lons))/(max(lons)-min(lons)+1e-5)*(vis_sz-30), (vis_sz-15)-(la-min(lats))/(max(lats)-min(lats)+1e-5)*(vis_sz-30)
                 m_draw.line([tr(la, lo) for la, lo in pts], fill=hex_to_rgba(m_color, vis_alpha), width=5)
-                m_x = rx + 40 + title_w + 30 if box_orient == "Vertical" else rx + (rw - title_w)//2 - vis_sz - 30
-                overlay.paste(vis_layer, (int(m_x), int(ry + 35)), vis_layer)
-            elif mode in ["WEEKLY", "MONTHLY"] and (weekly_data or monthly_data):
+                overlay.paste(vis_layer, (int(rx + (rw - vis_sz)//2), int(ry - vis_sz - 20)), vis_layer)
+            elif mode in ["WEEKLY", "MONTHLY"]:
                 d_obj = weekly_data if mode == "WEEKLY" else monthly_data
-                chart_img = create_bar_chart(d_obj['dists'], m_color, mode=mode, labels=d_obj.get('labels'), font_path=f_path)
-                vis_sz = vis_sz_adj
-                v_l = chart_img.resize((vis_sz, int(chart_img.size[1]*(vis_sz/chart_img.size[0]))), Image.Resampling.LANCZOS)
-                v_l.putalpha(v_l.getchannel('A').point(lambda x: x * (vis_alpha / 255)))
-                overlay.paste(v_l, ((CW - v_l.width)//2, CH - v_l.height - 80), v_l)
+                if d_obj:
+                    chart_img = create_bar_chart(d_obj['dists'], m_color, mode=mode, labels=d_obj.get('labels'), font_path=f_path)
+                    v_l = chart_img.resize((vis_sz_adj, int(chart_img.size[1]*(vis_sz_adj/chart_img.size[0]))), Image.Resampling.LANCZOS)
+                    v_l.putalpha(v_l.getchannel('A').point(lambda x: x * (vis_alpha / 255)))
+                    overlay.paste(v_l, ((CW - v_l.width)//2, CH - v_l.height - 80), v_l)
 
         if log_file:
             ls = 100; l_img = ImageOps.fit(Image.open(log_file).convert("RGBA"), (ls, ls))
