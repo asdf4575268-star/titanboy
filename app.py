@@ -34,28 +34,34 @@ def draw_styled_text(draw, pos, text, font, fill, shadow=True):
     draw.text(pos, text, font=font, fill=fill)
 @st.cache_resource
 @st.cache_resource
+@st.cache_resource
 def load_font(font_type, size):
     fonts = {
         "BlackHanSans": "https://github.com/google/fonts/raw/main/ofl/blackhansans/BlackHanSans-Regular.ttf",
-        "Sunflower": "https://github.com/google/fonts/raw/main/ofl/sunflower/Sunflower-Regular.ttf",
+        "Sunflower": "https://github.com/google/fonts/raw/main/ofl/sunflower/Sunflower-Light.ttf", # Sunflower 경로 확인
         "KirangHaerang": "https://github.com/google/fonts/raw/main/ofl/kiranghaerang/KirangHaerang-Regular.ttf",
         "JollyLodger": "https://github.com/google/fonts/raw/main/ofl/jollylodger/JollyLodger-Regular.ttf",
         "Lacquer": "https://github.com/google/fonts/raw/main/ofl/lacquer/Lacquer-Regular.ttf",
         "IndieFlower": "https://github.com/google/fonts/raw/main/ofl/indieflower/IndieFlower-Regular.ttf",
-        "Orbit": "https://github.com/google/fonts/raw/main/ofl/orbit/Orbit-Regular.ttf"  # Orbit 추가
+        "Orbit": "https://github.com/google/fonts/raw/main/ofl/orbit/Orbit-Regular.ttf"
     }
     
     f_path = f"font_{font_type}_{int(size)}.ttf"
+    
+    # 파일이 없는 경우에만 다운로드 실행
     if not os.path.exists(f_path):
-        font_url = fonts.get(font_type, fonts["BlackHanSans"]) # 없는 폰트면 기본폰트로 대체
-        r = requests.get(font_url)
-        with open(f_path, "wb") as f:
-            f.write(r.content)
+        font_url = fonts.get(font_type, fonts["BlackHanSans"])
+        try:
+            r = requests.get(font_url, timeout=10)
+            r.raise_for_status() # 연결 오류 확인
+            with open(f_path, "wb") as f:
+                f.write(r.content)
+        except Exception as e:
+            st.error(f"폰트 다운로드 실패 ({font_type}): {e}")
+            # 실패 시 기본 폰트 시스템 경로라도 반환하도록 방어
+            return ImageFont.load_default()
             
     return ImageFont.truetype(f_path, int(size))
-            
-    return ImageFont.truetype(f_path, int(size))
-
 def get_weekly_stats(activities, target_date_str):
     try:
         target_date = datetime.strptime(target_date_str, "%Y-%m-%d")
@@ -332,6 +338,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
