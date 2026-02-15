@@ -261,10 +261,11 @@ try:
         overlay.paste(l_img, l_pos, l_img)
 
     final = Image.alpha_composite(canvas, overlay).convert("RGB")
-    st.image(final, use_container_width=True)
+    st.image(final, width=500)
     buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
     st.download_button(f"📸 {mode} DOWNLOAD", buf.getvalue(), f"{mode.lower()}.jpg", use_container_width=True)
 except Exception as e:
     st.info("데이터를 선택하고 이미지를 업로드하면 미리보기가 나타납니다.")
+
 
 
