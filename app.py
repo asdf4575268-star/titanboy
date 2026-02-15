@@ -188,7 +188,7 @@ with col_design:
 
     # 4. 방향에 따른 최적화된 기본값 설정
     if box_orient == "Horizontal":
-        def_rx, def_ry, def_rw, def_rh = 0, 1000, 1080, 350
+        def_rx, def_ry, def_rw, def_rh = 0, 1000, 1000, 350
     else:
         def_rx, def_ry, def_rw, def_rh = 70, 1250, 450, 600
 
@@ -289,4 +289,5 @@ with col_main:
         st.download_button(f"📸 {mode} DOWNLOAD", buf.getvalue(), f"{mode.lower()}.jpg", use_container_width=True, key="down_btn")
     except Exception as e:
         st.info("데이터와 사진을 선택하면 매거진 미리보기가 나타납니다.")
+
 
