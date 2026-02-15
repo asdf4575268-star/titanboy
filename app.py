@@ -210,10 +210,12 @@ with col_design:
         font_name = st.selectbox("폰트", ["BlackHanSans", "Sunflower", "KirangHaerang", "JollyLodger", "Lacquer", "Orbit", "IndieFlower"])
 
     with st.expander("📍 위치 및 크기"):
-        rx, ry = st.number_input("박스 X 위치", 0, 1080, 40 if orient=="Horizontal" else 70)
+        # 변수를 각각 할당하여 TypeError 해결
+        rx = st.number_input("박스 X 위치", 0, 1080, 40 if orient=="Horizontal" else 70)
         ry = st.number_input("박스 Y 위치", 0, 1920, 350 if orient=="Horizontal" else 1250)
-        rw, rh = st.number_input("박스 너비", 100, 1080, 1000 if orient=="Horizontal" else 450)
+        rw = st.number_input("박스 너비", 100, 1080, 1000 if orient=="Horizontal" else 450)
         rh = st.number_input("박스 높이", 100, 1920, 350 if orient=="Horizontal" else 600)
+        
         b_alpha = st.slider("박스 투명도", 0, 255, 110)
         v_sz = st.slider("시각화 크기", 50, 1080, 200)
         v_alpha = st.slider("시각화 투명도", 0, 255, 240)
@@ -289,5 +291,6 @@ with col_main:
         st.image(final, width=350)
         buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
         st.download_button("📸 DOWNLOAD", buf.getvalue(), "titan.jpg", use_container_width=True)
+
 
 
