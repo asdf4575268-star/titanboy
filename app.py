@@ -246,50 +246,9 @@ try:
         st.image(final, use_container_width=True)
         buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
         st.download_button(f"📸 {mode} DOWNLOAD", buf.getvalue(), f"{mode.lower()}.jpg", use_container_width=True)
-        # --- [5. 디자인 설정 부분] ---
-# 캔버스 사이즈 규격 변경
-if mode == "DAILY":
-    CW, CH = 1080, 1920
-else:
-    CW, CH = 1080, 1350  # WEEKLY, MONTHLY 고정 사이즈
-
-# Y 위치 기본값 최적화 (1350 높이에 맞춰 조정)
-ry_default = 1250 if mode == "DAILY" else 850 
-rx = st.number_input("X 위치", 0, 1080, 70)
-ry = st.number_input("Y 위치", 0, 1920, ry_default)
-
-# --- [6. 렌더링 엔진 내 시각화 배치 수정] ---
-if show_vis:
-    if mode == "DAILY" and a and a.get('map', {}).get('summary_polyline'):
-        # ... (기존 DAILY 활동명 옆 지도 배치 로직 동일) ...
-        act_w = draw.textlength(v_act, font=f_t)
-        map_x = rx + 40 + act_w + 20
-        map_y = ry + 30
-        overlay.paste(vis_layer, (int(map_x), int(map_y)), vis_layer)
-            
-    elif mode in ["WEEKLY", "MONTHLY"] and (weekly_data or monthly_data):
-        # 주간/월간 데이터 선택
-        data_obj = weekly_data if mode == "WEEKLY" else monthly_data
-        
-        if mode == "WEEKLY":
-            chart_img = create_bar_chart(data_obj['dists'], m_color)
-        else:
-            chart_img = create_monthly_chart(data_obj['dists'], data_obj['labels'], m_color)
-            
-        # 1350 높이에서 그래프가 박스 아래쪽 적절한 위치에 오도록 배치
-        w_p = (vis_sz / float(chart_img.size[0]))
-        vis_layer = chart_img.resize((vis_sz, int(chart_img.size[1]*w_p)), Image.Resampling.LANCZOS)
-        alpha_mask = vis_layer.getchannel('A').point(lambda x: x * (vis_alpha / 255))
-        vis_layer.putalpha(alpha_mask)
-        
-        # 그래프를 박스 아래쪽 중앙에 배치 (1350 규격 최적화)
-        chart_x = (CW - vis_layer.width) // 2
-        chart_y = CH - vis_layer.height - 80 
-        overlay.paste(vis_layer, (chart_x, chart_y), vis_layer)
 
 except Exception as e:
     with col_main: st.info("활동을 선택하거나 사진을 업로드해 주세요.")
-
 
 
 
