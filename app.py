@@ -4,6 +4,7 @@ import io, os, requests, polyline, math
 import numpy as np
 from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 
 # --- [1. 기본 설정 및 API] ---
 API_CONFIGS = {
@@ -296,6 +297,7 @@ with col_main:
         st.image(final, width=350)
         buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
         st.download_button("📸 DOWNLOAD", buf.getvalue(), "titan.jpg", use_container_width=True)
+
 
 
 
