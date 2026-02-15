@@ -207,6 +207,12 @@ with col_design:
         v_dist = st.text_input("거리 km", v_dist); v_time = st.text_input("시간", v_time)
         v_pace = st.text_input("페이스", v_pace); v_hr = st.text_input("심박 bpm", v_hr)
 
+    with st.expander("💄 매거진 스타일", expanded=True):
+        use_shadow = st.toggle("글자 그림자 효과", value=True)
+        show_vis = st.toggle("지도/그래프 표시", value=True)
+        show_box = st.toggle("데이터 박스 표시", value=True)
+        border_thick = st.slider("프레임 테두리 두께", 0, 50, 0)
+        
     box_orient = st.radio("박스 방향", ["Vertical", "Horizontal"], horizontal=True)
     sel_font = st.selectbox("폰트", ["BlackHanSans", "Sunflower", "Orbit", 
         "KirangHaerang", "JollyLodger", "Lacquer", "IndieFlower"])
@@ -243,7 +249,23 @@ with col_main:
             # [규칙 2] km, bpm 소문자 고정
             items = [("distance", f"{v_dist} km"), ("time", v_time), ("pace", v_pace), ("avg bpm", f"{v_hr} bpm")]
             
-            # 1. 데이터 박스 렌더링
+            # 1. 데이터 박스 렌더링 (show_box가 True일 때만)
+            if show_box:
+                draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0,0,0,box_alpha))
+                if box_orient == "Vertical":
+                    # ... (세로형 텍스트 그리기 코드) ...
+                else:
+                    # ... (가로형 텍스트 그리기 코드) ...
+
+            # 2. 지도 및 그래프 (show_vis가 True일 때만)
+            if show_vis:
+                if mode == "DAILY" and a and a.get('map', {}).get('summary_polyline'):
+                    # ... (지도 생성 및 m_pos 계산 코드) ...
+                    overlay.paste(vis_layer, (int(m_pos[0]), int(m_pos[1])), vis_layer)
+                    
+                elif mode in ["WEEKLY", "MONTHLY"] and (weekly_data or monthly_data):
+                    # ... (그래프 생성 코드) ...
+                    overlay.paste(vis_layer, ((CW - vis_layer.width)//2, CH - vis_layer.height - 80), vis_layer)
             draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0,0,0,box_alpha))
             if box_orient == "Vertical":
                 draw_styled_text(draw, (rx + 40, ry + 30), v_act, f_t, m_color, shadow=use_shadow)
@@ -312,6 +334,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
