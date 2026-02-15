@@ -231,7 +231,7 @@ with col_main:
         CW, CH = (1080, 1920) if mode == "DAILY" else (1080, 1350)
         
         # 폰트 로드 (가이드: 활동명 90, 날짜 30, 숫자 60)
-        ft, fd, fn, fl = [load_font(font_name, s) for s in [80, 30, 50, 23]]
+        ft, fd, fn, fl = [load_font(font_name, s) for s in [90, 30, 60, 23]]
         
         canvas = make_collage(bg_files, (CW, CH))
         over = Image.new("RGBA", (CW, CH), (0,0,0,0))
