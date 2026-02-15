@@ -234,7 +234,7 @@ with col_design:
         k_suf = f"{mode}_{box_orient}"
         rx = st.number_input("박스 X", 0, 1080, def_rx, key=f"rx_{k_suf}")
         ry = st.number_input("박스 Y", 0, 1920, def_ry, key=f"ry_{k_suf}")
-        rw = st.number_input("박스 너비", 100, 1080, def_rw, key=f"rw_{k_suf}")
+        rw = st.number_input("박스 너비", 100, 1000, def_rw, key=f"rw_{k_suf}")
         rh = st.number_input("박스 높이", 100, 1920, def_rh, key=f"rh_{k_suf}")
         box_alpha = st.slider("박스 투명도", 0, 255, 110, key="box_alpha_sl")
         vis_sz_adj = st.slider("지도/그래프 크기", 50, 1080, 180 if mode=="DAILY" else 950, key="vis_sz_sl")
@@ -304,4 +304,5 @@ with col_main:
         st.download_button(f"📸 {mode} DOWNLOAD", buf.getvalue(), f"{mode.lower()}.jpg", use_container_width=True, key="down_btn")
     except Exception as e:
         st.info("데이터와 사진을 선택하면 매거진 미리보기가 나타납니다.")
+
 
