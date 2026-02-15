@@ -259,7 +259,7 @@ with col_main:
                 l_img.putalpha(mask)
                 
                 # 위치 계산: (전체 가로 - 로고 크기 - 여백, 여백)
-                l_pos = (CW - ls - margin, margin)
+                l_pos = (CW - ls - margin, CH - ls - margin)
                 
                 overlay.paste(l_img, (int(l_pos[0]), int(l_pos[1])), l_img)
 
@@ -271,6 +271,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
