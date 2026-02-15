@@ -259,12 +259,13 @@ with col_main:
 
         final = Image.alpha_composite(canvas, overlay).convert("RGB")
         # 미리보기 크기만 500px로 제한 (화질 영향 없음)
-        st.image(final, width=500)
+        st.image(final, width=300)
         
         buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
         st.download_button(f"📸 {mode} DOWNLOAD", buf.getvalue(), f"{mode.lower()}.jpg", use_container_width=True)
     except Exception as e:
         st.info("데이터와 사진을 선택하면 미리보기가 나타납니다.")
+
 
 
 
