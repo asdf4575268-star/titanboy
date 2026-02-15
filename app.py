@@ -258,8 +258,6 @@ with col_main:
                     draw_text(draw, (cx-draw.textlength(l, fl)//2, ry+200), l, fl, "#AAAAAA", shadow)
                     draw_text(draw, (cx-draw.textlength(val, fn)//2, ry+245), val.lower(), fn, s_col, shadow) # 소문자 변환 추가
 
-        # ... (이하 시각화 및 로고 로직 동일) ...
-
         # 2. 시각화 (지도/차트) - 캐싱된 함수 사용
         if show_vis:
             vis_img = None
@@ -291,4 +289,5 @@ with col_main:
         st.image(final, width=350)
         buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
         st.download_button("📸 DOWNLOAD", buf.getvalue(), "titan.jpg", use_container_width=True)
+
 
