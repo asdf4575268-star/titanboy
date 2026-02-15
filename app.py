@@ -157,7 +157,7 @@ with col_main:
         log_file = st.file_uploader("🔘 원형 로고", type=['jpg','jpeg','png'])
         
         mode = st.radio("모드 선택", ["DAILY", "WEEKLY", "MONTHLY"], horizontal=True)
-        v_act, v_date, v_dist, v_time, v_pace, v_hr = "RUNNING", "2026-02-15", "0.00", "00:00:00", "0'00\"", "0"
+        v_act, v_date, v_dist, v_time, v_pace, v_hr = "RUNNING", "2026-02-15", "0.00", "00:00", "0'00\"", "0"
         weekly_data, monthly_data, a = None, None, None
         
         if acts:
@@ -291,6 +291,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
