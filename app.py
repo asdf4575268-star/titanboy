@@ -113,17 +113,58 @@ def create_bar_chart(data, color_hex, mode="WEEKLY", labels=None, font_path=None
     plt.tight_layout(); buf = io.BytesIO(); plt.savefig(buf, format='png', transparent=True); buf.seek(0); plt.close(fig)
     return Image.open(buf)
 
+아이고, 콜라주 부분이 여전히 속을 썩이는군요! make_smart_collage 함수에서 이미지를 격자 형태로 배치할 때, 알파 채널(투명도) 처리나 이미지 크기 변형(Fit) 과정에서 캔버스에 제대로 붙지 않는 경우가 종종 생깁니다.
+
+특히 사진이 1장일 때는 잘 나오는데 여러 장일 때 안 나온다면, 캔버스를 생성할 때 RGBA 모드와 (0, 0, 0, 255)(검정 배경) 설정이 꼬였을 가능성이 커요.
+
+이 부분을 더 직관적이고 튼튼한 로직으로 교체해 드릴게요. 아래 함수를 기존 make_smart_collage 자리에 덮어쓰기 해주세요.
+
+🛠️ 콜라주 로직 수정 (이미지 유실 방지 버전)
+Python
 def make_smart_collage(files, target_size):
     tw, th = target_size
-    imgs = [ImageOps.exif_transpose(Image.open(f).convert("RGBA")) for f in files[:10]]
-    if not imgs: return Image.new("RGBA", (tw, th), (30, 30, 30, 255))
-    if len(imgs) == 1: return ImageOps.fit(imgs[0], (tw, th))
+    # 1. 이미지 로드 및 강제 RGBA 변환
+    imgs = []
+    for f in files[:10]:
+        try:
+            img = Image.open(f)
+            img = ImageOps.exif_transpose(img) # 회전 정보 수정
+            imgs.append(img.convert("RGBA"))
+        except:
+            continue
+
+    if not imgs: 
+        return Image.new("RGBA", (tw, th), (30, 30, 30, 255))
+    
+    # 2. 사진이 1장일 때는 꽉 채우기
+    if len(imgs) == 1:
+        return ImageOps.fit(imgs[0], (tw, th), Image.Resampling.LANCZOS)
+
+    # 3. 사진이 여러 장일 때 격자 계산
+    n = len(imgs)
+    if n == 2: cols, rows = 2, 1
+    elif n <= 4: cols, rows = 2, 2
+    elif n <= 6: cols, rows = 3, 2
+    else: cols, rows = 3, 3
+
+    # 4. 캔버스 생성 (완전 불투명 검정 배경)
     canvas = Image.new("RGBA", (tw, th), (0, 0, 0, 255))
-    n = len(imgs); cols, rows = (2, 1) if n == 2 else (2, 2) if n <= 4 else (3, 2) if n <= 6 else (3, 3)
-    w_step, h_step = tw / cols, th / rows
+    
+    w_step = tw // cols
+    h_step = th // rows
+
     for i, img in enumerate(imgs):
+        if i >= cols * rows: break  # 격자 크기를 넘어서면 중단
+        
         r, c = divmod(i, cols)
-        canvas.paste(ImageOps.fit(img, (int(w_step), int(h_step))), (int(c * w_step), int(r * h_step)))
+        # 각 격자에 맞게 사진 크기 조정
+        resized_img = ImageOps.fit(img, (w_step, h_step), Image.Resampling.LANCZOS)
+        
+        # 좌표 계산 및 붙여넣기
+        x = c * w_step
+        y = r * h_step
+        canvas.paste(resized_img, (x, y))
+
     return canvas
 
 # --- [3. 레이아웃 선언 (최상단 고정)] ---
@@ -302,5 +343,6 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
