@@ -168,132 +168,49 @@ def make_smart_collage(files, target_size):
 # --- [3. 레이아웃 선언 (최상단 고정)] ---
 col_main, col_design = st.columns([1.6, 1], gap="medium")
 
-# --- [4. 인증 및 데이터 연동 - 무한 루프 방지 및 모바일 세션 유지] ---
-if 'access_token' not in st.session_state:
-    st.session_state['access_token'] = None
-if 'cached_acts' not in st.session_state:
-    st.session_state['cached_acts'] = []
+# --- [4. 인증 및 데이터 연동] ---
+if 'access_token' not in st.session_state: st.session_state['access_token'] = None
+query_params = st.query_params
+if "code" in query_params and st.session_state['access_token'] is None:
+    res = requests.post("https://www.strava.com/oauth/token", data={"client_id": CLIENT_ID, "client_secret": CLIENT_SECRET, "code": query_params["code"], "grant_type": "authorization_code"}).json()
+    if 'access_token' in res: st.session_state['access_token'] = res['access_token']; st.query_params.clear(); st.rerun()
 
-# 1. URL 파라미터에서 정보 확인
-q_params = st.query_params
-
-# 시나리오 1: 이미 토큰을 가지고 재접속한 경우 (모바일 리프레시 대응)
-if "token" in q_params:
-    st.session_state['access_token'] = q_params["token"]
-
-# 시나리오 2: 스트라바에서 인증을 마치고 돌아온 직후 (code 존재)
-if "code" in q_params and not st.session_state['access_token']:
-    try:
-        # code를 사용하여 token 교환 (딱 한 번만 가능)
-        res = requests.post(
-            "https://www.strava.com/oauth/token",
-            data={
-                "client_id": CLIENT_ID,
-                "client_secret": CLIENT_SECRET,
-                "code": q_params["code"],
-                "grant_type": "authorization_code"
-            }
-        ).json()
-        
-        if 'access_token' in res:
-            new_token = res['access_token']
-            st.session_state['access_token'] = new_token
-            # [중요] 사용 완료된 code는 주소창에서 즉시 제거하고 token을 기록
-            # 이렇게 해야 모바일 브라우저가 '뒤로가기'를 해도 에러가 안 납니다.
-            st.query_params.clear()
-            st.query_params["token"] = new_token
-            st.rerun()
-        else:
-            st.error("토큰 발급에 실패했습니다. 스트라바 설정을 확인해주세요.")
-    except Exception as e:
-        st.error(f"인증 과정 중 오류: {e}")
-
-# 2. 데이터 불러오기 (토큰은 있지만 데이터가 비어있을 때만 실행)
-if st.session_state['access_token'] and not st.session_state['cached_acts']:
-    headers = {'Authorization': f"Bearer {st.session_state['access_token']}"}
-    with st.spinner("데이터 로딩 중..."):
-        r = requests.get("https://www.strava.com/api/v3/athlete/activities?per_page=50", headers=headers)
-        if r.status_code == 200:
-            st.session_state['cached_acts'] = r.json()
-        elif r.status_code == 401:
-            # 토큰이 만료된 경우 깔끔하게 비우고 재인증 유도
-            st.session_state.clear()
-            st.query_params.clear()
-            st.rerun()
-
-acts = st.session_state.get('cached_acts', [])
-
-# --- [5. 메인 화면 구성] ---
-with col_main:
-    st.title("TITAN BOY")
-    
-    # 기본값 설정 (에러 방지용)
-    v_act, v_date, v_dist, v_time, v_pace, v_hr = "RUNNING", "2026.02.16", "0.00", "00:00:00", "0'00\"", "0"
-    
-    if not st.session_state['access_token']:
-        # [체크] ACTUAL_URL이 스트라바에 등록한 도메인과 정확히 일치하는지 확인!
-        auth_url = f"https://www.strava.com/oauth/authorize?client_id={CLIENT_ID}&response_type=code&redirect_uri={ACTUAL_URL}&scope=read,activity:read_all&approval_prompt=force"
-        st.link_button("🚀 Strava 연동하기", auth_url, use_container_width=True)
-    else:
-        # 로그아웃 버튼 (세션과 URL 파라미터 모두 삭제)
-        if st.button("🔓 로그아웃 및 세션 초기화", use_container_width=True):
-            st.session_state.clear()
-            st.query_params.clear()
-            st.rerun()
-
-# 3. 데이터 로드 로직 (토큰이 확정된 후 실행)
 acts = [] 
 if st.session_state['access_token']:
     headers = {'Authorization': f"Bearer {st.session_state['access_token']}"}
-    
-    # 활동 데이터가 세션에 없거나 토큰이 바뀐 경우에만 새로 가져옴
-    if 'cached_acts' not in st.session_state:
-        with st.spinner("데이터를 불러오는 중..."):
-            r = requests.get("https://www.strava.com/api/v3/athlete/activities?per_page=50", headers=headers)
-            if r.status_code == 200:
-                st.session_state['cached_acts'] = r.json()
-            elif r.status_code == 401: # 토큰 만료 시 초기화
-                st.session_state.clear()
-                st.query_params.clear()
-                st.rerun()
-    
-    acts = st.session_state.get('cached_acts', [])
+    r = requests.get("https://www.strava.com/api/v3/athlete/activities?per_page=50", headers=headers)
+    if r.status_code == 200: acts = r.json()
 
 # --- [5. 메인 화면 구성] ---
 with col_main:
     st.title("TITAN BOY")
     
-    # 초기화
-    v_act, v_date, v_dist, v_time, v_pace, v_hr = "RUNNING", "2026.02.16", "0.00", "00:00:00", "0'00\"", "0"
+    # --- [여기에 초기화 배치] ---
+    v_act, v_date, v_dist, v_time, v_pace, v_hr = "RUNNING", "2026-02-15", "0.00", "00:00:00", "0'00\"", "0"
     weekly_data, monthly_data, a = None, None, None
-
     if not st.session_state['access_token']:
-        # 연동 버튼 (REDIRECT_URI가 정확해야 합니다)
-        auth_url = f"https://www.strava.com/oauth/authorize?client_id={CLIENT_ID}&response_type=code&redirect_uri={ACTUAL_URL}&scope=read,activity:read_all&approval_prompt=force"
-        st.link_button("🚀 Strava 연동하기", auth_url, use_container_width=True)
-        st.info("모바일은 '사파리'나 '크롬' 브라우저 사용을 권장합니다.")
+        st.link_button("🚀 Strava 연동", f"https://www.strava.com/oauth/authorize?client_id={CLIENT_ID}&response_type=code&redirect_uri={ACTUAL_URL}&scope=read,activity:read_all&approval_prompt=force", use_container_width=True)
     else:
-        # 로그아웃 버튼
-        if st.button("🔓 로그아웃 및 데이터 초기화", use_container_width=True):
-            st.session_state.clear()
-            st.query_params.clear()
-            st.rerun()
-            
-        bg_files = st.file_uploader("📸 배경 사진 업로드", type=['jpg','jpeg','png'], accept_multiple_files=True)
+        st.button("🔓 로그아웃", on_click=logout_and_clear, use_container_width=True)
+        bg_files = st.file_uploader("📸 배경 사진", type=['jpg','jpeg','png'], accept_multiple_files=True)
+        log_file = st.file_uploader("🔘 원형 로고", type=['jpg','jpeg','png'])
         
-        # 모드 선택
-        mode = st.radio("기록 모드", ["DAILY", "WEEKLY", "MONTHLY"], horizontal=True, key="mode_radio")
+        # [수정] 라디오 버튼은 여기서 딱 한 번만 선언합니다.
+        mode = st.radio("모드 선택", ["DAILY", "WEEKLY", "MONTHLY"], horizontal=True, key="main_mode_sel")
         
         if acts:
             if mode == "DAILY":
-                opts = [f"{ac['start_date_local'][:10]} - {ac['name']}" for ac in acts]
-                sel_name = st.selectbox("🏃 활동 선택", opts)
-                a = acts[opts.index(sel_name)]
+                act_opts = [f"{ac['start_date_local'][:10]} - {ac['name']}" for ac in acts]
+                sel_act = st.selectbox("🏃 활동 선택", act_opts)
+                a = acts[act_opts.index(sel_act)]
+                
                 if a:
-                    v_act = a['name'].upper()
-                    v_date = a['start_date_local'][:10].replace('-', '.')
+                    # DAILY: 스트라바 원래 이름 유지
+                    v_act = a['name'] 
+                    v_date = a['start_date_local'][:10]
                     d_km = a.get('distance', 0)/1000; m_s = a.get('moving_time', 0)
-                    v_dist, v_time = f"{d_km:.2f}", f"{m_s//3600:02d}:{(m_s%3600)//60:02d}:{m_s%60:02d}"
+                    v_dist = f"{d_km:.2f}"
+                    v_time = f"{m_s//3600:02d}:{(m_s%3600)//60:02d}:{m_s%60:02d}"
                     v_pace = f"{int((m_s/d_km)//60)}'{int((m_s/d_km)%60):02d}\"" if d_km > 0 else "0'00\""
                     v_hr = str(int(a.get('average_heartrate', 0))) if a.get('average_heartrate') else "0"
                 
@@ -424,5 +341,3 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
-
-
