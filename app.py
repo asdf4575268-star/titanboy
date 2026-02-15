@@ -116,7 +116,7 @@ def create_bar_chart(data, color_hex, mode="WEEKLY", labels=None, font_path=None
 def make_smart_collage(files, target_size):
     tw, th = target_size
     imgs = []
-    for f in files[:10]:
+    for f in files:  # 모든 파일 읽기
         try:
             img = Image.open(f)
             img = ImageOps.exif_transpose(img)
@@ -127,26 +127,27 @@ def make_smart_collage(files, target_size):
     if not imgs: 
         return Image.new("RGBA", (tw, th), (30, 30, 30, 255))
     
-    if len(imgs) == 1:
+    n = len(imgs)
+    if n == 1:
         return ImageOps.fit(imgs[0], (tw, th), Image.Resampling.LANCZOS)
 
-    # [핵심] 사진 개수에 따른 최적의 격자(행, 열) 계산
-    n = len(imgs)
-    if n == 2: cols, rows = 1, 2  # 2장은 위아래로 길게
+    # [규칙] 사진 개수에 따라 가장 꽉 차 보이는 격자 설정
+    if n == 2: cols, rows = 1, 2
     elif n <= 4: cols, rows = 2, 2
     elif n <= 6: cols, rows = 2, 3
     elif n <= 9: cols, rows = 3, 3
-    else: cols, rows = 3, 4
+    else: cols, rows = 3, 4 # 10장 이상
 
     canvas = Image.new("RGBA", (tw, th), (0, 0, 0, 255))
     
-    # [핵심] 여백 방지를 위해 정수가 아닌 실수로 계산 후 마지막에 맞춤
-    for i, img in enumerate(imgs):
-        if i >= cols * rows: break
+    # [핵심] 1픽셀의 오차도 허용하지 않는 좌표 계산
+    for i in range(cols * rows):
+        # 사진이 격자 수보다 적으면 처음 사진부터 다시 사용 (빈칸 방지)
+        img = imgs[i % n]
         
         r, c = divmod(i, cols)
         
-        # 각 칸의 시작과 끝 좌표를 정확히 계산 (여백 방지)
+        # 소수점 계산 후 정수 변환으로 인접 면 밀착
         x0 = int(c * tw / cols)
         y0 = int(r * th / rows)
         x1 = int((c + 1) * tw / cols)
@@ -155,7 +156,7 @@ def make_smart_collage(files, target_size):
         cell_w = x1 - x0
         cell_h = y1 - y0
         
-        # 해당 칸에 딱 맞춰서 자르기
+        # 해당 구역에 여백 없이 꽉 채우기
         resized_img = ImageOps.fit(img, (cell_w, cell_h), Image.Resampling.LANCZOS)
         canvas.paste(resized_img, (x0, y0))
 
@@ -337,6 +338,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
