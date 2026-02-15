@@ -122,25 +122,29 @@ if st.session_state['access_token']:
     r = requests.get("https://www.strava.com/api/v3/athlete/activities?per_page=50", headers=headers)
     if r.status_code == 200: acts = r.json()
 
-# --- [4. 레이아웃: 사이드바] ---
-with st.sidebar:
-    st.header("✍️ MANUAL EDIT")
-    v_act_in, v_date_in, v_dist_in, v_time_in, v_pace_in, v_hr_in = st.text_input("활동명 (수기)"), st.text_input("날짜 (수기)"), st.text_input("거리 km (수기)"), st.text_input("시간 (수기)"), st.text_input("페이스 (수기)"), st.text_input("심박 bpm (수기)")
-
-# --- [5. 메인 레이아웃 구성] ---
+# --- [4. 메인 레이아웃 구성] ---
 col_main, col_design = st.columns([1.6, 1], gap="medium")
 
-# 왼쪽: 데이터 선택 및 미리보기
 with col_main:
     st.title("TITAN BOY")
+    
+    # [인증 관련 상단 배치]
     if not st.session_state['access_token']:
         st.link_button("🚀 Strava 연동", f"https://www.strava.com/oauth/authorize?client_id={CLIENT_ID}&response_type=code&redirect_uri={ACTUAL_URL}&scope=read,activity:read_all&approval_prompt=force", use_container_width=True)
     else:
-        st.button("🔓 로그아웃", on_click=logout_and_clear)
+        st.button("🔓 로그아웃", on_click=logout_and_clear, use_container_width=True)
     
-    mode = st.radio("모드 선택", ["DAILY", "WEEKLY", "MONTHLY"], horizontal=True, label_visibility="collapsed")
+    # [배경 사진 및 로고 업로드 - 요청 사항 반영]
+    with st.expander("🖼️ 이미지 업로드 (배경/로고)", expanded=True):
+        col_img1, col_img2 = st.columns(2)
+        with col_img1:
+            bg_files = st.file_uploader("📸 배경 사진", type=['jpg','jpeg','png'], accept_multiple_files=True)
+        with col_img2:
+            log_file = st.file_uploader("🔘 원형 로고", type=['jpg','jpeg','png'])
+
+    # [활동 선택]
+    mode = st.radio("모드 선택", ["DAILY", "WEEKLY", "MONTHLY"], horizontal=True)
     
-    # 데이터 선택 섹션
     with st.container(border=True):
         v_act, v_date, v_dist, v_time, v_pace, v_hr = "RUNNING", "2026-02-14", "0.00", "00:00:00", "0'00\"", "0"
         weekly_data, monthly_data, a = None, None, None
@@ -165,61 +169,67 @@ with col_main:
                 monthly_data = get_monthly_stats(acts, f"{sel_month}-01")
                 if monthly_data: v_act, v_date, v_dist, v_time, v_pace, v_hr = "MONTHLY RUN", monthly_data['range'], monthly_data['total_dist'], monthly_data['total_time'], monthly_data['avg_pace'], monthly_data['avg_hr']
 
-    v_act, v_date, v_dist, v_time, v_pace, v_hr = v_act_in or v_act, v_date_in or v_date, v_dist_in or v_dist, v_time_in or v_time, v_pace_in or v_pace, v_hr_in or v_hr
-
-    # 오른쪽 디자인 설정값들을 미리 참조하기 위해 아래 순서를 유지하거나 empty 객체 사용
-    # 여기서는 가독성을 위해 col_design을 먼저 정의하고 렌더링을 col_main 하단에 배치함
-
-# 오른쪽: 디자인 설정
+# --- [5. 사이드바 (디자인 설정)] ---
 with col_design:
     st.header("🎨 DESIGN")
-    bg_files = st.file_uploader("📸 배경 사진", type=['jpg','jpeg','png'], accept_multiple_files=True)
-    log_file = st.file_uploader("🔘 원형 로고", type=['jpg','jpeg','png'])
     
+    # 텍스트 수기 수정 (필요시)
+    with st.expander("✍️ 텍스트 직접 수정"):
+        v_act_in = st.text_input("활동명", v_act)
+        v_date_in = st.text_input("날짜", v_date)
+        v_dist_in = st.text_input("거리 km", v_dist)
+        v_time_in = st.text_input("시간", v_time)
+        v_pace_in = st.text_input("페이스", v_pace)
+        v_hr_in = st.text_input("심박 bpm", v_hr)
+        v_act, v_date, v_dist, v_time, v_pace, v_hr = v_act_in, v_date_in, v_dist_in, v_time_in, v_pace_in, v_hr_in
+
     box_orient = st.radio("박스 방향", ["Vertical", "Horizontal"], horizontal=True)
-    show_box, show_vis = st.toggle("데이터 박스", value=True), st.toggle("지도/그래프", value=True)
+    show_box = st.toggle("데이터 박스", value=True)
+    show_vis = st.toggle("지도/그래프", value=True)
     sel_font = st.selectbox("폰트", ["BlackHanSans", "Jua", "DoHyeon", "NanumBrush", "Sunflower"])
     
     COLOR_OPTS = {"Yellow": "#FFD700", "White": "#FFFFFF", "Orange": "#FF4500", "Blue": "#00BFFF", "Grey": "#AAAAAA"}
     m_color = COLOR_OPTS[st.selectbox("포인트 컬러", list(COLOR_OPTS.keys()))]
     sub_color = COLOR_OPTS[st.selectbox("서브 컬러", list(COLOR_OPTS.keys()), index=1)]
     
-    with st.expander("📍 세부 위치 및 크기 설정"):
-        rx = st.number_input("X 위치", 0, 1080, 70)
-        ry = st.number_input("Y 위치", 0, 1920, 1250 if mode=="DAILY" else 850)
+    with st.expander("📍 세부 위치 설정"):
+        rx = st.number_input("박스 X", 0, 1080, 70)
+        ry = st.number_input("박스 Y", 0, 1920, 1250 if mode=="DAILY" else 850)
         rw = st.number_input("박스 너비", 100, 1080, 1080 if box_orient=="Horizontal" else 450)
-        rh = st.number_input("박스 높이", 100, 1920, 260 if box_orient=="Horizontal" else 630)
+        rh = st.number_input("박스 높이", 100, 1920, 550)
         box_alpha = st.slider("박스 투명도", 0, 255, 110)
-        vis_sz = st.slider("지도/그래프 크기", 50, 1080, 250 if mode=="DAILY" else 1000)
-        vis_alpha = st.slider("지도/그래프 투명도", 0, 255, 180)
+        vis_sz_adj = st.slider("지도 크기", 50, 600, 180 if mode=="DAILY" else 400)
+        vis_alpha = st.slider("지도 투명도", 0, 255, 180)
 
-# 왼쪽 하단: 결과물 렌더링 (col_main 안에서 실행)
+# --- [6. 미리보기 렌더링] ---
 with col_main:
     st.subheader("🖼️ PREVIEW")
     try:
         CW, CH = (1080, 1920) if mode == "DAILY" else (1080, 1350)
-        # 설정된 폰트 크기 적용: 활동명 90, 날짜 30, 숫자 60
         f_t, f_d, f_n, f_l = load_font(sel_font, 70), load_font(sel_font, 20), load_font(sel_font, 40), load_font(sel_font, 23)
         f_path = f"font_{sel_font}_90.ttf"
         
         canvas = make_smart_collage(bg_files, (CW, CH)) if bg_files else Image.new("RGBA", (CW, CH), (20, 20, 20, 255))
         overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
         
+        title_w = draw.textlength(v_act, font=f_t)
+
         if show_box:
             items = [("distance", f"{v_dist} km"), ("time", v_time), ("pace", v_pace), ("avg bpm", f"{v_hr} bpm")]
             if box_orient == "Vertical":
                 draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0,0,0,box_alpha))
                 draw.text((rx+40, ry+30), v_act, font=f_t, fill=m_color)
                 draw.text((rx+40, ry+145), v_date, font=f_d, fill="#AAAAAA")
-                y_c = ry + 240
+                y_c = ry + 220
                 for lab, val in items:
                     draw.text((rx+40, y_c), lab.lower(), font=f_l, fill="#AAAAAA")
-                    # km, bpm 등 단위 소문자 처리
                     v_s = val.lower() if any(x in val for x in ["km","bpm"]) else val
-                    draw.text((rx+40, y_c+30), v_s, font=f_n, fill=sub_color); y_c += 95
+                    draw.text((rx+40, y_c+30), v_s, font=f_n, fill=sub_color)
+                    y_c += 95
             else:
                 draw.rectangle([0, ry, 1080, ry + rh], fill=(0,0,0,box_alpha))
-                draw.text(((1080 - draw.textlength(v_act, font=f_t))//2, ry + 35), v_act, font=f_t, fill=m_color)
+                t_x = (1080 - title_w)//2
+                draw.text((t_x, ry + 35), v_act, font=f_t, fill=m_color)
                 draw.text(((1080 - draw.textlength(v_date, font=f_d))//2, ry + 140), v_date, font=f_d, fill="#AAAAAA")
                 sec_w = 1080 // 4
                 for i, (lab, val) in enumerate(items):
@@ -230,14 +240,21 @@ with col_main:
         if show_vis:
             if mode == "DAILY" and a and a.get('map', {}).get('summary_polyline'):
                 pts = polyline.decode(a['map']['summary_polyline']); lats, lons = zip(*pts)
+                vis_sz = vis_sz_adj
                 vis_layer = Image.new("RGBA", (vis_sz, vis_sz), (0,0,0,0)); m_draw = ImageDraw.Draw(vis_layer)
                 def tr(la, lo): return 15+(lo-min(lons))/(max(lons)-min(lons)+1e-5)*(vis_sz-30), (vis_sz-15)-(la-min(lats))/(max(lats)-min(lats)+1e-5)*(vis_sz-30)
                 m_draw.line([tr(la, lo) for la, lo in pts], fill=hex_to_rgba(m_color, vis_alpha), width=5)
-                m_x, m_y = (rx + 40 + draw.textlength(v_act, font=f_t) + 20, ry + 30) if box_orient == "Vertical" else ((1080 + draw.textlength(v_act, font=f_t))//2 + 20, ry + 35)
+                
+                if box_orient == "Vertical":
+                    m_x, m_y = rx + 40 + title_w + 30, ry + 35
+                else:
+                    m_x, m_y = (1080 - title_w)//2 - vis_sz - 30, ry + 35
                 overlay.paste(vis_layer, (int(m_x), int(m_y)), vis_layer)
+            
             elif mode in ["WEEKLY", "MONTHLY"] and (weekly_data or monthly_data):
                 d_obj = weekly_data if mode == "WEEKLY" else monthly_data
                 chart_img = create_bar_chart(d_obj['dists'], m_color, mode=mode, labels=d_obj.get('labels'), font_path=f_path)
+                vis_sz = vis_sz_adj
                 vis_layer = chart_img.resize((vis_sz, int(chart_img.size[1]*(vis_sz/chart_img.size[0]))), Image.Resampling.LANCZOS)
                 vis_layer.putalpha(vis_layer.getchannel('A').point(lambda x: x * (vis_alpha / 255)))
                 overlay.paste(vis_layer, ((CW - vis_layer.width)//2, CH - vis_layer.height - 80), vis_layer)
@@ -253,6 +270,4 @@ with col_main:
         buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
         st.download_button(f"📸 {mode} DOWNLOAD", buf.getvalue(), f"{mode.lower()}.jpg", use_container_width=True)
     except Exception as e:
-        st.info("데이터를 선택하면 미리보기가 나타납니다.")
-
-
+        st.info("데이터를 선택하고 이미지를 업로드하면 미리보기가 나타납니다.")
