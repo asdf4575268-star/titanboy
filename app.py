@@ -115,12 +115,11 @@ def create_bar_chart(data, color_hex, mode="WEEKLY", labels=None, font_path=None
 
 def make_smart_collage(files, target_size):
     tw, th = target_size
-    # 1. 이미지 로드 및 강제 RGBA 변환
     imgs = []
     for f in files[:10]:
         try:
             img = Image.open(f)
-            img = ImageOps.exif_transpose(img) # 회전 정보 수정
+            img = ImageOps.exif_transpose(img)
             imgs.append(img.convert("RGBA"))
         except:
             continue
@@ -128,34 +127,37 @@ def make_smart_collage(files, target_size):
     if not imgs: 
         return Image.new("RGBA", (tw, th), (30, 30, 30, 255))
     
-    # 2. 사진이 1장일 때는 꽉 채우기
     if len(imgs) == 1:
         return ImageOps.fit(imgs[0], (tw, th), Image.Resampling.LANCZOS)
 
-    # 3. 사진이 여러 장일 때 격자 계산
+    # [핵심] 사진 개수에 따른 최적의 격자(행, 열) 계산
     n = len(imgs)
-    if n == 2: cols, rows = 2, 1
+    if n == 2: cols, rows = 1, 2  # 2장은 위아래로 길게
     elif n <= 4: cols, rows = 2, 2
-    elif n <= 6: cols, rows = 3, 2
-    else: cols, rows = 3, 3
+    elif n <= 6: cols, rows = 2, 3
+    elif n <= 9: cols, rows = 3, 3
+    else: cols, rows = 3, 4
 
-    # 4. 캔버스 생성 (완전 불투명 검정 배경)
     canvas = Image.new("RGBA", (tw, th), (0, 0, 0, 255))
     
-    w_step = tw // cols
-    h_step = th // rows
-
+    # [핵심] 여백 방지를 위해 정수가 아닌 실수로 계산 후 마지막에 맞춤
     for i, img in enumerate(imgs):
-        if i >= cols * rows: break  # 격자 크기를 넘어서면 중단
+        if i >= cols * rows: break
         
         r, c = divmod(i, cols)
-        # 각 격자에 맞게 사진 크기 조정
-        resized_img = ImageOps.fit(img, (w_step, h_step), Image.Resampling.LANCZOS)
         
-        # 좌표 계산 및 붙여넣기
-        x = c * w_step
-        y = r * h_step
-        canvas.paste(resized_img, (x, y))
+        # 각 칸의 시작과 끝 좌표를 정확히 계산 (여백 방지)
+        x0 = int(c * tw / cols)
+        y0 = int(r * th / rows)
+        x1 = int((c + 1) * tw / cols)
+        y1 = int((r + 1) * th / rows)
+        
+        cell_w = x1 - x0
+        cell_h = y1 - y0
+        
+        # 해당 칸에 딱 맞춰서 자르기
+        resized_img = ImageOps.fit(img, (cell_w, cell_h), Image.Resampling.LANCZOS)
+        canvas.paste(resized_img, (x0, y0))
 
     return canvas
 
@@ -335,6 +337,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
