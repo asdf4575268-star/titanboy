@@ -37,13 +37,11 @@ def load_font(font_type, size):
     # 원하는 폰트의 GitHub 또는 구글 폰트 원본 주소를 여기에 추가하세요.
     fonts = {
         "BlackHanSans": "https://github.com/google/fonts/raw/main/ofl/blackhansans/BlackHanSans-Regular.ttf",
-        "Jua": "https://github.com/google/fonts/raw/main/ofl/jua/Jua-Regular.ttf",
-        "DoHyeon": "https://github.com/google/fonts/raw/main/ofl/dohyeon/DoHyeon-Regular.ttf",
-        "NanumBrush": "https://github.com/google/fonts/raw/main/ofl/nanumbrushscript/NanumBrushScript-Regular.ttf",
-        "Sunflower": "https://github.com/google/fonts/raw/main/ofl/sunflower/Sunflower-Bold.ttf",
-        "GothicA1": "https://github.com/google/fonts/raw/main/ofl/gothica1/GothicA1-Black.ttf", # 꽉 찬 고딕
         "SongMyung": "https://github.com/google/fonts/raw/main/ofl/songmyung/SongMyung-Regular.ttf", # 명조체 스타일
         "Orbit": "https://github.com/google/fonts/raw/main/ofl/orbit/Orbit-Regular.ttf" # 힙한 디자인 스타일
+        "KirangHaerang": "https://github.com/google/fonts/raw/main/ofl/kiranghaerang/KirangHaerang-Regular.ttf",
+        "JollyLodger": "https://github.com/google/fonts/raw/main/ofl/jollylodger/JollyLodger-Regular.ttf",
+        "Lacquer": "https://github.com/google/fonts/raw/main/ofl/lacquer/Lacquer-Regular.ttf"
     }
     
     f_path = f"font_{font_type}_{int(size)}.ttf"
@@ -191,7 +189,8 @@ with col_design:
         v_pace = st.text_input("페이스", v_pace); v_hr = st.text_input("심박 bpm", v_hr)
 
     box_orient = st.radio("박스 방향", ["Vertical", "Horizontal"], horizontal=True)
-    sel_font = st.selectbox("폰트", ["BlackHanSans", "Jua", "DoHyeon", "NanumBrush", "Sunflower", "Orbit", "GothicA1"])
+    sel_font = st.selectbox("폰트", ["BlackHanSans", "Jua", "Sunflower", "Orbit", "GothicA1", 
+        "KirangHaerang", "JollyLodger", "Lacquer"])
     
     with st.expander("💄 매거진 스타일", expanded=True):
         use_shadow = st.toggle("글자 그림자 효과", value=True)
@@ -292,4 +291,5 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
