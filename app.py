@@ -115,18 +115,50 @@ def load_font(font_type, size):
         r = requests.get(fonts.get(font_type, fonts["BlackHanSans"])); open(f_path, "wb").write(r.content)
     return ImageFont.truetype(f_path, int(size))
 
-# --- [3. 인증 및 데이터 처리] ---
-if 'access_token' not in st.session_state: st.session_state['access_token'] = None
-query_params = st.query_params
-if "code" in query_params and st.session_state['access_token'] is None:
-    res = requests.post("https://www.strava.com/oauth/token", data={"client_id": CLIENT_ID, "client_secret": CLIENT_SECRET, "code": query_params["code"], "grant_type": "authorization_code"}).json()
-    if 'access_token' in res: st.session_state['access_token'] = res['access_token']; st.query_params.clear(); st.rerun()
+# --- [3. 인증 및 데이터 처리 섹션 수정] ---
 
-acts = []
-if st.session_state['access_token']:
-    headers = {'Authorization': f"Bearer {st.session_state['access_token']}"}
-    r = requests.get("https://www.strava.com/api/v3/athlete/activities?per_page=30", headers=headers)
-    if r.status_code == 200: acts = r.json()
+if acts:
+    if mode == "DAILY":
+        # 기존대로 개별 활동 리스트업
+        act_options = [f"{act['start_date_local'][:10]} - {act['name']}" for act in acts]
+        sel_str = st.selectbox("🏃 활동 선택", act_options)
+        a = acts[act_options.index(sel_str)]
+        
+        d_km = a.get('distance', 0)/1000; m_sec = a.get('moving_time', 0)
+        v_act, v_date, v_dist = a['name'], a['start_date_local'][:10], f"{d_km:.2f}"
+        v_time = f"{m_sec//3600:02d}:{(m_sec%3600)//60:02d}:{m_sec%60:02d}"
+        v_pace = f"{int((m_sec/d_km)//60)}'{int((m_sec/d_km)%60):02d}\"" if d_km > 0 else "0'00\""
+        v_hr = str(int(a.get('average_heartrate', 0))) if a.get('average_heartrate') else "0"
+
+    elif mode == "WEEKLY":
+        # 활동 데이터에서 '주차'별로 고유 리스트 생성
+        weeks = []
+        for act in acts:
+            dt = datetime.strptime(act['start_date_local'][:10], "%Y-%m-%d")
+            start_of_week = dt - timedelta(days=dt.weekday())
+            week_str = f"{start_of_week.strftime('%Y.%m.%d')} 주차"
+            if week_str not in weeks: weeks.append(week_str)
+        
+        sel_week = st.selectbox("📅 주차 선택", weeks)
+        target_date = datetime.strptime(sel_week[:10], "%Y.%m.%d").strftime("%Y-%m-%d")
+        weekly_data = get_weekly_stats(acts, target_date)
+        
+        if weekly_data:
+            v_act, v_date, v_dist, v_time, v_pace, v_hr = "WEEKLY RUN", weekly_data['range'], weekly_data['total_dist'], weekly_data['total_time'], weekly_data['avg_pace'], weekly_data['avg_hr']
+
+    elif mode == "MONTHLY":
+        # 활동 데이터에서 '월'별로 고유 리스트 생성
+        months = []
+        for act in acts:
+            month_str = act['start_date_local'][:7] # YYYY-MM
+            if month_str not in months: months.append(month_str)
+        
+        sel_month = st.selectbox("🗓️ 월 선택", months)
+        target_date = f"{sel_month}-01" # 해당 월의 1일로 타겟팅
+        monthly_data = get_monthly_stats(acts, target_date)
+        
+        if monthly_data:
+            v_act, v_date, v_dist, v_time, v_pace, v_hr = "MONTHLY RUN", monthly_data['range'], monthly_data['total_dist'], monthly_data['total_time'], monthly_data['avg_pace'], monthly_data['avg_hr']
 
 # --- [4. 레이아웃: 사이드바] ---
 with st.sidebar:
