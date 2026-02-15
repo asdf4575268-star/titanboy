@@ -273,7 +273,10 @@ with col_main:
                 m_draw.line([tr(la, lo) for la, lo in pts], fill=hex_to_rgba(m_color, vis_alpha), width=6)
                 
                 # 지도 위치: Vertical일 땐 우측 상단 여백, Horizontal일 땐 상단 배치
-                if box_orient == "Vertical": m_pos = (rx, ry - vis_sz - 10) else: m_pos = (rx + 40, ry + (rh - vis_sz) // 2)
+                if box_orient == "Vertical":
+                    m_pos = (rx, ry - vis_sz - 10)
+                else:
+                    m_pos = (rx + 40, ry + (rh - vis_sz) // 2)
                 
             elif mode in ["WEEKLY", "MONTHLY"] and (weekly_data or monthly_data):
                 d_obj = weekly_data if mode == "WEEKLY" else monthly_data
@@ -283,7 +286,6 @@ with col_main:
                 vis_layer.putalpha(vis_layer.getchannel('A').point(lambda x: x * (vis_alpha / 255)))
                 overlay.paste(vis_layer, ((CW - vis_layer.width)//2, CH - vis_layer.height - 80), vis_layer)
 
-            # 3. 로고 로직 (복구 완료)
             # 3. 로고 로직 (캔버스 우상단 고정)
             if log_file:
                 ls = 90 # 로고 크기
@@ -309,6 +311,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
