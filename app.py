@@ -195,15 +195,15 @@ with st.sidebar:
     with st.expander("📍 위치/크기 조절"):
         rx, ry = st.number_input("박스 X", 0, 1080, 70), st.number_input("박스 Y", 0, 1920, 1250 if mode=="DAILY" else 850)
         rw, rh = st.number_input("박스 너비", 100, 1080, 1080 if box_orient=="Horizontal" else 450), st.number_input("박스 높이", 100, 1920, 550)
-        box_alpha = st.slider("박스 투명도", 0, 255, 110)
-        vis_sz_adj = st.slider("지도/그래프 크기", 50, 1080, 180 if mode=="DAILY" else 950)
-        vis_alpha = st.slider("지도/그래프 투명도", 0, 255, 180)
+        box_alpha = st.slider("박스 투명도", 0, 255, 100)
+        vis_sz_adj = st.slider("지도/그래프 크기", 50, 1080, 180 if mode=="DAILY" else 900)
+        vis_alpha = st.slider("지도/그래프 투명도", 0, 255, 255)
 
 # --- [7. 미리보기 렌더링 (메인 영역 하단)] ---
 st.subheader("🖼️ PREVIEW")
 try:
     CW, CH = (1080, 1920) if mode == "DAILY" else (1080, 1350)
-    f_t, f_d, f_n, f_l = load_font(sel_font, 90), load_font(sel_font, 30), load_font(sel_font, 60), load_font(sel_font, 23)
+    f_t, f_d, f_n, f_l = load_font(sel_font, 70), load_font(sel_font, 20), load_font(sel_font, 40), load_font(sel_font, 23)
     f_path = f"font_{sel_font}_90.ttf"
     
     canvas = make_smart_collage(bg_files, (CW, CH)) if bg_files else Image.new("RGBA", (CW, CH), (20, 20, 20, 255))
@@ -266,3 +266,4 @@ try:
     st.download_button(f"📸 {mode} DOWNLOAD", buf.getvalue(), f"{mode.lower()}.jpg", use_container_width=True)
 except Exception as e:
     st.info("데이터를 선택하고 이미지를 업로드하면 미리보기가 나타납니다.")
+
