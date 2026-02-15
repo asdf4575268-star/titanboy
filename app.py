@@ -4,6 +4,7 @@ import io, os, requests, polyline, math
 from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+from matplotlib import font_manager
 
 # --- [1. Strava API 및 기본 설정] ---
 API_CONFIGS = {
@@ -17,34 +18,101 @@ ACTUAL_URL = "https://titanboy-kgcnje3tg3hbfpfsp6uwzc.streamlit.app"
 st.set_page_config(page_title="TITAN BOY", layout="wide")
 mpl.use('Agg')
 
-# --- [2. 유틸리티 함수 내 수정] ---
-from matplotlib import font_manager
+# --- [2. 유틸리티 함수] ---
 
+# 로그아웃 함수 (NameError 방지를 위해 상단 배치)
+def logout_and_clear():
+    st.cache_data.clear(); st.cache_resource.clear(); st.session_state.clear(); st.query_params.clear(); st.rerun()
+
+def hex_to_rgba(hex_color, alpha):
+    hex_color = hex_color.lstrip('#')
+    return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4)) + (alpha,)
+
+def make_smart_collage(files, target_size):
+    tw, th = target_size
+    imgs = [ImageOps.exif_transpose(Image.open(f).convert("RGBA")) for f in files[:10]]
+    n = len(imgs)
+    if n == 0: return Image.new("RGBA", (tw, th), (30, 30, 30, 255))
+    if n == 1: return ImageOps.fit(imgs[0], (tw, th))
+    if n == 2: cols, rows = 2, 1
+    elif n <= 4: cols, rows = 2, 2
+    elif n <= 6: cols, rows = 3, 2
+    elif n <= 9: cols, rows = 3, 3
+    else: cols, rows = 5, 2
+    canvas = Image.new("RGBA", (tw, th), (0, 0, 0, 255))
+    w_step, h_step = tw / cols, th / rows
+    for i, img in enumerate(imgs):
+        r, c = divmod(i, cols)
+        x1, y1 = int(c * w_step), int(r * h_step)
+        x2 = int((c + 1) * w_step) if (c + 1) < cols else tw
+        y2 = int((r + 1) * h_step) if (r + 1) < rows else th
+        sub_img = ImageOps.fit(img, (x2 - x1, y2 - y1))
+        canvas.paste(sub_img, (x1, y1))
+    return canvas
+
+def get_weekly_stats(activities, target_date_str):
+    try:
+        target_date = datetime.strptime(target_date_str, "%Y-%m-%d")
+        start_of_week = target_date - timedelta(days=target_date.weekday())
+        end_of_week = start_of_week + timedelta(days=6)
+        weekly_dist = [0.0] * 7
+        total_dist, total_time, hr_sum, hr_count = 0.0, 0, 0, 0
+        for act in activities:
+            if act.get('type') == 'Run':
+                act_date = datetime.strptime(act['start_date_local'][:10], "%Y-%m-%d")
+                if start_of_week <= act_date <= end_of_week:
+                    dist = act.get('distance', 0) / 1000
+                    weekly_dist[act_date.weekday()] += dist
+                    total_dist += dist; total_time += act.get('moving_time', 0)
+                    if act.get('average_heartrate'): hr_sum += act.get('average_heartrate'); hr_count += 1
+        avg_hr = int(hr_sum / hr_count) if hr_count > 0 else 0
+        avg_pace_sec = (total_time / total_dist) if total_dist > 0 else 0
+        avg_pace = f"{int(avg_pace_sec//60)}'{int(avg_pace_sec%60):02d}\""
+        fmt_time = f"{total_time//3600:02d}:{(total_time%3600)//60:02d}:{total_time%60:02d}"
+        return {"dists": weekly_dist, "total_dist": f"{total_dist:.2f}", "total_time": fmt_time, "avg_pace": avg_pace, "avg_hr": str(avg_hr), "range": f"{start_of_week.strftime('%m.%d')} - {end_of_week.strftime('%m.%d')}"}
+    except: return None
+
+def get_monthly_stats(activities, target_date_str):
+    try:
+        target_date = datetime.strptime(target_date_str, "%Y-%m-%d")
+        first_day = target_date.replace(day=1)
+        if target_date.month == 12: last_day = target_date.replace(year=target_date.year + 1, month=1, day=1) - timedelta(days=1)
+        else: last_day = target_date.replace(month=target_date.month + 1, day=1) - timedelta(days=1)
+        num_days = last_day.day
+        monthly_dist = [0.0] * num_days
+        total_dist, total_time, hr_sum, hr_count = 0.0, 0, 0, 0
+        for act in activities:
+            if act.get('type') == 'Run':
+                act_date = datetime.strptime(act['start_date_local'][:10], "%Y-%m-%d")
+                if first_day <= act_date <= last_day:
+                    dist = act.get('distance', 0) / 1000
+                    monthly_dist[act_date.day - 1] += dist
+                    total_dist += dist; total_time += act.get('moving_time', 0)
+                    if act.get('average_heartrate'): hr_sum += act.get('average_heartrate'); hr_count += 1
+        avg_hr = int(hr_sum / hr_count) if hr_count > 0 else 0
+        avg_pace_sec = (total_time / total_dist) if total_dist > 0 else 0
+        avg_pace = f"{int(avg_pace_sec//60)}'{int(avg_pace_sec%60):02d}\""
+        fmt_time = f"{total_time//3600:02d}:{(total_time%3600)//60:02d}:{total_time%60:02d}"
+        return {"dists": monthly_dist, "total_dist": f"{total_dist:.2f}", "total_time": fmt_time, "avg_pace": avg_pace, "avg_hr": str(avg_hr), "range": first_day.strftime('%Y.%m'), "labels": [str(i+1) for i in range(num_days)]}
+    except: return None
+
+# [폰트 적용 차트 생성 함수]
 def create_bar_chart(data, color_hex, mode="WEEKLY", labels=None, font_path=None):
     if mode == "WEEKLY": labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+    prop = font_manager.FontProperties(fname=font_path) if font_path else None
     
-    # Matplotlib용 폰트 설정
-    if font_path:
-        prop = font_manager.FontProperties(fname=font_path)
-    else:
-        prop = None
-
     fig, ax = plt.subplots(figsize=(10, 3.5), dpi=150)
     fig.patch.set_alpha(0); ax.patch.set_alpha(0)
     bars = ax.bar(labels, data, color=color_hex, width=0.6)
-    
     for s in ['top', 'right', 'left']: ax.spines[s].set_visible(False)
     
-    # x축 레이블에 폰트 적용
     ax.tick_params(axis='x', colors='white')
     if prop:
         for label in ax.get_xticklabels():
             label.set_fontproperties(prop)
-            label.set_fontsize(12 if mode=="MONTHLY" else 14)
-            
+            label.set_fontsize(10 if mode=="MONTHLY" else 14)
     ax.tick_params(axis='y', left=False, labelleft=False)
     
-    # 막대 위 숫자(데이터 레이블)에 폰트 적용 (WEEKLY만 표시)
     if mode == "WEEKLY":
         for bar in bars:
             h = bar.get_height()
@@ -52,9 +120,16 @@ def create_bar_chart(data, color_hex, mode="WEEKLY", labels=None, font_path=None
                 ax.text(bar.get_x() + bar.get_width()/2., h + 0.1, f'{h:.1f}', 
                         ha='center', va='bottom', color='white', 
                         fontproperties=prop, fontsize=12, fontweight='bold')
-    
     plt.tight_layout(); buf = io.BytesIO(); plt.savefig(buf, format='png', transparent=True); buf.seek(0); plt.close(fig)
     return Image.open(buf)
+
+@st.cache_resource
+def load_font(font_type, size):
+    fonts = {"BlackHanSans": "https://github.com/google/fonts/raw/main/ofl/blackhansans/BlackHanSans-Regular.ttf", "Jua": "https://github.com/google/fonts/raw/main/ofl/jua/Jua-Regular.ttf", "DoHyeon": "https://github.com/google/fonts/raw/main/ofl/dohyeon/DoHyeon-Regular.ttf", "NanumBrush": "https://github.com/google/fonts/raw/main/ofl/nanumbrushscript/NanumBrushScript-Regular.ttf", "Sunflower": "https://github.com/google/fonts/raw/main/ofl/sunflower/Sunflower-Bold.ttf"}
+    f_path = f"font_{font_type}_{int(size)}.ttf"
+    if not os.path.exists(f_path):
+        r = requests.get(fonts.get(font_type, fonts["BlackHanSans"])); open(f_path, "wb").write(r.content)
+    return ImageFont.truetype(f_path, int(size))
 
 # --- [3. 인증 및 데이터 처리] ---
 if 'access_token' not in st.session_state: st.session_state['access_token'] = None
@@ -103,15 +178,9 @@ with col_main:
             v_time = f"{m_sec//3600:02d}:{(m_sec%3600)//60:02d}:{m_sec%60:02d}"
             v_pace = f"{int((m_sec/d_km)//60)}'{int((m_sec/d_km)%60):02d}\"" if d_km > 0 else "0'00\""
             v_hr = str(int(a.get('average_heartrate', 0))) if a.get('average_heartrate') else "0"
-        elif mode in ["WEEKLY", "MONTHLY"]:
-            data_obj = weekly_data if mode == "WEEKLY" else monthly_data
-            if data_obj:
-                # 선택된 폰트 파일 경로 가져오기
-                f_path = f"font_{sel_font}_{70}.ttf" # 이미 로드된 폰트 파일 활용
-                
-                chart_img = create_bar_chart(data_obj['dists'], m_color, mode=mode, 
-                                             labels=data_obj.get('labels'), 
-                                             font_path=f_path), weekly_data['avg_pace'], weekly_data['avg_hr']
+        elif mode == "WEEKLY":
+            weekly_data = get_weekly_stats(acts, a['start_date_local'][:10])
+            if weekly_data: v_act, v_date, v_dist, v_time, v_pace, v_hr = "WEEKLY RUN", weekly_data['range'], weekly_data['total_dist'], weekly_data['total_time'], weekly_data['avg_pace'], weekly_data['avg_hr']
         elif mode == "MONTHLY":
             monthly_data = get_monthly_stats(acts, a['start_date_local'][:10])
             if monthly_data: v_act, v_date, v_dist, v_time, v_pace, v_hr = "MONTHLY RUN", monthly_data['range'], monthly_data['total_dist'], monthly_data['total_time'], monthly_data['avg_pace'], monthly_data['avg_hr']
@@ -141,7 +210,11 @@ with col_design:
 
 # --- [6. 렌더링 엔진] ---
 try:
-    f_t, f_d, f_n, f_l = load_font(sel_font, 70), load_font(sel_font, 20), load_font(sel_font, 40), load_font(sel_font, 23)
+    # 폰트 로드 (메인 텍스트용)
+    f_t, f_d, f_n, f_l = load_font(sel_font, 90), load_font(sel_font, 30), load_font(sel_font, 60), load_font(sel_font, 23)
+    # 차트용 폰트 경로 확보
+    f_path = f"font_{sel_font}_{90}.ttf"
+    
     canvas = make_smart_collage(bg_files, (CW, CH)) if bg_files else Image.new("RGBA", (CW, CH), (20, 20, 20, 255))
     overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
     
@@ -150,22 +223,22 @@ try:
         if box_orient == "Vertical":
             draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0,0,0,box_alpha))
             draw.text((rx+40, ry+30), v_act, font=f_t, fill=m_color)
-            draw.text((rx+40, ry+130), v_date, font=f_d, fill="#AAAAAA")
-            y_c = ry + 210
+            draw.text((rx+40, ry+145), v_date, font=f_d, fill="#AAAAAA")
+            y_c = ry + 240
             for lab, val in items:
                 draw.text((rx+40, y_c), lab.lower(), font=f_l, fill="#AAAAAA")
                 v_s = val.lower() if any(x in val for x in ["km","bpm"]) else val
-                draw.text((rx+40, y_c+25), v_s, font=f_n, fill=sub_color); y_c += 115
+                draw.text((rx+40, y_c+30), v_s, font=f_n, fill=sub_color); y_c += 130
         else:
             draw.rectangle([0, ry, 1080, ry + rh], fill=(0,0,0,box_alpha))
             t_w = draw.textlength(v_act, font=f_t); draw.text(((1080 - t_w)//2, ry + 35), v_act, font=f_t, fill=m_color)
-            d_w = draw.textlength(v_date, font=f_d); draw.text(((1080 - d_w)//2, ry + 125), v_date, font=f_d, fill="#AAAAAA")
+            d_w = draw.textlength(v_date, font=f_d); draw.text(((1080 - d_w)//2, ry + 140), v_date, font=f_d, fill="#AAAAAA")
             sec_w = 1080 // 4
             for i, (lab, val) in enumerate(items):
                 cx = (i * sec_w) + (sec_w // 2); v_s = val.lower() if any(x in val for x in ["km","bpm"]) else val
                 lw, vw = draw.textlength(lab.lower(), font=f_l), draw.textlength(v_s, font=f_n)
-                draw.text((cx - lw//2, ry + 175), lab.lower(), font=f_l, fill="#AAAAAA")
-                draw.text((cx - vw//2, ry + 205), v_s, font=f_n, fill=sub_color)
+                draw.text((cx - lw//2, ry + 195), lab.lower(), font=f_l, fill="#AAAAAA")
+                draw.text((cx - vw//2, ry + 235), v_s, font=f_n, fill=sub_color)
 
     if show_vis:
         if mode == "DAILY" and a and a.get('map', {}).get('summary_polyline'):
@@ -179,7 +252,7 @@ try:
         elif mode in ["WEEKLY", "MONTHLY"]:
             data_obj = weekly_data if mode == "WEEKLY" else monthly_data
             if data_obj:
-                chart_img = create_bar_chart(data_obj['dists'], m_color, mode=mode, labels=data_obj.get('labels'))
+                chart_img = create_bar_chart(data_obj['dists'], m_color, mode=mode, labels=data_obj.get('labels'), font_path=f_path)
                 w_p = (vis_sz / float(chart_img.size[0])); vis_layer = chart_img.resize((vis_sz, int(chart_img.size[1]*w_p)), Image.Resampling.LANCZOS)
                 alpha_mask = vis_layer.getchannel('A').point(lambda x: x * (vis_alpha / 255)); vis_layer.putalpha(alpha_mask)
                 overlay.paste(vis_layer, ((CW - vis_layer.width)//2, CH - vis_layer.height - 80), vis_layer)
