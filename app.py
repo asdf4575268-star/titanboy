@@ -198,7 +198,7 @@ with col_design:
         rw = st.number_input("박스 너비", 100, 1080, 1080 if box_orient=="Horizontal" else 450)
         rh = st.number_input("박스 높이", 100, 1920, 550)
         box_alpha = st.slider("박스 투명도", 0, 255, 110)
-        vis_sz_adj = st.slider("지도 크기", 50, 600, 180 if mode=="DAILY" else 400)
+        vis_sz_adj = st.slider("지도/그래프 크기", 50, 1000, 450 if mode=="WEEKLY" "MONTHLY" else 1080)
         vis_alpha = st.slider("지도 투명도", 0, 255, 180)
 
 # --- [6. 미리보기 렌더링] ---
@@ -272,6 +272,7 @@ with col_main:
         st.download_button(f"📸 {mode} DOWNLOAD", buf.getvalue(), f"{mode.lower()}.jpg", use_container_width=True)
     except Exception as e:
         st.info("데이터를 선택하고 이미지를 업로드하면 미리보기가 나타납니다.")
+
 
 
 
