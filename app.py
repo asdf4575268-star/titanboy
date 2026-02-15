@@ -104,7 +104,7 @@ def load_font(font_type, size):
 def create_bar_chart(data, color_hex, mode="WEEKLY", labels=None, font_path=None):
     if mode == "WEEKLY": labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
     prop = font_manager.FontProperties(fname=font_path) if font_path else None
-    fig, ax = plt.subplots(figsize=(10, 5.0), dpi=150)
+    fig, ax = plt.subplots(figsize=(10, 4.0), dpi=150) # 그래프 높이 소폭 조정
     fig.patch.set_alpha(0); ax.patch.set_alpha(0)
     bars = ax.bar(labels, data, color=color_hex, width=0.6)
     for s in ['top', 'right', 'left']: ax.spines[s].set_visible(False)
@@ -174,23 +174,24 @@ with col_main:
 with col_design:
     st.header("🎨 DESIGN")
     
-    # 1. 모드 변경 감지를 위한 세션 상태
-    if "prev_orient" not in st.session_state:
-        st.session_state.prev_orient = "Vertical"
+    if "prev_orient" not in st.session_state: st.session_state.prev_orient = "Vertical"
+    if "prev_mode" not in st.session_state: st.session_state.prev_mode = "DAILY"
 
-    # 2. 박스 방향 라디오 버튼
     box_orient = st.radio("박스 방향", ["Vertical", "Horizontal"], horizontal=True, key="orient_radio")
 
-    # 3. 모드 변경 시 st.rerun()으로 UI 강제 리셋 (기본값 적용용)
-    if st.session_state.prev_orient != box_orient:
+    # 모드나 방향이 바뀌면 리셋
+    if st.session_state.prev_orient != box_orient or st.session_state.prev_mode != mode:
         st.session_state.prev_orient = box_orient
+        st.session_state.prev_mode = mode
         st.rerun()
 
-    # 4. 방향에 따른 최적화된 기본값 설정
-    if box_orient == "Horizontal":
-        def_rx, def_ry, def_rw, def_rh = 0, 1000, 1000, 350
-    else:
-        def_rx, def_ry, def_rw, def_rh = 70, 1250, 450, 600
+    # 모드/방향별 좌표 자동 계산 로직
+    if mode == "DAILY":
+        if box_orient == "Horizontal": def_rx, def_ry, def_rw, def_rh = 0, 1400, 1080, 350
+        else: def_rx, def_ry, def_rw, def_rh = 70, 1250, 450, 550
+    else: # WEEKLY, MONTHLY (1350 높이)
+        if box_orient == "Horizontal": def_rx, def_ry, def_rw, def_rh = 0, 100, 1080, 350 # 상단 배치 추천
+        else: def_rx, def_ry, def_rw, def_rh = 70, 70, 450, 550
 
     with st.expander("✍️ 텍스트 수정"):
         v_act = st.text_input("활동명", v_act, key="ti_act")
@@ -210,11 +211,12 @@ with col_design:
         sub_color = COLOR_OPTS[st.selectbox("서브 컬러", list(COLOR_OPTS.keys()), index=1, key="s_col_sel")]
 
     with st.expander("📍 위치/크기 조절", expanded=True):
-        # key에 box_orient를 포함시켜서 모드가 바뀌면 위젯을 완전히 새로 그림 (기본값 강제 적용 기술)
-        rx = st.number_input("박스 X", 0, 1080, def_rx, key=f"rx_{box_orient}")
-        ry = st.number_input("박스 Y", 0, 1920, def_ry, key=f"ry_{box_orient}")
-        rw = st.number_input("박스 너비", 100, 1080, def_rw, key=f"rw_{box_orient}")
-        rh = st.number_input("박스 높이", 100, 1920, def_rh, key=f"rh_{box_orient}")
+        # key에 모드와 방향을 합쳐서 리셋 유도
+        k_suf = f"{mode}_{box_orient}"
+        rx = st.number_input("박스 X", 0, 1080, def_rx, key=f"rx_{k_suf}")
+        ry = st.number_input("박스 Y", 0, 1920, def_ry, key=f"ry_{k_suf}")
+        rw = st.number_input("박스 너비", 100, 1080, def_rw, key=f"rw_{k_suf}")
+        rh = st.number_input("박스 높이", 100, 1920, def_rh, key=f"rh_{k_suf}")
         box_alpha = st.slider("박스 투명도", 0, 255, 110, key="box_alpha_sl")
         vis_sz_adj = st.slider("지도/그래프 크기", 50, 1080, 180 if mode=="DAILY" else 950, key="vis_sz_sl")
         vis_alpha = st.slider("지도/그래프 투명도", 0, 255, 180, key="vis_alpha_sl")
@@ -224,9 +226,8 @@ with col_main:
     st.subheader("🖼️ PREVIEW")
     try:
         CW, CH = (1080, 1920) if mode == "DAILY" else (1080, 1350)
-        # 설정된 값들 (90, 30, 60) 적용
-        f_t, f_d, f_n, f_l = load_font(sel_font, 70), load_font(sel_font, 20), load_font(sel_font, 45), load_font(sel_font, 23)
-        f_path = f"font_{sel_font}_70.ttf"
+        f_t, f_d, f_n, f_l = load_font(sel_font, 90), load_font(sel_font, 30), load_font(sel_font, 60), load_font(sel_font, 23)
+        f_path = f"font_{sel_font}_90.ttf"
         
         canvas = make_smart_collage(bg_files, (CW, CH)) if bg_files else Image.new("RGBA", (CW, CH), (20, 20, 20, 255))
         overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
@@ -274,7 +275,8 @@ with col_main:
                 vis_sz = vis_sz_adj
                 v_l = chart_img.resize((vis_sz, int(chart_img.size[1]*(vis_sz/chart_img.size[0]))), Image.Resampling.LANCZOS)
                 v_l.putalpha(v_l.getchannel('A').point(lambda x: x * (vis_alpha / 255)))
-                overlay.paste(v_l, ((CW - v_l.width)//2, CH - v_l.height - 80), v_l)
+                # 통계 그래프 위치 최적화: 캔버스 하단 중앙
+                overlay.paste(v_l, ((CW - v_l.width)//2, CH - v_l.height - 50), v_l)
 
         if log_file:
             ls = 100; l_img = ImageOps.fit(Image.open(log_file).convert("RGBA"), (ls, ls))
@@ -289,5 +291,3 @@ with col_main:
         st.download_button(f"📸 {mode} DOWNLOAD", buf.getvalue(), f"{mode.lower()}.jpg", use_container_width=True, key="down_btn")
     except Exception as e:
         st.info("데이터와 사진을 선택하면 매거진 미리보기가 나타납니다.")
-
-
