@@ -246,11 +246,21 @@ with col_main:
                 overlay.paste(vis_layer, ((CW - vis_layer.width)//2, CH - vis_layer.height - 80), vis_layer)
 
             # 3. 로고 로직 (복구 완료)
+            # 3. 로고 로직 (캔버스 우상단 고정)
             if log_file:
-                ls = 80 # 로고 크기
+                ls = 120  # 로고 크기
+                margin = 40  # 우측 및 상단에서의 여백
+                
                 l_img = ImageOps.fit(Image.open(log_file).convert("RGBA"), (ls, ls))
-                mask = Image.new('L', (ls, ls), 0); ImageDraw.Draw(mask).ellipse((0, 0, ls, ls), fill=255); l_img.putalpha(mask)
-                l_pos = (rx + rw - ls - 80, ry + 10) if box_orient == "Horizontal" else (rx + rw - ls - 25, ry + rh - ls - 25)
+                
+                # 원형 마스크 적용
+                mask = Image.new('L', (ls, ls), 0)
+                ImageDraw.Draw(mask).ellipse((0, 0, ls, ls), fill=255)
+                l_img.putalpha(mask)
+                
+                # 위치 계산: (전체 가로 - 로고 크기 - 여백, 여백)
+                l_pos = (CW - ls - margin, margin)
+                
                 overlay.paste(l_img, (int(l_pos[0]), int(l_pos[1])), l_img)
 
             final = Image.alpha_composite(canvas, overlay).convert("RGB")
@@ -261,6 +271,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
