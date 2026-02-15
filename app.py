@@ -33,20 +33,21 @@ def draw_styled_text(draw, pos, text, font, fill, shadow=True):
         draw.text((pos[0] + 3, pos[1] + 3), text, font=font, fill=(0, 0, 0, 180))
     draw.text(pos, text, font=font, fill=fill)
 @st.cache_resource
+@st.cache_resource
 def load_font(font_type, size):
-    # 원하는 폰트의 GitHub 또는 구글 폰트 원본 주소를 여기에 추가하세요.
     fonts = {
         "BlackHanSans": "https://github.com/google/fonts/raw/main/ofl/blackhansans/BlackHanSans-Regular.ttf",
         "Sunflower": "https://github.com/google/fonts/raw/main/ofl/sunflower/Sunflower-Regular.ttf",
         "KirangHaerang": "https://github.com/google/fonts/raw/main/ofl/kiranghaerang/KirangHaerang-Regular.ttf",
         "JollyLodger": "https://github.com/google/fonts/raw/main/ofl/jollylodger/JollyLodger-Regular.ttf",
         "Lacquer": "https://github.com/google/fonts/raw/main/ofl/lacquer/Lacquer-Regular.ttf",
-        "IndieFlower": "https://github.com/google/fonts/raw/main/ofl/indieflower/IndieFlower-Regular.ttf"
+        "IndieFlower": "https://github.com/google/fonts/raw/main/ofl/indieflower/IndieFlower-Regular.ttf",
+        "Orbit": "https://github.com/google/fonts/raw/main/ofl/orbit/Orbit-Regular.ttf"  # Orbit 추가
     }
     
     f_path = f"font_{font_type}_{int(size)}.ttf"
     if not os.path.exists(f_path):
-        font_url = fonts.get(font_type, fonts["BlackHanSans"])
+        font_url = fonts.get(font_type, fonts["BlackHanSans"]) # 없는 폰트면 기본폰트로 대체
         r = requests.get(font_url)
         with open(f_path, "wb") as f:
             f.write(r.content)
@@ -331,6 +332,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
