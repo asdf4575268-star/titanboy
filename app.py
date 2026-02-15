@@ -246,7 +246,8 @@ with col_main:
                 m_draw.line([tr(la, lo) for la, lo in pts], fill=hex_to_rgba(m_color, vis_alpha), width=5)
                 
                 if box_orient == "Vertical":
-                    m_x, m_y = rx + 40 + title_w + 30, ry + 35
+                    m_x = rx + 40 + title_w + 30
+                    m_y = ry + 35
                 else:
                     m_x, m_y = (1080 - title_w)//2 - vis_sz - 30, ry + 35
                 overlay.paste(vis_layer, (int(m_x), int(m_y)), vis_layer)
@@ -271,6 +272,7 @@ with col_main:
         st.download_button(f"📸 {mode} DOWNLOAD", buf.getvalue(), f"{mode.lower()}.jpg", use_container_width=True)
     except Exception as e:
         st.info("데이터를 선택하고 이미지를 업로드하면 미리보기가 나타납니다.")
+
 
 
 
