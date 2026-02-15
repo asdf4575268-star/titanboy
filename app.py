@@ -29,12 +29,11 @@ def hex_to_rgba(hex_color, alpha):
 
 def draw_styled_text(draw, pos, text, font, fill, shadow=True):
     if shadow:
-        # 그림자 위치를 (3, 3)으로 설정하여 약간의 입체감을 줍니다.
         draw.text((pos[0] + 3, pos[1] + 3), text, font=font, fill=(0, 0, 0, 180))
     draw.text(pos, text, font=font, fill=fill)
+
 @st.cache_resource
 def load_font(font_type, size):
-    # 원하는 폰트의 GitHub 또는 구글 폰트 원본 주소를 여기에 추가하세요.
     fonts = {
         "BlackHanSans": "https://github.com/google/fonts/raw/main/ofl/blackhansans/BlackHanSans-Regular.ttf",
         "Sunflower": "https://github.com/google/fonts/raw/main/ofl/sunflower/Sunflower-Regular.ttf",
@@ -43,16 +42,12 @@ def load_font(font_type, size):
         "Lacquer": "https://github.com/google/fonts/raw/main/ofl/lacquer/Lacquer-Regular.ttf",
         "IndieFlower": "https://github.com/google/fonts/raw/main/ofl/indieflower/IndieFlower-Regular.ttf"
     }
-    
     f_path = f"font_{font_type}_{int(size)}.ttf"
     if not os.path.exists(f_path):
         font_url = fonts.get(font_type, fonts["BlackHanSans"])
         r = requests.get(font_url)
         with open(f_path, "wb") as f:
             f.write(r.content)
-            
-    return ImageFont.truetype(f_path, int(size))
-            
     return ImageFont.truetype(f_path, int(size))
 
 def get_weekly_stats(activities, target_date_str):
@@ -145,8 +140,6 @@ if st.session_state['access_token']:
 # --- [5. 메인 화면 구성] ---
 with col_main:
     st.title("TITAN BOY")
-    
-    # --- [여기에 초기화 배치] ---
     v_act, v_date, v_dist, v_time, v_pace, v_hr = "RUNNING", "2026-02-15", "0.00", "00:00:00", "0'00\"", "0"
     weekly_data, monthly_data, a = None, None, None
     if not st.session_state['access_token']:
@@ -155,30 +148,47 @@ with col_main:
         st.button("🔓 로그아웃", on_click=logout_and_clear, use_container_width=True)
         bg_files = st.file_uploader("📸 배경 사진", type=['jpg','jpeg','png'], accept_multiple_files=True)
         log_file = st.file_uploader("🔘 원형 로고", type=['jpg','jpeg','png'])
-        
         mode = st.radio("모드 선택", ["DAILY", "WEEKLY", "MONTHLY"], horizontal=True)
-        v_act, v_date, v_dist, v_time, v_pace, v_hr = "RUNNING", "2026-02-15", "0.00", "00:00:00", "0'00\"", "0"
-        weekly_data, monthly_data, a = None, None, None
         
         if acts:
             if mode == "DAILY":
                 act_opts = [f"{ac['start_date_local'][:10]} - {ac['name']}" for ac in acts]
                 sel_act = st.selectbox("🏃 활동 선택", act_opts)
                 a = acts[act_opts.index(sel_act)]
+                
+                # 주차 및 월 계산 (DAILY)
+                dt_obj = datetime.strptime(a['start_date_local'][:10], "%Y-%m-%d")
+                month_name = dt_obj.strftime("%B").upper()
+                first_day = dt_obj.replace(day=1)
+                adj_dom = dt_obj.day + first_day.weekday()
+                week_num = (adj_dom - 1) // 7 + 1
+                suffix = "TH" if 11 <= week_num <= 13 else {1: "ST", 2: "ND", 3: "RD"}.get(week_num % 10, "TH")
+                
+                v_act = f"{week_num}{suffix} WEEK, {month_name}"
+                v_date = a['start_date_local'][:10]
                 d_km = a.get('distance', 0)/1000; m_s = a.get('moving_time', 0)
-                v_act, v_date, v_dist, v_time = a['name'], a['start_date_local'][:10], f"{d_km:.2f}", f"{m_s//3600:02d}:{(m_s%3600)//60:02d}:{m_s%60:02d}"
+                v_dist = f"{d_km:.2f}"
+                v_time = f"{m_s//3600:02d}:{(m_s%3600)//60:02d}:{m_s%60:02d}"
                 v_pace = f"{int((m_s/d_km)//60)}'{int((m_s/d_km)%60):02d}\"" if d_km > 0 else "0'00\""
                 v_hr = str(int(a.get('average_heartrate', 0))) if a.get('average_heartrate') else "0"
+                
             elif mode == "WEEKLY":
                 weeks = sorted(list(set([(datetime.strptime(ac['start_date_local'][:10], "%Y-%m-%d") - timedelta(days=datetime.strptime(ac['start_date_local'][:10], "%Y-%m-%d").weekday())).strftime('%Y.%m.%d') for ac in acts])), reverse=True)
                 sel_week = st.selectbox("📅 주차 선택", weeks)
                 weekly_data = get_weekly_stats(acts, sel_week.replace('.','-'))
-                if weekly_data: v_act, v_date, v_dist, v_time, v_pace, v_hr = "WEEKLY RUN", weekly_data['range'], weekly_data['total_dist'], weekly_data['total_time'], weekly_data['avg_pace'], weekly_data['avg_hr']
+                if weekly_data:
+                    dt_temp = datetime.strptime(sel_week.replace('.','-'), "%Y-%m-%d")
+                    v_act = f"{dt_temp.strftime('%B').upper()} WEEKLY"
+                    v_date, v_dist, v_time, v_pace, v_hr = weekly_data['range'], weekly_data['total_dist'], weekly_data['total_time'], weekly_data['avg_pace'], weekly_data['avg_hr']
+                    
             elif mode == "MONTHLY":
                 months = sorted(list(set([ac['start_date_local'][:7] for ac in acts])), reverse=True)
                 sel_month = st.selectbox("🗓️ 월 선택", months)
                 monthly_data = get_monthly_stats(acts, f"{sel_month}-01")
-                if monthly_data: v_act, v_date, v_dist, v_time, v_pace, v_hr = "MONTHLY RUN", monthly_data['range'], monthly_data['total_dist'], monthly_data['total_time'], monthly_data['avg_pace'], monthly_data['avg_hr']
+                if monthly_data:
+                    dt_temp = datetime.strptime(f"{sel_month}-01", "%Y-%m-%d")
+                    v_act = f"{dt_temp.strftime('%B').upper()} MONTHLY"
+                    v_date, v_dist, v_time, v_pace, v_hr = monthly_data['range'], monthly_data['total_dist'], monthly_data['total_time'], monthly_data['avg_pace'], monthly_data['avg_hr']
 
 # --- [6. 디자인 창 구성] ---
 with col_design:
@@ -189,8 +199,7 @@ with col_design:
         v_pace = st.text_input("페이스", v_pace); v_hr = st.text_input("심박 bpm", v_hr)
 
     box_orient = st.radio("박스 방향", ["Vertical", "Horizontal"], horizontal=True)
-    sel_font = st.selectbox("폰트", ["BlackHanSans", "Sunflower", "Orbit", 
-        "KirangHaerang", "JollyLodger", "Lacquer", "IndieFlower"])
+    sel_font = st.selectbox("폰트", ["BlackHanSans", "Sunflower", "KirangHaerang", "JollyLodger", "Lacquer", "IndieFlower"])
     
     with st.expander("💄 매거진 스타일", expanded=True):
         use_shadow = st.toggle("글자 그림자 효과", value=True)
@@ -206,7 +215,7 @@ with col_design:
         vis_sz_adj = st.slider("지도/그래프 크기", 50, 1080, 180 if mode=="DAILY" else 950)
         vis_alpha = st.slider("지도/그래프 투명도", 0, 255, 180)
 
-# --- [7. 미리보기 렌더링 (최종 통합본)] ---
+# --- [7. 미리보기 렌더링] ---
 with col_main:
     st.subheader("🖼️ PREVIEW")
     data_ready = (mode == "DAILY" and a) or (mode == "WEEKLY" and weekly_data) or (mode == "MONTHLY" and monthly_data)
@@ -214,37 +223,36 @@ with col_main:
     if data_ready:
         try:
             CW, CH = (1080, 1920) if mode == "DAILY" else (1080, 1350)
-            # [규칙 1] 폰트 크기 강제 고정
-            f_t, f_d, f_n, f_l = load_font(sel_font, 70), load_font(sel_font, 20), load_font(sel_font, 45), load_font(sel_font, 23)
-            f_path = f"font_{sel_font}_70.ttf"
+            f_t, f_d, f_n, f_l = load_font(sel_font, 90), load_font(sel_font, 30), load_font(sel_font, 60), load_font(sel_font, 23)
+            f_path = f"font_{sel_font}_90.ttf"
             
             canvas = make_smart_collage(bg_files, (CW, CH)) if bg_files else Image.new("RGBA", (CW, CH), (20, 20, 20, 255))
             overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
             
-            # [규칙 2] km, bpm 소문자 고정
             items = [("distance", f"{v_dist} km"), ("time", v_time), ("pace", v_pace), ("avg bpm", f"{v_hr} bpm")]
             
             # 1. 데이터 박스 렌더링
             draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0,0,0,box_alpha))
             if box_orient == "Vertical":
-                draw_styled_text(draw, (rx+40, ry+30), v_act, f_t, m_color)
-                draw_styled_text(draw, (rx+40, ry+125), v_date, f_d, "#AAAAAA")
-                y_c = ry + 190
+                draw_styled_text(draw, (rx+40, ry+30), v_act, f_t, m_color, shadow=use_shadow)
+                draw_styled_text(draw, (rx+40, ry+140), v_date, f_d, "#AAAAAA", shadow=use_shadow)
+                y_c = ry + 210
                 for lab, val in items:
-                    draw_styled_text(draw, (rx+40, y_c), lab.lower(), f_l, "#AAAAAA")
-                    draw_styled_text(draw, (rx+40, y_c+35), val.lower(), f_n, sub_color)
-                    y_c += 100
+                    draw_styled_text(draw, (rx+40, y_c), lab.lower(), f_l, "#AAAAAA", shadow=use_shadow)
+                    draw_styled_text(draw, (rx+40, y_c+35), val.lower(), f_n, sub_color, shadow=use_shadow)
+                    y_c += 110
             else:
                 title_w = draw.textlength(v_act, f_t)
-                draw_styled_text(draw, (rx + (rw-title_w)//2, ry+35), v_act, f_t, m_color)
-                draw_styled_text(draw, (rx + (rw-draw.textlength(v_date, f_d))//2, ry+130), v_date, f_d, "#AAAAAA")
+                draw_styled_text(draw, (rx + (rw-title_w)//2, ry+35), v_act, f_t, m_color, shadow=use_shadow)
+                date_w = draw.textlength(v_date, f_d)
+                draw_styled_text(draw, (rx + (rw-date_w)//2, ry+140), v_date, f_d, "#AAAAAA", shadow=use_shadow)
                 sec_w = rw // 4
                 for i, (lab, val) in enumerate(items):
                     cx = rx + (i * sec_w) + (sec_w // 2)
-                    draw_styled_text(draw, (cx - draw.textlength(lab.lower(), f_l)//2, ry+185), lab.lower(), f_l, "#AAAAAA")
-                    draw_styled_text(draw, (cx - draw.textlength(val.lower(), f_n)//2, ry+230), val.lower(), f_n, sub_color)
+                    draw_styled_text(draw, (cx - draw.textlength(lab.lower(), f_l)//2, ry+210), lab.lower(), f_l, "#AAAAAA", shadow=use_shadow)
+                    draw_styled_text(draw, (cx - draw.textlength(val.lower(), f_n)//2, ry+250), val.lower(), f_n, sub_color, shadow=use_shadow)
 
-            # 2. 지도 및 그래프 로직 (복구 완료)
+            # 2. 지도 및 그래프
             if mode == "DAILY" and a and a.get('map', {}).get('summary_polyline'):
                 pts = polyline.decode(a['map']['summary_polyline'])
                 lats, lons = zip(*pts)
@@ -252,9 +260,7 @@ with col_main:
                 vis_layer = Image.new("RGBA", (vis_sz, vis_sz), (0,0,0,0)); m_draw = ImageDraw.Draw(vis_layer)
                 def tr(la, lo): return 15+(lo-min(lons))/(max(lons)-min(lons)+1e-5)*(vis_sz-30), (vis_sz-15)-(la-min(lats))/(max(lats)-min(lats)+1e-5)*(vis_sz-30)
                 m_draw.line([tr(la, lo) for la, lo in pts], fill=hex_to_rgba(m_color, vis_alpha), width=6)
-                
-                # 지도 위치: Vertical일 땐 우측 상단 여백, Horizontal일 땐 상단 배치
-                m_pos = (rx + rw - vis_sz - 90, ry + 10) if box_orient == "Vertical" else (rx + (rw-vis_sz)//2, ry - vis_sz - 20)
+                m_pos = (rx + rw - vis_sz - 40, ry + 10) if box_orient == "Vertical" else (rx + (rw-vis_sz)//2, ry - vis_sz - 20)
                 overlay.paste(vis_layer, (int(m_pos[0]), int(m_pos[1])), vis_layer)
                 
             elif mode in ["WEEKLY", "MONTHLY"] and (weekly_data or monthly_data):
@@ -265,42 +271,26 @@ with col_main:
                 vis_layer.putalpha(vis_layer.getchannel('A').point(lambda x: x * (vis_alpha / 255)))
                 overlay.paste(vis_layer, ((CW - vis_layer.width)//2, CH - vis_layer.height - 80), vis_layer)
 
-            # 3. 로고 로직 (복구 완료)
-            # 3. 로고 로직 (캔버스 우상단 고정)
+            # 3. 로고 로직
             if log_file:
-                ls = 90 # 로고 크기
-                margin = 40  # 우측 및 상단에서의 여백
-                
+                ls = 90
+                margin = 40
                 l_img = ImageOps.fit(Image.open(log_file).convert("RGBA"), (ls, ls))
-                
-                # 원형 마스크 적용
                 mask = Image.new('L', (ls, ls), 0)
                 ImageDraw.Draw(mask).ellipse((0, 0, ls, ls), fill=255)
                 l_img.putalpha(mask)
-                
-                # 위치 계산: (전체 가로 - 로고 크기 - 여백, 여백)
                 l_pos = (CW - ls - margin, margin)
-                
                 overlay.paste(l_img, (int(l_pos[0]), int(l_pos[1])), l_img)
 
+            # 4. 프레임 테두리 (최종 덧씌우기)
+            if border_thick > 0:
+                draw.rectangle([0, 0, CW, CH], outline=m_color, width=border_thick)
+
             final = Image.alpha_composite(canvas, overlay).convert("RGB")
-            st.image(final, width=300)
+            st.image(final, width=400)
             
             buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
             st.download_button(f"📸 {mode} DOWNLOAD", buf.getvalue(), f"{mode.lower()}.jpg", use_container_width=True)
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
-
-
-
-
-
-
-
-
-
-
-
-
-
