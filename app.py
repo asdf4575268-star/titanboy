@@ -33,35 +33,28 @@ def draw_styled_text(draw, pos, text, font, fill, shadow=True):
         draw.text((pos[0] + 3, pos[1] + 3), text, font=font, fill=(0, 0, 0, 180))
     draw.text(pos, text, font=font, fill=fill)
 @st.cache_resource
-@st.cache_resource
-@st.cache_resource
 def load_font(font_type, size):
+    # 원하는 폰트의 GitHub 또는 구글 폰트 원본 주소를 여기에 추가하세요.
     fonts = {
         "BlackHanSans": "https://github.com/google/fonts/raw/main/ofl/blackhansans/BlackHanSans-Regular.ttf",
-        "Sunflower": "https://github.com/google/fonts/raw/main/ofl/sunflower/Sunflower-Light.ttf", # Sunflower 경로 확인
+        "Sunflower": "https://github.com/google/fonts/raw/main/ofl/sunflower/Sunflower-Regular.ttf",
         "KirangHaerang": "https://github.com/google/fonts/raw/main/ofl/kiranghaerang/KirangHaerang-Regular.ttf",
         "JollyLodger": "https://github.com/google/fonts/raw/main/ofl/jollylodger/JollyLodger-Regular.ttf",
         "Lacquer": "https://github.com/google/fonts/raw/main/ofl/lacquer/Lacquer-Regular.ttf",
-        "IndieFlower": "https://github.com/google/fonts/raw/main/ofl/indieflower/IndieFlower-Regular.ttf",
-        "Orbit": "https://github.com/google/fonts/raw/main/ofl/orbit/Orbit-Regular.ttf"
+        "IndieFlower": "https://github.com/google/fonts/raw/main/ofl/indieflower/IndieFlower-Regular.ttf"
     }
     
     f_path = f"font_{font_type}_{int(size)}.ttf"
-    
-    # 파일이 없는 경우에만 다운로드 실행
     if not os.path.exists(f_path):
         font_url = fonts.get(font_type, fonts["BlackHanSans"])
-        try:
-            r = requests.get(font_url, timeout=10)
-            r.raise_for_status() # 연결 오류 확인
-            with open(f_path, "wb") as f:
-                f.write(r.content)
-        except Exception as e:
-            st.error(f"폰트 다운로드 실패 ({font_type}): {e}")
-            # 실패 시 기본 폰트 시스템 경로라도 반환하도록 방어
-            return ImageFont.load_default()
+        r = requests.get(font_url)
+        with open(f_path, "wb") as f:
+            f.write(r.content)
             
     return ImageFont.truetype(f_path, int(size))
+            
+    return ImageFont.truetype(f_path, int(size))
+
 def get_weekly_stats(activities, target_date_str):
     try:
         target_date = datetime.strptime(target_date_str, "%Y-%m-%d")
@@ -209,35 +202,25 @@ with col_main:
 # --- [6. 디자인 창 구성] ---
 with col_design:
     st.header("🎨 DESIGN")
-    
     with st.expander("✍️ 텍스트 수정"):
-        v_act = st.text_input("활동명", v_act)
-        v_date = st.text_input("날짜", v_date)
-        v_dist = st.text_input("거리 km", v_dist)
-        v_time = st.text_input("시간", v_time)
-        v_pace = st.text_input("페이스", v_pace)
-        v_hr = st.text_input("심박 bpm", v_hr)
+        v_act = st.text_input("활동명", v_act); v_date = st.text_input("날짜", v_date)
+        v_dist = st.text_input("거리 km", v_dist); v_time = st.text_input("시간", v_time)
+        v_pace = st.text_input("페이스", v_pace); v_hr = st.text_input("심박 bpm", v_hr)
 
+    box_orient = st.radio("박스 방향", ["Vertical", "Horizontal"], horizontal=True)
+    sel_font = st.selectbox("폰트", ["BlackHanSans", "Sunflower", "Orbit", 
+        "KirangHaerang", "JollyLodger", "Lacquer", "IndieFlower"])
+    
     with st.expander("💄 매거진 스타일", expanded=True):
-        # 중복되었던 토글들을 여기서 한 번만 선언합니다.
-        use_shadow = st.toggle("글자 그림자 효과", value=True, key="tg_shadow")
-        show_vis = st.toggle("지도/그래프 표시", value=True, key="tg_vis")
-        show_box = st.toggle("데이터 박스 표시", value=True, key="tg_box")
-        
+        use_shadow = st.toggle("글자 그림자 효과", value=True)
         border_thick = st.slider("프레임 테두리 두께", 0, 50, 0)
-        
         COLOR_OPTS = {"Black": "#000000", "Yellow": "#FFD700", "White": "#FFFFFF", "Orange": "#FF4500", "Blue": "#00BFFF", "Grey": "#AAAAAA"}
         m_color = COLOR_OPTS[st.selectbox("포인트 컬러", list(COLOR_OPTS.keys()), key="m_col_sel")]
         sub_color = COLOR_OPTS[st.selectbox("서브 컬러", list(COLOR_OPTS.keys()), index=1, key="s_col_sel")]
 
-    box_orient = st.radio("박스 방향", ["Vertical", "Horizontal"], horizontal=True)
-    sel_font = st.selectbox("폰트", ["BlackHanSans", "Sunflower", "Orbit", "KirangHaerang", "JollyLodger", "Lacquer", "IndieFlower"])
-
     with st.expander("📍 위치/크기 조절"):
-        rx = st.number_input("박스 X", 0, 1080, 40 if box_orient=="Horizontal" else 70)
-        ry = st.number_input("박스 Y", 0, 1920, 350 if box_orient=="Horizontal" else 1250)
-        rw = st.number_input("박스 너비", 100, 1080, 1000 if box_orient=="Horizontal" else 450)
-        rh = st.number_input("박스 높이", 100, 1920, 350 if box_orient=="Horizontal" else 600)
+        rx, ry = st.number_input("박스 X", 0, 1080, 40 if box_orient=="Horizontal" else 70), st.number_input("박스 Y", 0, 1920, 350 if box_orient=="Horizontal" else 1250)
+        rw, rh = st.number_input("박스 너비", 100, 1080, 1000 if box_orient=="Horizontal" else 450), st.number_input("박스 높이", 100, 1920, 350 if box_orient=="Horizontal" else 600)
         box_alpha = st.slider("박스 투명도", 0, 255, 110)
         vis_sz_adj = st.slider("지도/그래프 크기", 50, 1080, 180 if mode=="DAILY" else 950)
         vis_alpha = st.slider("지도/그래프 투명도", 0, 255, 240)
@@ -250,86 +233,77 @@ with col_main:
     if data_ready:
         try:
             CW, CH = (1080, 1920) if mode == "DAILY" else (1080, 1350)
-            # [규칙 1] 활동명 90, 날짜 30, 숫자 60, 라벨 23 (디자인 가이드 반영)
-            f_t = load_font(sel_font, 70)
-            f_d = load_font(sel_font, 20)
-            f_n = load_font(sel_font, 45)
-            f_l = load_font(sel_font, 23)
-            f_path = f"font_{sel_font}_90.ttf"
+            # [규칙 1] 폰트 크기 강제 고정
+            f_t, f_d, f_n, f_l = load_font(sel_font, 70), load_font(sel_font, 20), load_font(sel_font, 45), load_font(sel_font, 23)
+            f_path = f"font_{sel_font}_70.ttf"
             
             canvas = make_smart_collage(bg_files, (CW, CH)) if bg_files else Image.new("RGBA", (CW, CH), (20, 20, 20, 255))
             overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
             
             # [규칙 2] km, bpm 소문자 고정
             items = [("distance", f"{v_dist} km"), ("time", v_time), ("pace", v_pace), ("avg bpm", f"{v_hr} bpm")]
+            
+            # 1. 데이터 박스 렌더링
+            draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0,0,0,box_alpha))
+            if box_orient == "Vertical":
+                draw_styled_text(draw, (rx + 40, ry + 30), v_act, f_t, m_color, shadow=use_shadow)
+                t_width = draw.textlength(v_act, font=f_t)
+                draw_styled_text(draw, (rx + 40 + t_width + 30, ry + 80), v_date, f_d, "#AAAAAA", shadow=use_shadow)
+                y_c = ry + 165
+                for lab, val in items:
+                    draw_styled_text(draw, (rx + 40, y_c), lab.lower(), f_l, "#AAAAAA", shadow=use_shadow)
+                    draw_styled_text(draw, (rx + 40, y_c + 35), val.lower(), f_n, sub_color, shadow=use_shadow)
+                    y_c += 105
+            else:
+                title_w = draw.textlength(v_act, f_t)
+                draw_styled_text(draw, (rx + (rw-title_w)//2, ry+35), v_act, f_t, m_color)
+                draw_styled_text(draw, (rx + (rw-draw.textlength(v_date, f_d))//2, ry+130), v_date, f_d, "#AAAAAA")
+                sec_w = rw // 4
+                for i, (lab, val) in enumerate(items):
+                    cx = rx + (i * sec_w) + (sec_w // 2)
+                    draw_styled_text(draw, (cx - draw.textlength(lab.lower(), f_l)//2, ry+185), lab.lower(), f_l, "#AAAAAA")
+                    draw_styled_text(draw, (cx - draw.textlength(val.lower(), f_n)//2, ry+230), val.lower(), f_n, sub_color)
 
-            # --- [1. 데이터 박스 렌더링] ---
-            if show_box:
-                draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0,0,0,box_alpha))
+            # 2. 지도 및 그래프 로직 (복구 완료)
+            if mode == "DAILY" and a and a.get('map', {}).get('summary_polyline'):
+                pts = polyline.decode(a['map']['summary_polyline'])
+                lats, lons = zip(*pts)
+                vis_sz = vis_sz_adj
+                vis_layer = Image.new("RGBA", (vis_sz, vis_sz), (0,0,0,0)); m_draw = ImageDraw.Draw(vis_layer)
+                def tr(la, lo): return 15+(lo-min(lons))/(max(lons)-min(lons)+1e-5)*(vis_sz-30), (vis_sz-15)-(la-min(lats))/(max(lats)-min(lats)+1e-5)*(vis_sz-30)
+                m_draw.line([tr(la, lo) for la, lo in pts], fill=hex_to_rgba(m_color, vis_alpha), width=6)
+                
                 if box_orient == "Vertical":
-                    # 세로형: 활동명 옆에 날짜 (세로모드 전용)
-                    draw_styled_text(draw, (rx + 40, ry + 30), v_act, f_t, m_color, shadow=use_shadow)
-                    t_w = draw.textlength(v_act, font=f_t)
-                    draw_styled_text(draw, (rx + 40 + t_w + 30, ry + 80), v_date, f_d, "#AAAAAA", shadow=use_shadow)
-                    
-                    y_c = ry + 165
-                    for lab, val in items:
-                        draw_styled_text(draw, (rx + 40, y_c), lab.lower(), f_l, "#AAAAAA", shadow=use_shadow)
-                        draw_styled_text(draw, (rx + 40, y_c + 35), val.lower(), f_n, sub_color, shadow=use_shadow)
-                        y_c += 105
+                    m_pos = (rx, ry - vis_sz - 10)
                 else:
-                    # 가로형: 중앙 정렬 레이아웃
-                    title_w = draw.textlength(v_act, f_t)
-                    draw_styled_text(draw, (rx + (rw-title_w)//2, ry+35), v_act, f_t, m_color, shadow=use_shadow)
-                    date_w = draw.textlength(v_date, f_d)
-                    draw_styled_text(draw, (rx + (rw-date_w)//2, ry+135), v_date, f_d, "#AAAAAA", shadow=use_shadow)
-                    
-                    sec_w = rw // 4
-                    for i, (lab, val) in enumerate(items):
-                        cx = rx + (i * sec_w) + (sec_w // 2)
-                        draw_styled_text(draw, (cx - draw.textlength(lab.lower(), f_l)//2, ry+200), lab.lower(), f_l, "#AAAAAA", shadow=use_shadow)
-                        draw_styled_text(draw, (cx - draw.textlength(val.lower(), f_n)//2, ry+245), val.lower(), f_n, sub_color, shadow=use_shadow)
+                    m_pos = (rx + 100, ry + 10)
+                overlay.paste(vis_layer, (int(m_pos[0]), int(m_pos[1])), vis_layer)
+                
+            elif mode in ["WEEKLY", "MONTHLY"] and (weekly_data or monthly_data):
+                d_obj = weekly_data if mode == "WEEKLY" else monthly_data
+                chart_img = create_bar_chart(d_obj['dists'], m_color, mode=mode, labels=d_obj.get('labels'), font_path=f_path)
+                vis_sz = vis_sz_adj
+                vis_layer = chart_img.resize((vis_sz, int(chart_img.size[1]*(vis_sz/chart_img.size[0]))), Image.Resampling.LANCZOS)
+                vis_layer.putalpha(vis_layer.getchannel('A').point(lambda x: x * (vis_alpha / 255)))
+                overlay.paste(vis_layer, ((CW - vis_layer.width)//2, CH - vis_layer.height - 80), vis_layer)
 
-            # --- [2. 지도 및 그래프 렌더링] ---
-            if show_vis:
-                if mode == "DAILY" and a and a.get('map', {}).get('summary_polyline'):
-                    pts = polyline.decode(a['map']['summary_polyline'])
-                    lats, lons = zip(*pts)
-                    vis_sz = vis_sz_adj
-                    vis_layer = Image.new("RGBA", (vis_sz, vis_sz), (0,0,0,0)); m_draw = ImageDraw.Draw(vis_layer)
-                    
-                    def tr(la, lo): return 15+(lo-min(lons))/(max(lons)-min(lons)+1e-5)*(vis_sz-30), (vis_sz-15)-(la-min(lats))/(max(lats)-min(lats)+1e-5)*(vis_sz-30)
-                    m_draw.line([tr(la, lo) for la, lo in pts], fill=hex_to_rgba(m_color, vis_alpha), width=6)
-                    
-                    # [위치 계산] 세로형일 땐 박스 위 좌측, 가로형일 땐 여백 정중앙
-                    if box_orient == "Vertical":
-                        m_pos = (rx, max(5, ry - vis_sz - 15))
-                    else:
-                        title_center_x = rx + (rw // 2)
-                        left_space_center = (rx + title_center_x) // 2
-                        m_pos = (int(left_space_center - (vis_sz // 2)), int(ry + (rh - vis_sz) // 2))
-                    
-                    overlay.paste(vis_layer, (int(m_pos[0]), int(m_pos[1])), vis_layer)
-                    
-                elif mode in ["WEEKLY", "MONTHLY"] and (weekly_data or monthly_data):
-                    d_obj = weekly_data if mode == "WEEKLY" else monthly_data
-                    chart_img = create_bar_chart(d_obj['dists'], m_color, mode=mode, labels=d_obj.get('labels'), font_path=f_path)
-                    vis_sz = vis_sz_adj
-                    vis_layer = chart_img.resize((vis_sz, int(chart_img.size[1]*(vis_sz/chart_img.size[0]))), Image.Resampling.LANCZOS)
-                    vis_layer.putalpha(vis_layer.getchannel('A').point(lambda x: x * (vis_alpha / 255)))
-                    overlay.paste(vis_layer, ((CW - vis_layer.width)//2, CH - vis_layer.height - 80), vis_layer)
-
-            # --- [3. 로고 렌더링] ---
+            # 3. 로고 로직 (캔버스 우상단 고정)
             if log_file:
-                ls = 90
-                margin = 40
+                ls = 90 # 로고 크기
+                margin = 40  # 우측 및 상단에서의 여백
+                
                 l_img = ImageOps.fit(Image.open(log_file).convert("RGBA"), (ls, ls))
+                
+                # 원형 마스크 적용
                 mask = Image.new('L', (ls, ls), 0)
                 ImageDraw.Draw(mask).ellipse((0, 0, ls, ls), fill=255)
                 l_img.putalpha(mask)
-                overlay.paste(l_img, (CW - ls - margin, margin), l_img)
+                
+                # 위치 계산: (전체 가로 - 로고 크기 - 여백, 여백)
+                l_pos = (CW - ls - margin, margin)
+                
+                overlay.paste(l_img, (int(l_pos[0]), int(l_pos[1])), l_img)
 
-            # --- [최종 합체 및 다운로드] ---
             final = Image.alpha_composite(canvas, overlay).convert("RGB")
             st.image(final, width=300)
             
@@ -338,40 +312,3 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
