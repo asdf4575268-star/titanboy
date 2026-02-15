@@ -243,7 +243,7 @@ with col_main:
                 for lab, val in items:
                     draw_styled_text(draw, (rx+40, y_c), lab.lower(), f_l, "#AAAAAA", shadow=use_shadow)
                     draw_styled_text(draw, (rx+40, y_c+35), val.lower(), f_n, sub_color, shadow=use_shadow)
-                    y_c += 110
+                    y_c += 120
             else:
                 title_w = draw.textlength(v_act, f_t)
                 draw_styled_text(draw, (rx + (rw-title_w)//2, ry+35), v_act, f_t, m_color, shadow=use_shadow)
@@ -297,6 +297,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
