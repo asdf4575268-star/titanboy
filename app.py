@@ -173,6 +173,25 @@ with col_main:
 # --- [5. 디자인 설정] ---
 with col_design:
     st.header("🎨 DESIGN")
+    
+    # 1. 모드 변경 감지를 위한 세션 상태
+    if "prev_orient" not in st.session_state:
+        st.session_state.prev_orient = "Vertical"
+
+    # 2. 박스 방향 라디오 버튼
+    box_orient = st.radio("박스 방향", ["Vertical", "Horizontal"], horizontal=True, key="orient_radio")
+
+    # 3. 모드 변경 시 st.rerun()으로 UI 강제 리셋 (기본값 적용용)
+    if st.session_state.prev_orient != box_orient:
+        st.session_state.prev_orient = box_orient
+        st.rerun()
+
+    # 4. 방향에 따른 최적화된 기본값 설정
+    if box_orient == "Horizontal":
+        def_rx, def_ry, def_rw, def_rh = 0, 1000, 1080, 350
+    else:
+        def_rx, def_ry, def_rw, def_rh = 70, 1250, 450, 550
+
     with st.expander("✍️ 텍스트 수정"):
         v_act = st.text_input("활동명", v_act, key="ti_act")
         v_date = st.text_input("날짜", v_date, key="ti_date")
@@ -181,19 +200,8 @@ with col_design:
         v_pace = st.text_input("페이스", v_pace, key="ti_pace")
         v_hr = st.text_input("심박 bpm", v_hr, key="ti_hr")
 
-    box_orient = st.radio("박스 방향", ["Vertical", "Horizontal"], horizontal=True, key="orient_radio")
     sel_font = st.selectbox("폰트", ["BlackHanSans", "Jua", "DoHyeon", "NanumBrush", "Sunflower"], key="font_sel")
     
-    # 가로/세로 모드에 따른 기본값 동적 설정
-    if box_orient == "Horizontal":
-        def_rx, def_ry = 0, 1000
-        def_rw, def_rh = 1080, 350
-    else:
-        def_rx, def_ry = 70, 1250
-        def_rw, def_rh = 450, 550
-	
-
-
     with st.expander("💄 매거진 스타일", expanded=True):
         use_shadow = st.toggle("글자 그림자 효과", value=True, key="shadow_tg")
         border_thick = st.slider("프레임 테두리 두께", 0, 50, 0, key="border_sl")
@@ -201,11 +209,12 @@ with col_design:
         m_color = COLOR_OPTS[st.selectbox("포인트 컬러", list(COLOR_OPTS.keys()), key="m_col_sel")]
         sub_color = COLOR_OPTS[st.selectbox("서브 컬러", list(COLOR_OPTS.keys()), index=1, key="s_col_sel")]
 
-    with st.expander("📍 위치/크기 조절"):
-        rx = st.number_input("박스 X", 0, 1080, def_rx, key="box_rx")
-        ry = st.number_input("박스 Y", 0, 1920, def_ry, key="box_ry")
-        rw = st.number_input("박스 너비", 100, 1080, def_rw, key="box_rw")
-        rh = st.number_input("박스 높이", 100, 1920, def_rh, key="box_rh")
+    with st.expander("📍 위치/크기 조절", expanded=True):
+        # key에 box_orient를 포함시켜서 모드가 바뀌면 위젯을 완전히 새로 그림 (기본값 강제 적용 기술)
+        rx = st.number_input("박스 X", 0, 1080, def_rx, key=f"rx_{box_orient}")
+        ry = st.number_input("박스 Y", 0, 1920, def_ry, key=f"ry_{box_orient}")
+        rw = st.number_input("박스 너비", 100, 1080, def_rw, key=f"rw_{box_orient}")
+        rh = st.number_input("박스 높이", 100, 1920, def_rh, key=f"rh_{box_orient}")
         box_alpha = st.slider("박스 투명도", 0, 255, 110, key="box_alpha_sl")
         vis_sz_adj = st.slider("지도/그래프 크기", 50, 1080, 180 if mode=="DAILY" else 950, key="vis_sz_sl")
         vis_alpha = st.slider("지도/그래프 투명도", 0, 255, 180, key="vis_alpha_sl")
@@ -215,6 +224,7 @@ with col_main:
     st.subheader("🖼️ PREVIEW")
     try:
         CW, CH = (1080, 1920) if mode == "DAILY" else (1080, 1350)
+        # 설정된 값들 (90, 30, 60) 적용
         f_t, f_d, f_n, f_l = load_font(sel_font, 90), load_font(sel_font, 30), load_font(sel_font, 60), load_font(sel_font, 23)
         f_path = f"font_{sel_font}_90.ttf"
         
@@ -279,4 +289,3 @@ with col_main:
         st.download_button(f"📸 {mode} DOWNLOAD", buf.getvalue(), f"{mode.lower()}.jpg", use_container_width=True, key="down_btn")
     except Exception as e:
         st.info("데이터와 사진을 선택하면 매거진 미리보기가 나타납니다.")
-
