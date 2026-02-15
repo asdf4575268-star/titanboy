@@ -27,10 +27,11 @@ def hex_to_rgba(hex_color, alpha):
     hex_color = hex_color.lstrip('#')
     return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4)) + (alpha,)
 
-File "/mount/src/titanboy/app.py", line 31
-      if shadow:
-     ^
-IndentationError: unexpected indent
+def draw_styled_text(draw, pos, text, font, fill, shadow=True):
+    if shadow:
+        # 그림자 위치를 (3, 3)으로 설정하여 약간의 입체감을 줍니다.
+        draw.text((pos[0] + 3, pos[1] + 3), text, font=font, fill=(0, 0, 0, 180))
+    draw.text(pos, text, font=font, fill=fill)
 @st.cache_resource
 def load_font(font_type, size):
     # 원하는 폰트의 GitHub 또는 구글 폰트 원본 주소를 여기에 추가하세요.
@@ -287,15 +288,9 @@ with col_main:
             
             buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
             st.download_button(f"📸 {mode} DOWNLOAD", buf.getvalue(), f"{mode.lower()}.jpg", use_container_width=True)
-        if border_thick > 0:
-    # outline에는 m_color나 s_color를 사용하세요.
-    draw.rectangle([0, 0, CW, CH], outline=m_color, width=border_thick)
+            
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
-
-
-
-
 
 
 
