@@ -179,6 +179,22 @@ with col_design:
         v_pace = st.text_input("페이스", v_pace); v_hr = st.text_input("심박 bpm", v_hr)
 
     box_orient = st.radio("박스 방향", ["Vertical", "Horizontal"], horizontal=True)
+    if box_orient == "Horizontal":
+        default_rw = 1080  # 가로모드일 땐 꽉 차게
+        default_rh = 350   # 가로모드일 땐 얇게
+    else:
+        default_rw = 450   # 세로모드일 땐 적당히
+        default_rh = 550   # 세로모드일 땐 길게
+
+    with st.expander("📍 위치/크기 조절"):
+        rx = st.number_input("박스 X", 0, 1080, 0 if box_orient=="Horizontal" else 70)
+        ry = st.number_input("박스 Y", 0, 1920, 1250)
+        
+        # 여기서 삽입한 기본값(default_rw, default_rh)을 사용합니다.
+        rw = st.number_input("박스 너비", 100, 1080, default_rw)
+        rh = st.number_input("박스 높이", 100, 1920, default_rh)
+        
+        box_alpha = st.slider("박스 투명도", 0, 255, 110)
     sel_font = st.selectbox("폰트", ["BlackHanSans", "Jua", "DoHyeon", "NanumBrush", "Sunflower"])
     
     with st.expander("💄 매거진 스타일", expanded=True):
@@ -265,6 +281,7 @@ with col_main:
         st.download_button(f"📸 {mode} DOWNLOAD", buf.getvalue(), f"{mode.lower()}.jpg", use_container_width=True)
     except Exception as e:
         st.info("데이터와 사진을 선택하면 미리보기가 나타납니다.")
+
 
 
 
