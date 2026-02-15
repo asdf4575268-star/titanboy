@@ -25,6 +25,11 @@ def hex_to_rgba(hex_color, alpha):
     hex_color = hex_color.lstrip('#')
     return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4)) + (alpha,)
 
+def draw_styled_text(draw, pos, text, font, fill, shadow=True):
+    if shadow:
+        # 그림자 위치를 (3, 3)으로 설정하여 약간의 입체감을 줍니다.
+        draw.text((pos[0] + 3, pos[1] + 3), text, font=font, fill=(0, 0, 0, 180))
+    draw.text(pos, text, font=font, fill=fill)
 @st.cache_resource
 def load_font(font_type, size):
     fonts = {"BlackHanSans": "https://github.com/google/fonts/raw/main/ofl/blackhansans/BlackHanSans-Regular.ttf", "Jua": "https://github.com/google/fonts/raw/main/ofl/jua/Jua-Regular.ttf", "DoHyeon": "https://github.com/google/fonts/raw/main/ofl/dohyeon/DoHyeon-Regular.ttf", "NanumBrush": "https://github.com/google/fonts/raw/main/ofl/nanumbrushscript/NanumBrushScript-Regular.ttf", "Sunflower": "https://github.com/google/fonts/raw/main/ofl/sunflower/Sunflower-Bold.ttf"}
@@ -210,3 +215,4 @@ with col_main:
             st.image(final, width=300)
         except Exception as e:
             st.error(f"렌더링 오류: {e}")
+
