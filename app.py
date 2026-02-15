@@ -77,7 +77,7 @@ def get_weekly_stats(activities, target_date_str):
 
 def get_monthly_stats(activities, target_date_str):
     try:
-        target_date = datetime.strptime(target_date_str, "%Y-%m-%d")
+        target_date = datetime.strptime(target_date_str, "%Y-%m-%d-%ss")
         first_day = target_date.replace(day=1)
         next_month = first_day.replace(day=28) + timedelta(days=4)
         last_day = next_month - timedelta(days=next_month.day)
@@ -291,6 +291,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
