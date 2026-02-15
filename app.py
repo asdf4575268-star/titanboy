@@ -34,10 +34,26 @@ def draw_styled_text(draw, pos, text, font, fill, shadow=True):
     draw.text(pos, text, font=font, fill=fill)
 @st.cache_resource
 def load_font(font_type, size):
-    fonts = {"BlackHanSans": "https://github.com/google/fonts/raw/main/ofl/blackhansans/BlackHanSans-Regular.ttf", "Jua": "https://github.com/google/fonts/raw/main/ofl/jua/Jua-Regular.ttf", "DoHyeon": "https://github.com/google/fonts/raw/main/ofl/dohyeon/DoHyeon-Regular.ttf", "NanumBrush": "https://github.com/google/fonts/raw/main/ofl/nanumbrushscript/NanumBrushScript-Regular.ttf", "Sunflower": "https://github.com/google/fonts/raw/main/ofl/sunflower/Sunflower-Bold.ttf"}
+    # 원하는 폰트의 GitHub 또는 구글 폰트 원본 주소를 여기에 추가하세요.
+    fonts = {
+        "BlackHanSans": "https://github.com/google/fonts/raw/main/ofl/blackhansans/BlackHanSans-Regular.ttf",
+        "Jua": "https://github.com/google/fonts/raw/main/ofl/jua/Jua-Regular.ttf",
+        "DoHyeon": "https://github.com/google/fonts/raw/main/ofl/dohyeon/DoHyeon-Regular.ttf",
+        "NanumBrush": "https://github.com/google/fonts/raw/main/ofl/nanumbrushscript/NanumBrushScript-Regular.ttf",
+        "Sunflower": "https://github.com/google/fonts/raw/main/ofl/sunflower/Sunflower-Bold.ttf",
+        # --- 새로 추가해볼 만한 스타일 ---
+        "GothicA1": "https://github.com/google/fonts/raw/main/ofl/gothica1/GothicA1-Black.ttf", # 꽉 찬 고딕
+        "SongMyung": "https://github.com/google/fonts/raw/main/ofl/songmyung/SongMyung-Regular.ttf", # 명조체 스타일
+        "Orbit": "https://github.com/google/fonts/raw/main/ofl/orbit/Orbit-Regular.ttf" # 힙한 디자인 스타일
+    }
+    
     f_path = f"font_{font_type}_{int(size)}.ttf"
     if not os.path.exists(f_path):
-        r = requests.get(fonts.get(font_type, fonts["BlackHanSans"])); open(f_path, "wb").write(r.content)
+        font_url = fonts.get(font_type, fonts["BlackHanSans"])
+        r = requests.get(font_url)
+        with open(f_path, "wb") as f:
+            f.write(r.content)
+            
     return ImageFont.truetype(f_path, int(size))
 
 def get_weekly_stats(activities, target_date_str):
@@ -271,6 +287,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
