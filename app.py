@@ -226,7 +226,7 @@ with col_main:
     if data_ready:
         try:
             CW, CH = (1080, 1920) if mode == "DAILY" else (1080, 1350)
-            f_t, f_d, f_n, f_l = load_font(sel_font, 90), load_font(sel_font, 30), load_font(sel_font, 60), load_font(sel_font, 23)
+            f_t, f_d, f_n, f_l = load_font(sel_font, 70), load_font(sel_font, 20), load_font(sel_font, 45), load_font(sel_font, 23)
             f_path = f"font_{sel_font}_90.ttf"
             
             canvas = make_smart_collage(bg_files, (CW, CH)) if bg_files else Image.new("RGBA", (CW, CH), (20, 20, 20, 255))
@@ -297,6 +297,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
