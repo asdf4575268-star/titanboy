@@ -77,7 +77,7 @@ def get_weekly_stats(activities, target_date_str):
 
 def get_monthly_stats(activities, target_date_str):
     try:
-        target_date = datetime.strptime(target_date_str, "%Y-%m-%d-%s")
+        target_date = datetime.strptime(target_date_str, "%Y-%m-%d")
         first_day = target_date.replace(day=1)
         next_month = first_day.replace(day=28) + timedelta(days=4)
         last_day = next_month - timedelta(days=next_month.day)
@@ -147,7 +147,7 @@ with col_main:
     st.title("TITAN BOY")
     
     # --- [여기에 초기화 배치] ---
-    v_act, v_date, v_dist, v_time, v_pace, v_hr = "RUNNING", "2026-02-15", "0.00", "00:00", "0'00\"", "0"
+    v_act, v_date, v_dist, v_time, v_pace, v_hr = "RUNNING", "2026-02-15", "0.00", "00:00:00", "0'00\"", "0"
     weekly_data, monthly_data, a = None, None, None
     if not st.session_state['access_token']:
         st.link_button("🚀 Strava 연동", f"https://www.strava.com/oauth/authorize?client_id={CLIENT_ID}&response_type=code&redirect_uri={ACTUAL_URL}&scope=read,activity:read_all&approval_prompt=force", use_container_width=True)
@@ -157,7 +157,7 @@ with col_main:
         log_file = st.file_uploader("🔘 원형 로고", type=['jpg','jpeg','png'])
         
         mode = st.radio("모드 선택", ["DAILY", "WEEKLY", "MONTHLY"], horizontal=True)
-        v_act, v_date, v_dist, v_time, v_pace, v_hr = "RUNNING", "2026-02-15", "0.00", "00:00", "0'00\"", "0"
+        v_act, v_date, v_dist, v_time, v_pace, v_hr = "RUNNING", "2026-02-15", "0.00", "00:00:00", "0'00\"", "0"
         weekly_data, monthly_data, a = None, None, None
         
         if acts:
@@ -225,43 +225,24 @@ with col_main:
             items = [("distance", f"{v_dist} km"), ("time", v_time), ("pace", v_pace), ("avg bpm", f"{v_hr} bpm")]
             
             # 1. 데이터 박스 렌더링
-            # 1. 배경 박스 그리기
-draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0,0,0,box_alpha))
-
-# 2. 텍스트 렌더링 (그림자 변수 use_shadow 추가)
-if box_orient == "Vertical":
-    # 활동명 (v_act)
-    draw_styled_text(draw, (rx+40, ry+30), v_act, f_t, m_color, shadow=use_shadow)
-    # 날짜 (v_date)
-    draw_styled_text(draw, (rx+40, ry+125), v_date, f_d, "#AAAAAA", shadow=use_shadow)
-    
-    y_c = ry + 190
-    for lab, val in items:
-        # 라벨 (dist, time 등)
-        draw_styled_text(draw, (rx+40, y_c), lab.lower(), f_l, "#AAAAAA", shadow=use_shadow)
-        # 수치 (10.00km 등)
-        draw_styled_text(draw, (rx+40, y_c+35), val.lower(), f_n, sub_color, shadow=use_shadow)
-        y_c += 100
-else:
-    # 가로형 배치
-    title_w = draw.textlength(v_act, f_t)
-    draw_styled_text(draw, (rx + (rw-title_w)//2, ry+35), v_act, f_t, m_color, shadow=use_shadow)
-    
-    date_w = draw.textlength(v_date, f_d)
-    draw_styled_text(draw, (rx + (rw-date_w)//2, ry+130), v_date, f_d, "#AAAAAA", shadow=use_shadow)
-    
-    sec_w = rw // 4
-    for i, (lab, val) in enumerate(items):
-        cx = rx + (i * sec_w) + (sec_w // 2)
-        # 라벨 중앙 정렬
-        draw_styled_text(draw, (cx - draw.textlength(lab.lower(), f_l)//2, ry+185), lab.lower(), f_l, "#AAAAAA", shadow=use_shadow)
-        # 수치 중앙 정렬
-        draw_styled_text(draw, (cx - draw.textlength(val.lower(), f_n)//2, ry+230), val.lower(), f_n, sub_color, shadow=use_shadow)
-
-# 3. 프레임 테두리 (모든 텍스트를 다 그린 후 마지막에!)
-if border_thick > 0:
-    # 이미지의 전체 크기 CW, CH를 사용합니다.
-    draw.rectangle([0, 0, CW, CH], outline=m_color, width=border_thick)
+            draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0,0,0,box_alpha))
+            if box_orient == "Vertical":
+                draw_styled_text(draw, (rx+40, ry+30), v_act, f_t, m_color)
+                draw_styled_text(draw, (rx+40, ry+125), v_date, f_d, "#AAAAAA")
+                y_c = ry + 190
+                for lab, val in items:
+                    draw_styled_text(draw, (rx+40, y_c), lab.lower(), f_l, "#AAAAAA")
+                    draw_styled_text(draw, (rx+40, y_c+35), val.lower(), f_n, sub_color)
+                    y_c += 100
+            else:
+                title_w = draw.textlength(v_act, f_t)
+                draw_styled_text(draw, (rx + (rw-title_w)//2, ry+35), v_act, f_t, m_color)
+                draw_styled_text(draw, (rx + (rw-draw.textlength(v_date, f_d))//2, ry+130), v_date, f_d, "#AAAAAA")
+                sec_w = rw // 4
+                for i, (lab, val) in enumerate(items):
+                    cx = rx + (i * sec_w) + (sec_w // 2)
+                    draw_styled_text(draw, (cx - draw.textlength(lab.lower(), f_l)//2, ry+185), lab.lower(), f_l, "#AAAAAA")
+                    draw_styled_text(draw, (cx - draw.textlength(val.lower(), f_n)//2, ry+230), val.lower(), f_n, sub_color)
 
             # 2. 지도 및 그래프 로직 (복구 완료)
             if mode == "DAILY" and a and a.get('map', {}).get('summary_polyline'):
@@ -310,11 +291,6 @@ if border_thick > 0:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
-
-
-
-
-
 
 
 
