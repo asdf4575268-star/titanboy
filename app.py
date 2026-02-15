@@ -200,7 +200,7 @@ with col_main:
     st.subheader("🖼️ PREVIEW")
     try:
         CW, CH = (1080, 1920) if mode == "DAILY" else (1080, 1350)
-        f_t, f_d, f_n, f_l = load_font(sel_font, 90), load_font(sel_font, 30), load_font(sel_font, 60), load_font(sel_font, 23)
+        f_t, f_d, f_n, f_l = load_font(sel_font, 70), load_font(sel_font, 20), load_font(sel_font, 45), load_font(sel_font, 23)
         f_path = f"font_{sel_font}_90.ttf"
         
         canvas = make_smart_collage(bg_files, (CW, CH)) if bg_files else Image.new("RGBA", (CW, CH), (20, 20, 20, 255))
@@ -265,3 +265,4 @@ with col_main:
         st.download_button(f"📸 {mode} DOWNLOAD", buf.getvalue(), f"{mode.lower()}.jpg", use_container_width=True)
     except Exception as e:
         st.info("데이터와 사진을 선택하면 미리보기가 나타납니다.")
+
