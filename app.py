@@ -182,42 +182,65 @@ with col_main:
                     v.update({"act": title, "date": stats['range'], "dist": stats['total_dist'], 
                               "time": stats['total_time'], "pace": stats['avg_pace'], "hr": stats['avg_hr']})
 
-# --- [4. 디자인 및 렌더링] ---
+# --- [4. 디자인 및 렌더링 섹션 수정본] ---
+
 with col_design:
     st.header("🎨 DESIGN")
-    # v_act 변수 분리하여 입력 반응성 향상
-    t_act = st.text_input("제목", v["act"]); t_date = st.text_input("날짜", v["date"])
-    t_dist = st.text_input("거리", v["dist"]); t_time = st.text_input("시간", v["time"])
-    t_pace = st.text_input("페이스", v["pace"]); t_hr = st.text_input("심박", v["hr"])
     
-    show_vis = st.toggle("그래프/지도", True)
-    show_box = st.toggle("박스", True)
-    shadow = st.toggle("그림자", True)
+    # [수정] 수기 입력창을 expander로 묶어 기본적으로 접어둠 (공간 확보)
+    with st.expander("📝 텍스트 직접 수정 (필요 시)"):
+        t_act = st.text_input("제목", v["act"])
+        t_date = st.text_input("날짜", v["date"])
+        t_dist = st.text_input("거리", v["dist"])
+        t_time = st.text_input("시간", v["time"])
+        t_pace = st.text_input("페이스", v["pace"])
+        t_hr = st.text_input("심박", v["hr"])
     
-    cols = {"Yellow":"#FFD700", "White":"#FFFFFF", "Black":"#000000", "Orange":"#FF4500", "Blue":"#00BFFF"}
-    m_col = cols[st.selectbox("메인 컬러", list(cols.keys()))]
-    s_col = cols[st.selectbox("서브 컬러", list(cols.keys()), index=1)]
-    
-    orient = st.radio("방향", ["Vertical", "Horizontal"], horizontal=True)
-    font_name = st.selectbox("폰트", ["BlackHanSans", "Sunflower", "KirangHaerang", "JollyLodger", "Lacquer", "Orbit", "IndieFlower"])
-    
-    rx, ry = st.number_input("X", 0, 1080, 40 if orient=="Horizontal" else 70), st.number_input("Y", 0, 1920, 350 if orient=="Horizontal" else 1250)
-    rw, rh = st.number_input("W", 100, 1080, 1000 if orient=="Horizontal" else 450), st.number_input("H", 100, 1920, 350 if orient=="Horizontal" else 600)
-    b_alpha, v_sz, v_alpha = st.slider("박스 투명도",0,255,110), st.slider("시각화 크기",50,1080,200), st.slider("시각화 투명도",0,255,240)
+    # [설정] 매거진 스타일 옵션
+    with st.expander("💄 스타일 설정", expanded=True):
+        show_vis = st.toggle("그래프/지도 표시", True)
+        show_box = st.toggle("데이터 박스 표시", True)
+        shadow = st.toggle("글자 그림자 효과", True)
+        
+        cols = {"Yellow":"#FFD700", "White":"#FFFFFF", "Black":"#000000", "Orange":"#FF4500", "Blue":"#00BFFF"}
+        m_col = cols[st.selectbox("메인 컬러", list(cols.keys()))]
+        s_col = cols[st.selectbox("서브 컬러", list(cols.keys()), index=1)]
+        
+        orient = st.radio("박스 방향", ["Vertical", "Horizontal"], horizontal=True)
+        font_name = st.selectbox("폰트", ["BlackHanSans", "Sunflower", "KirangHaerang", "JollyLodger", "Lacquer", "Orbit", "IndieFlower"])
+
+    with st.expander("📍 위치 및 크기"):
+        rx, ry = st.number_input("박스 X 위치", 0, 1080, 40 if orient=="Horizontal" else 70)
+        ry = st.number_input("박스 Y 위치", 0, 1920, 350 if orient=="Horizontal" else 1250)
+        rw, rh = st.number_input("박스 너비", 100, 1080, 1000 if orient=="Horizontal" else 450)
+        rh = st.number_input("박스 높이", 100, 1920, 350 if orient=="Horizontal" else 600)
+        b_alpha = st.slider("박스 투명도", 0, 255, 110)
+        v_sz = st.slider("시각화 크기", 50, 1080, 200)
+        v_alpha = st.slider("시각화 투명도", 0, 255, 240)
 
 with col_main:
     if st.session_state.access_token:
+        # 캔버스 크기 결정
         CW, CH = (1080, 1920) if mode == "DAILY" else (1080, 1350)
+        
+        # 폰트 로드 (가이드: 활동명 90, 날짜 30, 숫자 60)
         ft, fd, fn, fl = [load_font(font_name, s) for s in [90, 30, 60, 23]]
         
-        # 여기서 캐싱된 함수 호출 (속도 개선의 핵심)
         canvas = make_collage(bg_files, (CW, CH))
-        over = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(over)
+        over = Image.new("RGBA", (CW, CH), (0,0,0,0))
+        draw = ImageDraw.Draw(over)
         
-        # 1. 데이터 박스
+        # 1. 데이터 박스 렌더링
         if show_box:
             draw.rectangle([rx, ry, rx+rw, ry+rh], fill=(0,0,0,b_alpha))
-            items = [("distance", f"{t_dist} km"), ("time", t_time), ("pace", t_pace), ("avg bpm", f"{t_hr} bpm")]
+            
+            # [수정] 단위 소문자 적용 (km, bpm)
+            items = [
+                ("distance", f"{t_dist} km"), 
+                ("time", t_time), 
+                ("pace", t_pace), 
+                ("avg bpm", f"{t_hr} bpm")
+            ]
             
             if orient == "Vertical":
                 draw_text(draw, (rx+40, ry+30), t_act, ft, m_col, shadow)
@@ -225,7 +248,7 @@ with col_main:
                 for i, (l, val) in enumerate(items):
                     y = ry + 165 + i*105
                     draw_text(draw, (rx+40, y), l, fl, "#AAAAAA", shadow)
-                    draw_text(draw, (rx+40, y+35), val, fn, s_col, shadow)
+                    draw_text(draw, (rx+40, y+35), val.lower(), fn, s_col, shadow) # 소문자 변환 추가
             else:
                 draw_text(draw, (rx+(rw-draw.textlength(t_act, ft))//2, ry+35), t_act, ft, m_col, shadow)
                 draw_text(draw, (rx+(rw-draw.textlength(t_date, fd))//2, ry+135), t_date, fd, "#AAAAAA", shadow)
@@ -233,7 +256,9 @@ with col_main:
                 for i, (l, val) in enumerate(items):
                     cx = rx + i*step + step//2
                     draw_text(draw, (cx-draw.textlength(l, fl)//2, ry+200), l, fl, "#AAAAAA", shadow)
-                    draw_text(draw, (cx-draw.textlength(val, fn)//2, ry+245), val, fn, s_col, shadow)
+                    draw_text(draw, (cx-draw.textlength(val, fn)//2, ry+245), val.lower(), fn, s_col, shadow) # 소문자 변환 추가
+
+        # ... (이하 시각화 및 로고 로직 동일) ...
 
         # 2. 시각화 (지도/차트) - 캐싱된 함수 사용
         if show_vis:
@@ -266,3 +291,4 @@ with col_main:
         st.image(final, width=350)
         buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
         st.download_button("📸 DOWNLOAD", buf.getvalue(), "titan.jpg", use_container_width=True)
+
