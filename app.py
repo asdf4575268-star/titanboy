@@ -275,7 +275,9 @@ with col_main:
                 if box_orient == "Vertical":
                     m_pos = (rx, ry - vis_sz - 10)
                 else:
-                    m_pos = (rx + 40, ry + (rh - vis_sz) // 2)
+                    title_start_x = rx + 40
+                    target_x = int(rx + (40 - vis_sz) // 2)
+                    target_y = int(ry + (rh - vis_sz) // 2)
                 overlay.paste(vis_layer, (int(m_pos[0]), int(m_pos[1])), vis_layer)
                 
             elif mode in ["WEEKLY", "MONTHLY"] and (weekly_data or monthly_data):
@@ -311,6 +313,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
