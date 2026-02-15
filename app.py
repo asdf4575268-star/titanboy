@@ -184,21 +184,45 @@ with col_design:
     box_orient = st.radio("박스 방향", ["Vertical", "Horizontal"], horizontal=True, key="orient_radio")
     sel_font = st.selectbox("폰트", ["BlackHanSans", "Jua", "DoHyeon", "NanumBrush", "Sunflower"], key="font_sel")
     
-    # 가로/세로 모드에 따른 기본값 동적 설정
+    if "prev_orient" not in st.session_state:
+        st.session_state.prev_orient = "Vertical"
+
+    # 라디오 버튼 - on_change를 넣거나, 아래처럼 orient에 따라 위젯 key를 바꿔버리면 강제 리셋됩니다.
+    box_orient = st.radio("박스 방향", ["Vertical", "Horizontal"], horizontal=True, key="orient_radio")
+
+    # 모드가 바뀌었는지 감지
+    if st.session_state.prev_orient != box_orient:
+        st.session_state.prev_orient = box_orient
+        # 모드 변경 시 즉시 리셋을 위해 페이지를 재실행하거나 내부 값을 초기화함
+        st.rerun()
+
+    # 가로/세로 모드에 따른 강제 설정값
+    if box_orient == "Horizontal":
+        def_rx, def_ry, def_rw, def_rh = 0, 1000, 1080, 350
+    else:
+        def_rx, def_ry, def_rw, def_rh = 70, 1250, 450, 550
+
+    with st.expander("📍 위치/크기 조절", expanded=True):
+        # key에 box_orient를 포함시켜서 모드가 바뀌면 위젯 자체가 새로 생성되게 함 (가장 확실한 방법)
+        rx = st.number_input("박스 X", 0, 1080, def_rx, key=f"rx_{box_orient}")
+        ry = st.number_input("박스 Y", 0, 1920, def_ry, key=f"ry_{box_orient}")
+        rw = st.number_input("박스 너비", 100, 1080, def_rw, key=f"rw_{box_orient}")
+        rh = st.number_input("박스 높이", 100, 1920, def_rh, key=f"rh_{box_orient}")
     if box_orient == "Horizontal":
         def_rx, def_ry = 0, 1000
         def_rw, def_rh = 1080, 350
     else:
         def_rx, def_ry = 70, 1250
-        def_rw, def_rh = 450, 550
-
+        def_rw, def_rh = 450, 600
+    
     with st.expander("💄 매거진 스타일", expanded=True):
         use_shadow = st.toggle("글자 그림자 효과", value=True, key="shadow_tg")
         border_thick = st.slider("프레임 테두리 두께", 0, 50, 0, key="border_sl")
         COLOR_OPTS = {"Yellow": "#FFD700", "White": "#FFFFFF", "Orange": "#FF4500", "Blue": "#00BFFF", "Grey": "#AAAAAA"}
         m_color = COLOR_OPTS[st.selectbox("포인트 컬러", list(COLOR_OPTS.keys()), key="m_col_sel")]
         sub_color = COLOR_OPTS[st.selectbox("서브 컬러", list(COLOR_OPTS.keys()), index=1, key="s_col_sel")]
-
+    
+        
     with st.expander("📍 위치/크기 조절"):
         rx = st.number_input("박스 X", 0, 1080, def_rx, key="box_rx")
         ry = st.number_input("박스 Y", 0, 1920, def_ry, key="box_ry")
@@ -277,4 +301,5 @@ with col_main:
         st.download_button(f"📸 {mode} DOWNLOAD", buf.getvalue(), f"{mode.lower()}.jpg", use_container_width=True, key="down_btn")
     except Exception as e:
         st.info("데이터와 사진을 선택하면 매거진 미리보기가 나타납니다.")
+
 
