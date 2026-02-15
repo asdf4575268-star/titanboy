@@ -248,7 +248,7 @@ with col_main:
             # 3. 로고 로직 (복구 완료)
             # 3. 로고 로직 (캔버스 우상단 고정)
             if log_file:
-                ls = 120  # 로고 크기
+                ls = 90 # 로고 크기
                 margin = 40  # 우측 및 상단에서의 여백
                 
                 l_img = ImageOps.fit(Image.open(log_file).convert("RGBA"), (ls, ls))
@@ -271,6 +271,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
