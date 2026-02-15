@@ -27,7 +27,7 @@ def hex_to_rgba(hex_color, alpha):
     hex_color = hex_color.lstrip('#')
     return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4)) + (alpha,)
 
-draw_styled_text(draw, (tx, ty), v_act, f_act, m_color, shadow=use_shadow, shadow=True):
+draw_styled_text(draw, (tx, ty), v_act, f_act, m_color, shadow=use_shadow)
     if shadow:
         # 그림자 위치를 (3, 3)으로 설정하여 약간의 입체감을 줍니다.
         draw.text((pos[0] + 3, pos[1] + 3), text, font=font, fill=(0, 0, 0, 180))
@@ -293,6 +293,7 @@ with col_main:
     draw.rectangle([0, 0, CW, CH], outline=m_color, width=border_thick)
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
