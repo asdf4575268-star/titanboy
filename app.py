@@ -41,7 +41,6 @@ def load_font(font_type, size):
         "DoHyeon": "https://github.com/google/fonts/raw/main/ofl/dohyeon/DoHyeon-Regular.ttf",
         "NanumBrush": "https://github.com/google/fonts/raw/main/ofl/nanumbrushscript/NanumBrushScript-Regular.ttf",
         "Sunflower": "https://github.com/google/fonts/raw/main/ofl/sunflower/Sunflower-Bold.ttf",
-        # --- 새로 추가해볼 만한 스타일 ---
         "GothicA1": "https://github.com/google/fonts/raw/main/ofl/gothica1/GothicA1-Black.ttf", # 꽉 찬 고딕
         "SongMyung": "https://github.com/google/fonts/raw/main/ofl/songmyung/SongMyung-Regular.ttf", # 명조체 스타일
         "Orbit": "https://github.com/google/fonts/raw/main/ofl/orbit/Orbit-Regular.ttf" # 힙한 디자인 스타일
@@ -291,6 +290,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
