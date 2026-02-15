@@ -183,24 +183,51 @@ with col_main:
     bg_files = st.file_uploader("📸 배경 사진", type=['jpg','jpeg','png'], accept_multiple_files=True)
     log_file = st.file_uploader("🔘 원형 로고", type=['jpg','jpeg','png'])
     
-    v_act, v_date, v_dist, v_time, v_pace, v_hr, weekly_data, monthly_data, a = "RUNNING", "2026-02-14", "0.00", "00:00:00", "0'00\"", "0", None, None, None
+    # 변수 초기화
+    v_act, v_date, v_dist, v_time, v_pace, v_hr = "RUNNING", "2026-02-14", "0.00", "00:00:00", "0'00\"", "0"
+    weekly_data, monthly_data, a = None, None, None
+
     if acts:
-        act_options = [f"{act['start_date_local'][:10]} - {act['name']}" for act in acts]
-        sel_str = st.selectbox("🏃 활동 선택", act_options)
-        a = acts[act_options.index(sel_str)]
         if mode == "DAILY":
+            act_options = [f"{act['start_date_local'][:10]} - {act['name']}" for act in acts]
+            sel_str = st.selectbox("🏃 활동 선택", act_options)
+            a = acts[act_options.index(sel_str)]
+            
             d_km = a.get('distance', 0)/1000; m_sec = a.get('moving_time', 0)
             v_act, v_date, v_dist = a['name'], a['start_date_local'][:10], f"{d_km:.2f}"
             v_time = f"{m_sec//3600:02d}:{(m_sec%3600)//60:02d}:{m_sec%60:02d}"
             v_pace = f"{int((m_sec/d_km)//60)}'{int((m_sec/d_km)%60):02d}\"" if d_km > 0 else "0'00\""
             v_hr = str(int(a.get('average_heartrate', 0))) if a.get('average_heartrate') else "0"
-        elif mode == "WEEKLY":
-            weekly_data = get_weekly_stats(acts, a['start_date_local'][:10])
-            if weekly_data: v_act, v_date, v_dist, v_time, v_pace, v_hr = "WEEKLY RUN", weekly_data['range'], weekly_data['total_dist'], weekly_data['total_time'], weekly_data['avg_pace'], weekly_data['avg_hr']
-        elif mode == "MONTHLY":
-            monthly_data = get_monthly_stats(acts, a['start_date_local'][:10])
-            if monthly_data: v_act, v_date, v_dist, v_time, v_pace, v_hr = "MONTHLY RUN", monthly_data['range'], monthly_data['total_dist'], monthly_data['total_time'], monthly_data['avg_pace'], monthly_data['avg_hr']
 
+        elif mode == "WEEKLY":
+            weeks = []
+            for act in acts:
+                dt = datetime.strptime(act['start_date_local'][:10], "%Y-%m-%d")
+                start_of_week = dt - timedelta(days=dt.weekday())
+                week_str = f"{start_of_week.strftime('%Y.%m.%d')} 주차"
+                if week_str not in weeks: weeks.append(week_str)
+            
+            sel_week = st.selectbox("📅 주차 선택", weeks)
+            target_date = datetime.strptime(sel_week[:10], "%Y.%m.%d").strftime("%Y-%m-%d")
+            weekly_data = get_weekly_stats(acts, target_date)
+            
+            if weekly_data:
+                v_act, v_date, v_dist, v_time, v_pace, v_hr = "WEEKLY RUN", weekly_data['range'], weekly_data['total_dist'], weekly_data['total_time'], weekly_data['avg_pace'], weekly_data['avg_hr']
+
+        elif mode == "MONTHLY":
+            months = []
+            for act in acts:
+                month_str = act['start_date_local'][:7] # YYYY-MM
+                if month_str not in months: months.append(month_str)
+            
+            sel_month = st.selectbox("🗓️ 월 선택", months)
+            target_date = f"{sel_month}-01"
+            monthly_data = get_monthly_stats(acts, target_date)
+            
+            if monthly_data:
+                v_act, v_date, v_dist, v_time, v_pace, v_hr = "MONTHLY RUN", monthly_data['range'], monthly_data['total_dist'], monthly_data['total_time'], monthly_data['avg_pace'], monthly_data['avg_hr']
+
+    # 수기 입력 덮어쓰기 로직
     v_act = v_act_in if v_act_in else v_act
     v_date = v_date_in if v_date_in else v_date
     v_dist = v_dist_in if v_dist_in else v_dist
@@ -283,3 +310,4 @@ try:
 
 except Exception as e:
     with col_main: st.info(f"데이터를 선택해 주세요.")
+
