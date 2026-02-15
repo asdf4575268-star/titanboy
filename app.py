@@ -1,6 +1,6 @@
 import streamlit as st
 from PIL import Image, ImageDraw, ImageFont, ImageOps
-import io, os, requests, polyline, mathf
+import io, os, requests, polyline, math
 import numpy as np
 from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
@@ -297,6 +297,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
