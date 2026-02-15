@@ -164,15 +164,27 @@ with col_main:
 # --- [6. 디자인 창 구성] ---
 with col_design:
     st.header("🎨 DESIGN")
+    with st.expander("✍️ 텍스트 수정"):
+        v_act = st.text_input("활동명", v_act); v_date = st.text_input("날짜", v_date)
+        v_dist = st.text_input("거리 km", v_dist); v_time = st.text_input("시간", v_time)
+        v_pace = st.text_input("페이스", v_pace); v_hr = st.text_input("심박 bpm", v_hr)
+
     box_orient = st.radio("박스 방향", ["Vertical", "Horizontal"], horizontal=True)
     sel_font = st.selectbox("폰트", ["BlackHanSans", "Jua", "DoHyeon", "NanumBrush", "Sunflower"])
-    m_color = st.color_picker("포인트 컬러", "#FFD700")
-    sub_color = st.color_picker("서브 컬러", "#FFFFFF")
-    rx, ry = st.number_input("박스 X", 0, 1080, 70), st.number_input("박스 Y", 0, 1920, 1250 if mode=="DAILY" else 80)
-    rw, rh = st.number_input("박스 너비", 100, 1080, 1000 if box_orient=="Horizontal" else 450), st.number_input("박스 높이", 100, 1920, 350 if box_orient=="Horizontal" else 600)
-    box_alpha = st.slider("박스 투명도", 0, 255, 110)
-    vis_sz_adj = st.slider("지도/그래프 크기", 50, 1080, 180 if mode=="DAILY" else 950)
-    vis_alpha = st.slider("지도/그래프 투명도", 0, 255, 180)
+    
+    with st.expander("💄 매거진 스타일", expanded=True):
+        use_shadow = st.toggle("글자 그림자 효과", value=True)
+        border_thick = st.slider("프레임 테두리 두께", 0, 50, 0)
+        COLOR_OPTS = {"Yellow": "#FFD700", "White": "#FFFFFF", "Orange": "#FF4500", "Blue": "#00BFFF", "Grey": "#AAAAAA"}
+        m_color = COLOR_OPTS[st.selectbox("포인트 컬러", list(COLOR_OPTS.keys()))]
+        sub_color = COLOR_OPTS[st.selectbox("서브 컬러", list(COLOR_OPTS.keys()), index=1)]
+
+    with st.expander("📍 위치/크기 조절"):
+        rx, ry = st.number_input("박스 X", 0, 1080, 70), st.number_input("박스 Y", 0, 1920, 1250 if mode=="DAILY" else 850)
+        rw, rh = st.number_input("박스 너비", 100, 1080, 1000 if box_orient=="Horizontal" else 450), st.number_input("박스 높이", 100, 1920, 350 if box_orient=="Horizontal" else 600)
+        box_alpha = st.slider("박스 투명도", 0, 255, 110)
+        vis_sz_adj = st.slider("지도/그래프 크기", 50, 1080, 180 if mode=="DAILY" else 950)
+        vis_alpha = st.slider("지도/그래프 투명도", 0, 255, 180)
 
 # --- [7. 미리보기 렌더링 (최종 통합)] ---
 with col_main:
@@ -217,6 +229,7 @@ with col_main:
             st.image(final, width=500)
         except Exception as e:
             st.error(f"렌더링 오류: {e}")
+
 
 
 
