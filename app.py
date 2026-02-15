@@ -175,9 +175,9 @@ with col_design:
     with st.expander("💄 매거진 스타일", expanded=True):
         use_shadow = st.toggle("글자 그림자 효과", value=True)
         border_thick = st.slider("프레임 테두리 두께", 0, 50, 0)
-        COLOR_OPTS = {"Yellow": "#FFD700", "White": "#FFFFFF", "Orange": "#FF4500", "Blue": "#00BFFF", "Grey": "#AAAAAA"}
-        m_color = COLOR_OPTS[st.selectbox("포인트 컬러", list(COLOR_OPTS.keys()))]
-        sub_color = COLOR_OPTS[st.selectbox("서브 컬러", list(COLOR_OPTS.keys()), index=1)]
+        COLOR_OPTS = {"Black": "#000000", "Yellow": "#FFD700", "White": "#FFFFFF", "Orange": "#FF4500", "Blue": "#00BFFF", "Grey": "#AAAAAA"}
+        m_color = COLOR_OPTS[st.selectbox("포인트 컬러", list(COLOR_OPTS.keys()), key="m_col_sel")]
+        sub_color = COLOR_OPTS[st.selectbox("서브 컬러", list(COLOR_OPTS.keys()), index=1, key="s_col_sel")]
 
     with st.expander("📍 위치/크기 조절"):
         rx, ry = st.number_input("박스 X", 0, 1080, 70), st.number_input("박스 Y", 0, 1920, 1250 if mode=="DAILY" else 850)
@@ -229,6 +229,7 @@ with col_main:
             st.image(final, width=500)
         except Exception as e:
             st.error(f"렌더링 오류: {e}")
+
 
 
 
