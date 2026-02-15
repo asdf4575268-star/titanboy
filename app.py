@@ -244,9 +244,9 @@ with col_main:
         try:
             CW, CH = (1080, 1920) if mode == "DAILY" else (1080, 1350)
             # [규칙 1] 활동명 90, 날짜 30, 숫자 60, 라벨 23 (디자인 가이드 반영)
-            f_t = load_font(sel_font, 90)
-            f_d = load_font(sel_font, 30)
-            f_n = load_font(sel_font, 60)
+            f_t = load_font(sel_font, 70)
+            f_d = load_font(sel_font, 20)
+            f_n = load_font(sel_font, 45)
             f_l = load_font(sel_font, 23)
             f_path = f"font_{sel_font}_90.ttf"
             
@@ -331,6 +331,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
