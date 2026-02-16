@@ -1,202 +1,145 @@
 import streamlit as st
 from PIL import Image, ImageDraw, ImageFont, ImageOps
-import io, requests, polyline, math, os
+import io, os, requests, polyline, math
 import numpy as np
 from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
+from matplotlib import font_manager
 
-# --- [1. 기본 설정 및 유틸리티] ---
-st.set_page_config(page_title="TITAN BOY", layout="wide")
-plt.switch_backend('Agg')
-CLIENT_ID, CLIENT_SECRET = '202274', '63f6a7007ebe6b405763fc3104e17bb53b468ad0'
+# --- [1. 설정 및 API] ---
+API_CFG = {"ID": '202275', "SECRET": '969201cab488e4eaf1398b106de1d4e520dc564c'}
 ACTUAL_URL = "https://titanboy-kgcnje3tg3hbfpfsp6uwzc.streamlit.app"
+st.set_page_config(page_title="TITAN BOY", layout="wide")
 
-def hex_to_rgba(hex_color, alpha):
-    hex_color = hex_color.lstrip('#')
-    rgb = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
-    return (rgb[0], rgb[1], rgb[2], int(alpha))
+def logout():
+    st.cache_data.clear(); st.cache_resource.clear(); st.session_state.clear(); st.query_params.clear(); st.rerun()
 
 @st.cache_resource
-def load_font_cached(name, size):
-    urls = {
+def load_font(font_type, size):
+    fonts = {
         "BlackHanSans": "https://github.com/google/fonts/raw/main/ofl/blackhansans/BlackHanSans-Regular.ttf",
+        "Sunflower": "https://github.com/google/fonts/raw/main/ofl/sunflower/Sunflower-Regular.ttf",
         "KirangHaerang": "https://github.com/google/fonts/raw/main/ofl/kiranghaerang/KirangHaerang-Regular.ttf",
         "JollyLodger": "https://github.com/google/fonts/raw/main/ofl/jollylodger/JollyLodger-Regular.ttf",
-        "Lacquer": "https://github.com/google/fonts/raw/main/ofl/lacquer/Lacquer-Regular.ttf"
+        "Lacquer": "https://github.com/google/fonts/raw/main/ofl/lacquer/Lacquer-Regular.ttf",
+        "Orbit": "https://github.com/google/fonts/raw/main/ofl/orbit/Orbit-Regular.ttf"
     }
-    path = f"font_{name}.ttf"
-    if not os.path.exists(path) and name in urls:
-        try:
-            with open(path, "wb") as f: f.write(requests.get(urls[name]).content)
-        except: pass
-    try: return ImageFont.truetype(path, int(size))
+    try:
+        r = requests.get(fonts.get(font_type, fonts["BlackHanSans"]), timeout=10)
+        return ImageFont.truetype(io.BytesIO(r.content), int(size))
     except: return ImageFont.load_default()
 
-def draw_text(draw, pos, text, font, fill, shadow=True):
-    if shadow: draw.text((pos[0]+2, pos[1]+2), text, font=font, fill=(0,0,0,220))
-    draw.text(pos, text, font=font, fill=fill)
+# --- [2. 유틸리티] ---
+def make_smart_collage(files, target_size):
+    tw, th = target_size
+    imgs = [ImageOps.exif_transpose(Image.open(f).convert("RGBA")) for f in files]
+    if not imgs: return Image.new("RGBA", (tw, th), (30, 30, 30, 255))
+    n = len(imgs)
+    if n == 1: return ImageOps.fit(imgs[0], (tw, th))
+    cols = math.ceil(math.sqrt(n))
+    rows = math.ceil(n / cols)
+    canvas = Image.new("RGBA", (tw, th), (0, 0, 0, 255))
+    for i, img in enumerate(imgs):
+        r, c = divmod(i, cols)
+        cur_cols = n % cols if (r == rows-1 and n % cols != 0) else cols
+        x0, x1 = int((i%cols)*tw/cur_cols), int(((i%cols)+1)*tw/cur_cols)
+        y0, y1 = int(r*th/rows), int((r+1)*th/rows)
+        canvas.paste(ImageOps.fit(img, (x1-x0, y1-y0)), (x0, y0))
+    return canvas
 
-# --- [2. 데이터 수집 및 세션] ---
-if 'token' not in st.session_state: st.session_state.token = None
-if 'acts' not in st.session_state: st.session_state.acts = []
-qp = st.query_params
+def create_bar_chart(data, color, labels):
+    fig, ax = plt.subplots(figsize=(10, 4), dpi=100)
+    fig.patch.set_alpha(0); ax.patch.set_alpha(0)
+    ax.bar(range(len(labels)), data, color=color, width=0.6)
+    ax.set_xticks(range(len(labels))); ax.set_xticklabels(labels, color='white', fontsize=12)
+    for s in ['top', 'right', 'left']: ax.spines[s].set_visible(False)
+    ax.tick_params(axis='y', left=False, labelleft=False)
+    buf = io.BytesIO(); plt.savefig(buf, format='png', transparent=True); plt.close(fig)
+    return Image.open(buf)
 
-if "token" in qp: st.session_state.token = qp["token"]
-elif "code" in qp and not st.session_state.token:
-    res = requests.post("https://www.strava.com/oauth/token", data={"client_id": CLIENT_ID, "client_secret": CLIENT_SECRET, "code": qp["code"], "grant_type": "authorization_code"}).json()
-    if 'access_token' in res:
-        st.session_state.token = res['access_token']; st.query_params.clear(); st.query_params["token"] = res['access_token']; st.rerun()
+# --- [3. 인증 및 데이터] ---
+if 'access_token' not in st.session_state: st.session_state.access_token = None
+if "code" in st.query_params and not st.session_state.access_token:
+    res = requests.post("https://www.strava.com/oauth/token", data={"client_id": API_CFG["ID"], "client_secret": API_CFG["SECRET"], "code": st.query_params["code"], "grant_type": "authorization_code"}).json()
+    st.session_state.access_token = res.get('access_token'); st.query_params.clear(); st.rerun()
 
-if st.session_state.token and not st.session_state.acts:
-    st.session_state.acts = requests.get("https://www.strava.com/api/v3/athlete/activities?per_page=50", headers={'Authorization': f"Bearer {st.session_state.token}"}).json()
+acts = []
+if st.session_state.access_token:
+    r = requests.get("https://www.strava.com/api/v3/athlete/activities?per_page=50", headers={'Authorization': f"Bearer {st.session_state.access_token}"})
+    acts = r.json() if r.status_code == 200 else []
 
-# --- [3. 레이아웃: 메인 & 스타일] ---
-col_main, col_style = st.columns([1.5, 1], gap="medium")
+# --- [4. 메인/디자인 레이아웃] ---
+col_main, col_design = st.columns([1.6, 1], gap="medium")
 
 with col_main:
     st.title("TITAN BOY")
-    bg_files = st.file_uploader("📸 배경 사진 (여러 장 가능)", type=['jpg','png'], accept_multiple_files=True)
-    log_file = st.file_uploader("🔘 로고 업로드", type=['jpg','png'])
-    
-    v_act, v_date, v_dist, v_time, v_pace, v_hr, a = "RUNNING", "2026.02.16 12:00 PM", "0.00", "00:00:00", "0'00\"", "0", None
-    
-    if not st.session_state.token:
-        st.link_button("🚀 Strava 연동하기", f"https://www.strava.com/oauth/authorize?client_id={CLIENT_ID}&response_type=code&redirect_uri={ACTUAL_URL}&scope=read,activity:read_all&approval_prompt=force", use_container_width=True)
+    v = {"act": "RUNNING", "date": "2026-02-15", "dist": "0.00", "time": "00:00:00", "pace": "0'00\"", "hr": "0"}
+    a_sel, w_data, m_data = None, None, None
+
+    if not st.session_state.access_token:
+        st.link_button("🚀 Strava 연동", f"https://www.strava.com/oauth/authorize?client_id={API_CFG['ID']}&response_type=code&redirect_uri={ACTUAL_URL}&scope=read,activity:read_all&approval_prompt=force", use_container_width=True)
     else:
-        mode = st.radio("모드 선택", ["DAILY", "WEEKLY", "MONTHLY"], horizontal=True)
-        if st.session_state.acts and mode == "DAILY":
-            acts_list = [f"{x['start_date_local'][:10]} - {x['name']}" for x in st.session_state.acts]
-            sel = st.selectbox("활동 선택", acts_list)
-            a = st.session_state.acts[acts_list.index(sel)]
-            v_act = a['name'].upper()
-        
-            raw_date = a['start_date_local'].replace('Z', '')
-            dt_obj = datetime.fromisoformat(raw_date)
-            v_date = dt_obj.strftime("%Y.%m.%d %I:%M %p")
+        st.button("🔓 로그아웃", on_click=logout)
+        bg_files = st.file_uploader("📸 배경 사진", accept_multiple_files=True)
+        log_file = st.file_uploader("🔘 로고")
+        mode = st.radio("모드", ["DAILY", "WEEKLY", "MONTHLY"], horizontal=True)
 
-# --- [4. 오른쪽 사이드바: 수기 입력 (비상용)] ---
-with st.sidebar:
-    st.header("⚙️ SYSTEM")
-    if st.button("🔓 로그아웃", use_container_width=True):
-        st.session_state.clear(); st.query_params.clear(); st.rerun()
-    
-    with st.expander("📝 OCR / 수기 수정 (비상용)"):
-        v_act = st.text_input("활동명 커스텀", v_act)
-        v_date = st.text_input("날짜/시간 커스텀", v_date)
-        v_dist = st.text_input("거리 km", v_dist)
-        v_time = st.text_input("시간", v_time)
-        v_pace = st.text_input("페이스", v_pace)
-        v_hr = st.text_input("심박 bpm", v_hr)
+        if acts:
+            if mode == "DAILY":
+                opts = [f"{ac['start_date_local'][:10]} - {ac['name']}" for ac in acts]
+                a_sel = acts[opts.index(st.selectbox("🏃 활동 선택", opts))]
+                d_km = a_sel['distance']/1000; m_s = a_sel['moving_time']
+                v.update({"act": a_sel['name'], "date": a_sel['start_date_local'][:10], "dist": f"{d_km:.2f}", "time": f"{m_s//3600:02d}:{(m_s%3600)//60:02d}:{m_s%60:02d}", "pace": f"{int((m_s/d_km)//60)}'{int((m_s/d_km)%60):02d}\"", "hr": str(int(a_sel.get('average_heartrate', 0)))})
+            elif mode == "WEEKLY":
+                weeks = sorted(list(set([(datetime.strptime(ac['start_date_local'][:10], "%Y-%m-%d") - timedelta(days=datetime.strptime(ac['start_date_local'][:10], "%Y-%m-%d").weekday())).strftime('%Y-%m-%d') for ac in acts])), reverse=True)
+                sel_w = st.selectbox("📅 주차 선택", weeks)
+                dt = datetime.strptime(sel_w, "%Y-%m-%d"); wn = dt.isocalendar()[1]
+                v.update({"act": f"{wn}TH WEEK", "date": f"{dt.strftime('%m.%d')} - {(dt+timedelta(days=6)).strftime('%m.%d')}"})
+            elif mode == "MONTHLY":
+                months = sorted(list(set([ac['start_date_local'][:7] for ac in acts])), reverse=True)
+                sel_m = st.selectbox("🗓️ 월 선택", months)
+                dt = datetime.strptime(sel_m, "%Y-%m")
+                v.update({"act": dt.strftime("%B").upper(), "date": dt.strftime("%Y.%m")})
 
-# --- [5. 오른쪽 디자인 통합 창] ---
-with col_style:
-    st.header("🎨 STYLE")
-    
-    with st.container(border=True):
-        st.subheader("폰트 및 컬러")
-        f_name = st.selectbox("폰트 선택", ["KirangHaerang", "JollyLodger", "Lacquer", "BlackHanSans"])
-        C_MAP = {"Yellow":"#FFD700", "White":"#FFFFFF", "Black":"#000000", "Orange":"#FF4500", "Blue":"#00BFFF"}
-        col1, col2 = st.columns(2)
-        m_col = C_MAP[col1.selectbox("포인트 컬러", list(C_MAP.keys()), 0)]
-        s_col = C_MAP[col2.selectbox("서브 컬러", list(C_MAP.keys()), 1)]
-    
-    with st.container(border=True):
-        st.subheader("박스 설정")
-        orient = st.radio("정렬 방향", ["Vertical", "Horizontal"], horizontal=True)
-        col1, col2 = st.columns(2)
-        sw_vis = col1.toggle("지도/그래프", True)
-        sw_box = col2.toggle("배경 박스", True)
-        sw_shadow = col1.toggle("글자 그림자", True)
-        b_thick = st.slider("테두리 두께", 0, 50, 0)
-        box_al = st.slider("박스 투명도", 0, 255, 0)
+with col_design:
+    st.header("🎨 DESIGN")
+    v["act"] = st.text_input("활동명", v["act"]); v["date"] = st.text_input("날짜", v["date"])
+    v["dist"] = st.text_input("거리 km", v["dist"]); v["pace"] = st.text_input("페이스", v["pace"])
+    v["hr"] = st.text_input("심박 bpm", v["hr"])
+    box_orient = st.radio("박스 방향", ["Vertical", "Horizontal"], horizontal=True)
+    show_vis = st.toggle("지도/그래프 표시", True)
+    m_col = st.selectbox("포인트 컬러", ["#FFD700", "#FFFFFF", "#000000", "#FF4500"])
+    sel_font = st.selectbox("폰트", ["BlackHanSans", "Sunflower", "KirangHaerang", "JollyLodger", "Lacquer", "Orbit"])
+    rx, ry = st.number_input("X", 0, 1080, 70), st.number_input("Y", 0, 1920, 1250)
+    rw, rh = st.number_input("너비", 100, 1080, 450 if box_orient=="Vertical" else 1000), st.number_input("높이", 100, 1080, 600 if box_orient=="Vertical" else 350)
+    vis_sz = st.slider("지도/그래프 크기", 50, 800, 200)
 
-    with st.expander("📍 세부 위치 조절"):
-        rx = st.number_input("박스 X", 0, 1080, 80)
-        ry = st.number_input("박스 Y", 0, 1920, 1200)
-        rw = st.number_input("박스 가로", 100, 1080, 450 if orient=="Vertical" else 1000)
-        rh = st.number_input("박스 세로", 100, 1920, 600 if orient=="Vertical" else 350)
-        vis_sz = st.slider("시각화 크기", 50, 1080, 200)
-
-# --- [6. 미리보기 렌더링 (메인 하단)] ---
+# --- [5. 렌더링] ---
 with col_main:
-    st.divider()
-    if bg_files:
-        try:
-            CW, CH = (1080, 1920) if (mode=="DAILY" if 'mode' in locals() else True) else (1080, 1350)
-            # 글자 크기 가이드: 활동명 90, 날짜 30, 숫자 60
-            f_t = load_font_cached(f_name, 90)
-            f_d = load_font_cached(f_name, 30)
-            f_n = load_font_cached(f_name, 60)
-            f_l = load_font_cached(f_name, 25)
+    if st.session_state.access_token:
+        CW, CH = (1080, 1920) if mode == "DAILY" else (1080, 1350)
+        f_t, f_d, f_n, f_l = [load_font(sel_font, s) for s in [90, 30, 60, 23]]
+        canvas = make_smart_collage(bg_files, (CW, CH))
+        overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
+        
+        draw.rectangle([rx, ry, rx+rw, ry+rh], fill=(0,0,0,110))
+        draw.text((rx+40, ry+30), v["act"], font=f_t, fill=m_col)
+        draw.text((rx+40, ry+135), v["date"], font=f_d, fill="#AAAAAA")
+        
+        items = [("distance", f"{v['dist']} km"), ("time", v["time"]), ("pace", v["pace"]), ("avg bpm", f"{v['hr']} bpm")]
+        for i, (lab, val) in enumerate(items):
+            px, py = (rx+40, ry+200+i*100) if box_orient=="Vertical" else (rx+40+i*240, ry+200)
+            draw.text((px, py), lab.lower(), font=f_l, fill="#AAAAAA")
+            draw.text((px, py+35), val.lower(), font=f_n, fill="#FFFFFF")
 
-            # 콜라주 생성
-            from PIL import ImageFilter
-            imgs = [ImageOps.exif_transpose(Image.open(f)).convert("RGBA") for f in bg_files]
-            if len(imgs) == 1: canvas = ImageOps.fit(imgs[0], (CW, CH))
-            else:
-                cols = math.ceil(math.sqrt(len(imgs))); rows = math.ceil(len(imgs)/cols)
-                canvas = Image.new("RGBA", (CW, CH))
-                for i, img in enumerate(imgs):
-                    r, c = divmod(i, cols)
-                    canvas.paste(ImageOps.fit(img, (CW//cols, CH//rows)), (c*(CW//cols), r*(CH//rows)))
-            
-            overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
-            
-            # 테두리
-            if b_thick > 0: draw.rectangle([(0,0), (CW-1, CH-1)], outline=m_col, width=b_thick)
+        if show_vis and mode == "DAILY" and a_sel and a_sel.get('map', {}).get('summary_polyline'):
+            pts = polyline.decode(a_sel['map']['summary_polyline']); lats, lons = zip(*pts)
+            vis_l = Image.new("RGBA", (vis_sz, vis_sz), (0,0,0,0)); d_m = ImageDraw.Draw(vis_l)
+            def tr(la, lo): return 10+(lo-min(lons))/(max(lons)-min(lons)+1e-5)*(vis_sz-20), (vis_sz-10)-(la-min(lats))/(max(lats)-min(lats)+1e-5)*(vis_sz-20)
+            d_m.line([tr(la, lo) for la, lo in pts], fill=m_col, width=5)
+            overlay.paste(vis_l, (rx, ry-vis_sz-20), vis_l)
 
-            # 데이터 박스
-            if sw_box:
-                draw.rectangle([rx, ry, rx+rw, ry+rh], fill=(0,0,0, box_al))
-                # 소문자 단위 설정 (km, bpm)
-                items = [("distance", f"{v_dist} km"), ("time", v_time), ("pace", v_pace), ("avg bpm", f"{v_hr} bpm")]
-                
-                if orient == "Vertical":
-                    draw_text(draw, (rx+40, ry+30), v_act, f_t, m_col, sw_shadow)
-                    draw_text(draw, (rx+44, ry+125), v_date, f_d, "#AAAAAA", sw_shadow)
-                    yc = ry+200
-                    for l, v in items:
-                        draw_text(draw, (rx+40, yc), l.lower(), f_l, "#AAAAAA", sw_shadow)
-                        draw_text(draw, (rx+40, yc+35), v.lower(), f_n, s_col, sw_shadow); yc+=110
-                else:
-                    draw_text(draw, (rx+(rw-draw.textlength(v_act,f_t))//2, ry+35), v_act, f_t, m_col, sw_shadow)
-                    draw_text(draw, (rx+(rw-draw.textlength(v_date,f_d))//2, ry+135), v_date, f_d, "#AAAAAA", sw_shadow)
-                    sw = rw//4
-                    for i, (l, v) in enumerate(items):
-                        cx = rx + i*sw + sw//2
-                        draw_text(draw, (cx-draw.textlength(l.lower(),f_l)//2, ry+210), l.lower(), f_l, "#AAAAAA", sw_shadow)
-                        draw_text(draw, (cx-draw.textlength(v.lower(),f_n)//2, ry+255), v.lower(), f_n, s_col, sw_shadow)
-
-            # 지도 시각화 부분 (기존 코드 내 수정)
-            if sw_vis and a and a.get('map', {}).get('summary_polyline'):
-                pts = polyline.decode(a['map']['summary_polyline'])
-                lats, lons = zip(*pts)
-                v_lyr = Image.new("RGBA", (vis_sz, vis_sz), (0,0,0,0))
-                md = ImageDraw.Draw(v_lyr)
-    
-            def tr(la, lo): 
-                return (10 + (lo - min(lons)) / (max(lons) - min(lons) + 1e-5) * (vis_sz - 20), 
-                (vis_sz - 10) - (la - min(lats)) / (max(lats) - min(lats) + 1e-5) * (vis_sz - 20))
-    
-            line_color = hex_to_rgba(m_col, 220) 
-            md.line([tr(la, lo) for la, lo in pts], fill=line_color, width=5)
-    
-            # 위치 계산 및 붙여넣기
-            paste_x = int(rx)
-            paste_y = int(ry - vis_sz - 20 if orient == "Vertical" else ry + 20)
-            overlay.paste(v_lyr, (paste_x, paste_y), v_lyr)
-
-            if log_file:
-                li = ImageOps.fit(Image.open(log_file).convert("RGBA"), (120, 120))
-                overlay.paste(li, (CW-160, 40), li)
-
-            final = Image.alpha_composite(canvas, overlay).convert("RGB")
-            st.image(final, caption="PREVIEW (300px)", width=450)
-            
-            buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
-            st.download_button("📸 사진 저장하기", buf.getvalue(), "titan_run.jpg", use_container_width=True)
-        except Exception as e: st.error(f"렌더링 에러: {e}")
-    else:
-        st.info("💡 배경 사진을 업로드하면 미리보기가 생성됩니다.")
-
-
+        final = Image.alpha_composite(canvas, overlay).convert("RGB")
+        st.image(final, width=350)
+        buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
+        st.download_button("📸 DOWNLOAD", buf.getvalue(), "titan.jpg", use_container_width=True)
