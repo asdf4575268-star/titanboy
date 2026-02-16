@@ -256,7 +256,7 @@ with col_main:
                 a = acts[act_opts.index(sel_act)]
                 if a:
                     v_act = a['name'].upper()
-                    v_date = f"{a['start_date_local'][:10].replace('-', '.')} {datetime.strptime(a['start_date_local'][:19], '%Y-%m-%dT%H:%M:%S').strftime('%I:%M %p')}"
+                    v_date = a['start_date_local'][:10].replace('-', '.')
                     d_km = a.get('distance', 0)/1000; m_s = a.get('moving_time', 0)
                     v_dist = f"{d_km:.2f}" 
                     v_time = f"{int(m_s//3600):02d}:{int((m_s%3600)//60):02d}:{int(m_s%60):02d}" if m_s >= 3600 else f"{int(m_s//60):02d}:{int(m_s%60):02d}"
@@ -316,7 +316,7 @@ with col_main:
         try:
             CW, CH = (1080, 1920) if mode == "DAILY" else (1080, 1350)
             # 90-30-60-23 가이드 적용
-            f_t, f_d, f_n, f_l = load_font(sel_font, 70), load_font(sel_font, 30), load_font(sel_font, 60), load_font(sel_font, 25)
+            f_t, f_d, f_n, f_l = load_font(sel_font, 70), load_font(sel_font, 20), load_font(sel_font, 50), load_font(sel_font, 25)
             
             canvas = make_smart_collage(bg_files, (CW, CH)) if bg_files else Image.new("RGBA", (CW, CH), (20, 20, 20, 255))
             overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
@@ -386,7 +386,3 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
-
-
-
-
