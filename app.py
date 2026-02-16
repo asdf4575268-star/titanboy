@@ -265,18 +265,9 @@ with col_main:
                     v_hr = str(int(a.get('average_heartrate', 0))) if a.get('average_heartrate') else "0"
                 
             elif mode == "WEEKLY":
-                weeks = sorted(list(set([(datetime.strptime(ac['start_date_local'][:10], "%Y-%m-%d") - timedelta(days=datetime.strptime(ac['start_date_local'][:10], "%Y-%m-%d").weekday())).strftime('%Y.%m.%d') for ac in acts])), reverse=True)
-                sel_week = st.selectbox("📅 주차 선택", weeks)
-                weekly_data = get_weekly_stats(acts, sel_week.replace('.','-'))
-                
-                if weekly_data:
-                    dt_t = datetime.strptime(sel_week.replace('.','-'), "%Y-%m-%d")
-                    # 연간 누적 주차 계산 (ISO)
-                    w_num = dt_t.isocalendar()[1]
-                    sfx = "TH" if 11 <= w_num <= 13 else {1: "ST", 2: "ND", 3: "RD"}.get(w_num % 10, "TH")
-                    
-                    v_act = f"{w_num}{sfx} WEEK"
-                    v_date, v_dist, v_time, v_pace, v_hr = weekly_data['range'], weekly_data['total_dist'], weekly_data['total_time'], weekly_data['avg_pace'], weekly_data['avg_hr']
+                w_map = { (dt := datetime.strptime(ac['start_date_local'][:10], "%Y-%m-%d") - timedelta(days=dt.weekday())).strftime('%Y-%m-%d'): f"{dt.year}-{dt.isocalendar()[1]}주차" for ac in acts }
+                sel_week = st.selectbox("📅 주차 선택", sorted(w_map.keys(), reverse=True), format_func=lambda x: w_map[x])
+                weekly_data = get_weekly_stats(acts, sel_week)
                     
             elif mode == "MONTHLY":
                 months = sorted(list(set([ac['start_date_local'][:7] for ac in acts])), reverse=True)
@@ -391,6 +382,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
