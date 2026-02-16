@@ -304,17 +304,14 @@ with col_main:
     if data_ready:
         try:
             CW, CH = (1080, 1920) if mode == "DAILY" else (1080, 1350)
-            f_t, f_d, f_n, f_l = load_font(sel_font, 90), load_font(sel_font, 30), load_font(sel_font, 60), load_font(sel_font, 25)
+            # 90-30-60-23 가이드 적용
+            f_t, f_d, f_n, f_l = load_font(sel_font, 70), load_font(sel_font, 20), load_font(sel_font, 50), load_font(sel_font, 25)
             
-            # 1. 배경 생성 (사진)
             canvas = make_smart_collage(bg_files, (CW, CH)) if bg_files else Image.new("RGBA", (CW, CH), (20, 20, 20, 255))
-            
-            # 2. 오버레이 레이어 (텍스트, 지도)
-            overlay = Image.new("RGBA", (CW, CH), (0,0,0,0))
-            draw = ImageDraw.Draw(overlay)
+            overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
             items = [("distance", f"{v_dist} km"), ("time", v_time), ("pace", v_pace), ("avg bpm", f"{v_hr} bpm")]
 
-            # 3. 데이터 박스 렌더링 (박스 및 텍스트)
+            # 1. 데이터 박스 (show_box가 True일 때만)
             if show_box:
                 draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0,0,0,box_alpha))
                 if box_orient == "Vertical":
@@ -336,7 +333,7 @@ with col_main:
                         draw_styled_text(draw, (cx - draw.textlength(lab.lower(), f_l)//2, ry+200), lab.lower(), f_l, "#AAAAAA", shadow=use_shadow)
                         draw_styled_text(draw, (cx - draw.textlength(val.lower(), f_n)//2, ry+245), val.lower(), f_n, sub_color, shadow=use_shadow)
 
-            # 4. 지도/그래프 렌더링
+            # 2. 지도 및 그래프 (show_vis가 True일 때만)
             if show_vis:
                 if mode == "DAILY" and a and a.get('map', {}).get('summary_polyline'):
                     pts = polyline.decode(a['map']['summary_polyline'])
@@ -345,66 +342,31 @@ with col_main:
                     vis_layer = Image.new("RGBA", (vis_sz, vis_sz), (0,0,0,0)); m_draw = ImageDraw.Draw(vis_layer)
                     def tr(la, lo): return 15+(lo-min(lons))/(max(lons)-min(lons)+1e-5)*(vis_sz-30), (vis_sz-15)-(la-min(lats))/(max(lats)-min(lats)+1e-5)*(vis_sz-30)
                     m_draw.line([tr(la, lo) for la, lo in pts], fill=hex_to_rgba(m_color, vis_alpha), width=6)
-                    m_pos = (rx, max(5, ry - vis_sz - 15)) if box_orient == "Vertical" else (rx + 100, ry + 10)
+                    
+                    if box_orient == "Vertical": m_pos = (rx, max(5, ry - vis_sz - 15))
+                    else: m_pos = (rx + 100, ry + 10)
                     overlay.paste(vis_layer, (int(m_pos[0]), int(m_pos[1])), vis_layer)
+                    
                 elif mode in ["WEEKLY", "MONTHLY"] and (weekly_data or monthly_data):
                     d_obj = weekly_data if mode == "WEEKLY" else monthly_data
+                    # 폰트는 제목용 90px 폰트를 차트 레이블용으로 재활용
                     chart_img = create_bar_chart(d_obj['dists'], m_color, mode=mode, labels=d_obj.get('labels'), font_path=None)
                     vis_sz = vis_sz_adj
                     vis_layer = chart_img.resize((vis_sz, int(chart_img.size[1]*(vis_sz/chart_img.size[0]))), Image.Resampling.LANCZOS)
                     vis_layer.putalpha(vis_layer.getchannel('A').point(lambda x: x * (vis_alpha / 255)))
                     overlay.paste(vis_layer, ((CW - vis_layer.width)//2, CH - vis_layer.height - 80), vis_layer)
 
-            # --- [핵심 수정: 레이어 합성 순서] ---
-            # 1. 먼저 사진(canvas) 위에 글자/지도(overlay)를 합칩니다.
-            combined = Image.alpha_composite(canvas, overlay)
-
-            # 2. 그 다음 프레임을 별도의 레이어로 불러와서 가장 위에 씌웁니다.
+            # 3. 로고 (항상 표시 또는 로직 유지)
             if log_file:
-                frame_img = Image.open(log_file).convert("RGBA")
-                frame_img = ImageOps.fit(frame_img, (CW, CH), Image.Resampling.LANCZOS)
-                # 최종 이미지(combined) 위에 프레임을 한 번 더 합성
-                combined = Image.alpha_composite(combined, frame_img)
+                ls, margin = 100, 40
+                l_img = ImageOps.fit(Image.open(log_file).convert("RGBA"), (ls, ls))
+                mask = Image.new('L', (ls, ls), 0); ImageDraw.Draw(mask).ellipse((0, 0, ls, ls), fill=255); l_img.putalpha(mask)
+                overlay.paste(l_img, (CW - ls - margin, margin), l_img)
 
-            final = combined.convert("RGB")
+            final = Image.alpha_composite(canvas, overlay).convert("RGB")
             st.image(final, width=300)
-            
             buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
             st.download_button(f"📸 {mode} DOWNLOAD", buf.getvalue(), f"{mode.lower()}.jpg", use_container_width=True)
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
