@@ -39,9 +39,20 @@ def load_font(name, size):
         "KirangHaerang": "https://github.com/google/fonts/raw/main/ofl/kiranghaerang/KirangHaerang-Regular.ttf",
         "Lacquer": "https://github.com/google/fonts/raw/main/ofl/lacquer/Lacquer-Regular.ttf"
     }
-    f_path = f"font_{name}_{size}.ttf"
+    f_path = f"font_{name}.ttf"
+    # 파일이 없으면 다운로드 시도
+    if not os.path.exists(f_path):
+        try:
+            r = requests.get(fonts[name])
+            with open(f_path, "wb") as f:
+                f.write(r.content)
+        except:
+            return ImageFont.load_default() # 다운로드 실패 시 기본 폰트 반환
     
-    return ImageFont.truetype(f_path, int(size))
+    try:
+        return ImageFont.truetype(f_path, int(size))
+    except:
+        return ImageFont.load_default()
 
 def get_weekly_stats(activities, target_date_str):
     try:
@@ -375,3 +386,4 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
