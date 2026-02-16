@@ -36,11 +36,9 @@ def draw_styled_text(draw, pos, text, font, fill, shadow=True):
 def load_font(name, size):
     fonts = {
         "BlackHanSans": "https://github.com/google/fonts/raw/main/ofl/blackhansans/BlackHanSans-Regular.ttf",
-        "Sunflower": "https://github.com/google/fonts/raw/main/ofl/sunflower/Sunflower-Regular.ttf",
         "KirangHaerang": "https://github.com/google/fonts/raw/main/ofl/kiranghaerang/KirangHaerang-Regular.ttf",
-        "JollyLodger": "https://github.com/google/fonts/raw/main/ofl/jollylodger/JollyLodger-Regular.ttf",
         "Lacquer": "https://github.com/google/fonts/raw/main/ofl/lacquer/Lacquer-Regular.ttf",
-        "Playball": "https://github.com/google/fonts/raw/main/ofl/playball/Playball-Regular.ttf"  # 추가됨
+        "IndieFlower": "https://github.com/google/fonts/raw/main/ofl/IndieFlower/IndieFlower-Regular.ttf"
     }
     f_path = f"font_{name}_{size}.ttf"
     
@@ -299,7 +297,7 @@ with col_design:
         sub_color = COLOR_OPTS[st.selectbox("서브 컬러", list(COLOR_OPTS.keys()), index=2, key="s_col_sel")]
 
     box_orient = st.radio("박스 방향", ["Vertical", "Horizontal"], horizontal=True)
-    sel_font = st.selectbox("폰트", ["BlackHanSans", "KirangHaerang", "Lacquer", "IndieFlower", "Playball"])
+    sel_font = st.selectbox("폰트", ["BlackHanSans", "KirangHaerang", "Lacquer", "IndieFlower"])
 
     with st.expander("📍 위치/크기 조절"):
         rx, ry = st.number_input("박스 X", 0, 1080, 40 if box_orient=="Horizontal" else 70), st.number_input("박스 Y", 0, 1920, 150 if box_orient=="Horizontal" else 1250)
@@ -382,6 +380,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
