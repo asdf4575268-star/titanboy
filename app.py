@@ -263,21 +263,41 @@ with col_main:
                     v_pace = f"{int((m_s/d_km)//60)}'{int((m_s/d_km)%60):02d}\"" if d_km > 0 else "0'00\""
                     v_hr = str(int(a.get('average_heartrate', 0))) if a.get('average_heartrate') else "0"
                 
-            elif mode == "WEEKLY":
-                weeks = sorted(list(set([(datetime.strptime(ac['start_date_local'][:10], "%Y-%m-%d") - timedelta(days=datetime.strptime(ac['start_date_local'][:10], "%Y-%m-%d").weekday())).strftime('%Y-%m-%d') for ac in acts])), reverse=True)
-                sel_week = st.selectbox("📅 주차 선택", weeks, format_func=lambda x: f"{x[:4]}-{datetime.strptime(x, '%Y-%m-%d').isocalendar()[1]}주차")    
-                weekly_data = get_weekly_stats(acts, sel_week)
-                
-            elif mode == "MONTHLY":
-                months = sorted(list(set([ac['start_date_local'][:7] for ac in acts])), reverse=True)
-                sel_month = st.selectbox("🗓️ 월 선택", months)
-                monthly_data = get_monthly_stats(acts, f"{sel_month}-01")
-                
-                if monthly_data:
-                    dt_t = datetime.strptime(f"{sel_month}-01", "%Y-%m-%d")
-                    # 월 이름 대문자 (예: FEBRUARY)
-                    v_act = dt_t.strftime("%B").upper()
-                    v_date, v_dist, v_time, v_pace, v_hr = monthly_data['range'], monthly_data['total_dist'], monthly_data['total_time'], monthly_data['avg_pace'], monthly_data['avg_hr']
+            Horizontal 모드에서 그래프가 데이터 박스 위치를 따라 올라가는 이유는, 현재 코드에서 그래프의 y 좌표가 ry(데이터 박스의 시작 높이)를 기준으로 설정되어 있기 때문입니다.
+
+Horizontal 모드일 때는 데이터 박스가 보통 상단이나 중앙에 위치하므로, 그래프를 화면 하단에 고정하거나 데이터 박스 아래에 여유 있게 배치하도록 로직을 수정해야 합니다.
+
+해당 부분의 코드(elif mode in ["WEEKLY", "MONTHLY"] 블록)를 아래와 같이 수정해 보세요.
+
+🛠️ 시각화(그래프) 위치 로직 수정
+Python
+                elif mode in ["WEEKLY", "MONTHLY"]:
+                    d_obj = weekly_data if mode == "WEEKLY" else monthly_data
+                    if d_obj:
+                        chart_img = create_bar_chart(d_obj['dists'], m_color, mode=mode, labels=d_obj.get('labels'), font_path=None)
+                        vis_sz = vis_sz_adj
+                        
+                        # 비율 유지 리사이즈
+                        chart_w = vis_sz
+                        chart_h = int(chart_img.size[1] * (vis_sz / chart_img.size[0]))
+                        vis_layer = chart_img.resize((chart_w, chart_h), Image.Resampling.LANCZOS)
+                        
+                        # 투명도 적용
+                        alpha_ch = vis_layer.getchannel('A').point(lambda x: x * (vis_alpha / 255))
+                        vis_layer.putalpha(alpha_ch)
+                        
+                        # [수정] 박스 방향에 따른 그래프 위치 최적화
+                        if box_orient == "Vertical":
+                            # 세로 모드: 데이터 박스 위쪽에 배치
+                            graph_y = ry - vis_layer.height - 20
+                        else:
+                            # 가로(Horizontal) 모드: 데이터 박스 아래쪽에 배치하거나 화면 하단 부근에 배치
+                            # 데이터 박스 바로 아래 배치하려면: graph_y = ry + rh + 40
+                            # 화면 하단에 고정하려면 (추천):
+                            graph_y = CH - vis_layer.height - 100 
+                        
+                        graph_x = (CW - vis_layer.width) // 2
+                        overlay.paste(vis_layer, (int(graph_x), int(graph_y)), vis_layer)
 # --- [6. 디자인 창 구성] ---
 with col_design:
     st.header("🎨 DESIGN")
@@ -413,4 +433,5 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 상세 오류: {e}")
+
 
