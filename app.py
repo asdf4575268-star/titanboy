@@ -69,13 +69,10 @@ with col_main:
             sel = st.selectbox("활동 선택", acts_list)
             a = st.session_state.acts[acts_list.index(sel)]
             v_act = a['name'].upper()
-            # 시간 파싱 (AM/PM 포함)
-            dt_obj = datetime.strptime(a['start_date_local'], "%Y-%m-%dT%H:%M:%SZ") + timedelta(hours=9) # KST
+        
+            raw_date = a['start_date_local'].replace('Z', '')
+            dt_obj = datetime.fromisoformat(raw_date)
             v_date = dt_obj.strftime("%Y.%m.%d %I:%M %p")
-            d, t = a.get('distance',0)/1000, a.get('moving_time',0)
-            v_dist, v_time = f"{d:.2f}", f"{t//3600:02d}:{(t%3600)//60:02d}:{t%60:02d}"
-            v_pace = f"{int((t/d)//60)}'{int((t/d)%60):02d}\"" if d > 0 else "0'00\""
-            v_hr = str(int(a.get('average_heartrate', 0)))
 
 # --- [4. 오른쪽 사이드바: 수기 입력 (비상용)] ---
 with st.sidebar:
@@ -201,4 +198,5 @@ with col_main:
         except Exception as e: st.error(f"렌더링 에러: {e}")
     else:
         st.info("💡 배경 사진을 업로드하면 미리보기가 생성됩니다.")
+
 
