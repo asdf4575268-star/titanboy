@@ -263,7 +263,7 @@ with col_main:
                     v_pace = f"{int((m_s/d_km)//60)}'{int((m_s/d_km)%60):02d}\"" if d_km > 0 else "0'00\""
                     v_hr = str(int(a.get('average_heartrate', 0))) if a.get('average_heartrate') else "0"
                 
-                elif mode in ["WEEKLY", "MONTHLY"]:
+           elif mode in ["WEEKLY", "MONTHLY"]:
                     d_obj = weekly_data if mode == "WEEKLY" else monthly_data
                     if d_obj:
                         chart_img = create_bar_chart(d_obj['dists'], m_color, mode=mode, labels=d_obj.get('labels'), font_path=None)
@@ -425,6 +425,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 상세 오류: {e}")
+
 
 
 
