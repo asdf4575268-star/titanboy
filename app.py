@@ -13,7 +13,8 @@ ACTUAL_URL = "https://titanboy-kgcnje3tg3hbfpfsp6uwzc.streamlit.app"
 
 def hex_to_rgba(hex_color, alpha):
     hex_color = hex_color.lstrip('#')
-    return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4)) + (int(alpha),)
+    rgb = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+    return (rgb[0], rgb[1], rgb[2], int(alpha))
 
 @st.cache_resource
 def load_font_cached(name, size):
@@ -189,3 +190,4 @@ with col_main:
         except Exception as e: st.error(f"렌더링 에러: {e}")
     else:
         st.info("💡 배경 사진을 업로드하면 미리보기가 생성됩니다.")
+
