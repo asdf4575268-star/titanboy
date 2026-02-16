@@ -33,24 +33,25 @@ def draw_styled_text(draw, pos, text, font, fill, shadow=True):
         draw.text((pos[0] + 3, pos[1] + 3), text, font=font, fill=(0, 0, 0, 180))
     draw.text(pos, text, font=font, fill=fill)
 @st.cache_resource
-def load_font(font_type, size):
-    # 원하는 폰트의 GitHub 또는 구글 폰트 원본 주소를 여기에 추가하세요.
+def load_font(name, size):
     fonts = {
         "BlackHanSans": "https://github.com/google/fonts/raw/main/ofl/blackhansans/BlackHanSans-Regular.ttf",
+        "Sunflower": "https://github.com/google/fonts/raw/main/ofl/sunflower/Sunflower-Regular.ttf",
         "KirangHaerang": "https://github.com/google/fonts/raw/main/ofl/kiranghaerang/KirangHaerang-Regular.ttf",
+        "JollyLodger": "https://github.com/google/fonts/raw/main/ofl/jollylodger/JollyLodger-Regular.ttf",
         "Lacquer": "https://github.com/google/fonts/raw/main/ofl/lacquer/Lacquer-Regular.ttf",
-        "IndieFlower": "https://github.com/google/fonts/raw/main/ofl/indieflower/IndieFlower-Regular.ttf",
-        "Playball": "https://github.com/google/fonts/raw/main/ofl/playball/Playball-Regular.ttf"
+        "Playball": "https://github.com/google/fonts/raw/main/ofl/playball/Playball-Regular.ttf"  # 추가됨
     }
+    f_path = f"font_{name}_{size}.ttf"
     
-    f_path = f"font_{font_type}_{int(size)}.ttf"
     if not os.path.exists(f_path):
-        font_url = fonts.get(font_type, fonts["BlackHanSans"])
-        r = requests.get(font_url)
-        with open(f_path, "wb") as f:
-            f.write(r.content)
-            
-    return ImageFont.truetype(f_path, int(size))
+        try:
+            r = requests.get(fonts.get(name, fonts["BlackHanSans"]), timeout=5)
+            with open(f_path, "wb") as f:
+                f.write(r.content)
+        except:
+            # 다운로드 실패 시 기본 폰트 반환하여 렌더링 에러 방지
+            return ImageFont.load_default()
             
     return ImageFont.truetype(f_path, int(size))
 
@@ -381,6 +382,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
