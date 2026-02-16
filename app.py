@@ -265,12 +265,10 @@ with col_main:
                     v_hr = str(int(a.get('average_heartrate', 0))) if a.get('average_heartrate') else "0"
                 
             elif mode == "WEEKLY":
-                raw_weeks = sorted(list(set([(datetime.strptime(ac['start_date_local'][:10], "%Y-%m-%d") - timedelta(days=datetime.strptime(ac['start_date_local'][:10], "%Y-%m-%d").weekday())).strftime('%Y-%m-%d') for ac in acts])), reverse=True)
-                week_options = {f"{w} ({w[:4]}-{datetime.strptime(w, '%Y-%m-%d').isocalendar()[1]}주차)": w for w in raw_weeks}
-                sel_display = st.selectbox("📅 주차 선택", list(week_options.keys()))
-                sel_week = week_options[sel_display] # 실제 데이터 계산에는 원래 날짜(w) 사용
+                w_map = { (dt := datetime.strptime(ac['start_date_local'][:10], "%Y-%m-%d") - timedelta(days=dt.weekday())).strftime('%Y-%m-%d'): f"{dt.year}-{dt.isocalendar()[1]}주차" for ac in acts }
+                sel_week = st.selectbox("📅 주차 선택", sorted(w_map.keys(), reverse=True), format_func=lambda x: w_map[x])    
                 weekly_data = get_weekly_stats(acts, sel_week)
-                    
+                
             elif mode == "MONTHLY":
                 months = sorted(list(set([ac['start_date_local'][:7] for ac in acts])), reverse=True)
                 sel_month = st.selectbox("🗓️ 월 선택", months)
@@ -384,6 +382,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
