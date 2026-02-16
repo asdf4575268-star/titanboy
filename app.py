@@ -311,6 +311,11 @@ with col_main:
             overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
             items = [("distance", f"{v_dist} km"), ("time", v_time), ("pace", v_pace), ("avg bpm", f"{v_hr} bpm")]
 
+            if border_thick > 0:
+                # 캔버스 외곽선을 따라 테두리를 그립니다. 
+                # outline=m_color (포인트 컬러 사용), width=border_thick (슬라이더 값 적용)
+                draw.rectangle([(0, 0), (CW-1, CH-1)], outline=m_color, width=border_thick)
+
             # 1. 데이터 박스 (show_box가 True일 때만)
             if show_box:
                 draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0,0,0,box_alpha))
@@ -370,6 +375,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
