@@ -52,6 +52,12 @@ def load_font(name, size):
         except:
             # 다운로드 실패 시 기본 폰트 반환하여 렌더링 에러 방지
             return ImageFont.load_default()
+    try:
+        # 더 선명한 렌더링 엔진을 우선적으로 사용 시도
+        return ImageFont.truetype(f_path, int(size), layout_engine=ImageFont.Layout.BASIC)
+    except:
+        # 엔진 설정이 지원되지 않는 환경일 경우 기본 방식으로 로드
+        return ImageFont.truetype(f_path, int(size))
             
     return ImageFont.truetype(f_path, int(size))
 
@@ -382,6 +388,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
