@@ -363,10 +363,16 @@ with col_main:
                 mask = Image.new('L', (ls, ls), 0); ImageDraw.Draw(mask).ellipse((0, 0, ls, ls), fill=255); l_img.putalpha(mask)
                 overlay.paste(l_img, (CW - ls - margin, margin), l_img)
 
-            final = Image.alpha_composite(canvas, overlay).convert("RGB")
+            final = Image.alpha_composite(canvas, overlay)
+            
+            if log_file:
+                # 프레임을 캔버스 크기에 맞춰 바로 덮어버림 (가장 위 레이어)
+                final = Image.alpha_composite(final, ImageOps.fit(Image.open(log_file).convert("RGBA"), (CW, CH)))
+
+            # 최종 출력물 (RGBA -> RGB 변환)
+            final = final.convert("RGB")
             st.image(final, width=300)
-            buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
-            st.download_button(f"📸 {mode} DOWNLOAD", buf.getvalue(), f"{mode.lower()}.jpg", use_container_width=True)
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
