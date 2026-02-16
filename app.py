@@ -4,27 +4,30 @@ import io, requests, polyline, math, os
 import numpy as np
 from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
-import matplotlib.font_manager as fm
 
 # --- [1. 설정 및 유틸리티] ---
 st.set_page_config(page_title="TITAN BOY", layout="wide")
-plt.switch_backend('Agg')
+plt.switch_backend('Agg') # GUI 에러 방지
 CLIENT_ID, CLIENT_SECRET = '202274', '63f6a7007ebe6b405763fc3104e17bb53b468ad0'
 ACTUAL_URL = "https://titanboy-kgcnje3tg3hbfpfsp6uwzc.streamlit.app"
 
+# [누락된 함수 복구]
+def hex_to_rgba(hex_color, alpha):
+    hex_color = hex_color.lstrip('#')
+    return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4)) + (int(alpha),)
+
 @st.cache_resource
 def load_font_cached(name, size):
-    # 폰트 로딩을 캐싱하여 IO 에러 방지 및 속도 향상
     urls = {
         "BlackHanSans": "https://github.com/google/fonts/raw/main/ofl/blackhansans/BlackHanSans-Regular.ttf",
         "KirangHaerang": "https://github.com/google/fonts/raw/main/ofl/kiranghaerang/KirangHaerang-Regular.ttf",
         "Lacquer": "https://github.com/google/fonts/raw/main/ofl/lacquer/Lacquer-Regular.ttf"
     }
+    path = f"font_{name}.ttf"
     try:
-        if name not in urls: return ImageFont.load_default()
-        path = f"font_{name}.ttf"
         if not os.path.exists(path):
-            with open(path, "wb") as f: f.write(requests.get(urls[name]).content)
+            if name in urls:
+                with open(path, "wb") as f: f.write(requests.get(urls[name]).content)
         return ImageFont.truetype(path, int(size))
     except: return ImageFont.load_default()
 
@@ -69,7 +72,10 @@ def create_chart(data, color, mode, labels):
 
 def make_collage(files, w, h):
     if not files: return Image.new("RGBA", (w, h), (20,20,20,255))
-    imgs = [ImageOps.exif_transpose(Image.open(f)).convert("RGBA") for f in files]
+    imgs = []
+    for f in files:
+        try: imgs.append(ImageOps.exif_transpose(Image.open(f)).convert("RGBA"))
+        except: continue
     if not imgs: return Image.new("RGBA", (w, h), (20,20,20,255))
     if len(imgs) == 1: return ImageOps.fit(imgs[0], (w, h), Image.Resampling.LANCZOS)
     
@@ -77,7 +83,6 @@ def make_collage(files, w, h):
     canvas = Image.new("RGBA", (w, h), (0,0,0,255))
     for i, img in enumerate(imgs):
         r, c = divmod(i, cols)
-        # 마지막 줄 정렬 로직
         n_cols = len(imgs)%cols if (r==rows-1 and len(imgs)%cols) else cols
         cw, ch = w//n_cols if (r==rows-1 and len(imgs)%cols) else w//cols, h//rows
         x, y = (i%cols)*cw if (r==rows-1 and len(imgs)%cols) else c*(w//cols), r*ch
@@ -146,7 +151,7 @@ with col_design:
         cols = st.columns(2); v_pace = cols[0].text_input("페이스", v_pace); v_hr = cols[1].text_input("심박", v_hr)
         
         sw_vis = st.toggle("지도/그래프", True); sw_box = st.toggle("데이터박스", True); sw_shadow = st.toggle("그림자", True)
-        b_thick = st.slider("테두리 두께", 0, 50, 0) # [테두리 기능 활성화 변수]
+        b_thick = st.slider("테두리 두께", 0, 50, 0)
         
         C_MAP = {"Black":"#000000", "Yellow":"#FFD700", "White":"#FFFFFF", "Orange":"#FF4500", "Blue":"#00BFFF", "Grey":"#AAAAAA"}
         m_col = C_MAP[st.selectbox("메인색", list(C_MAP.keys()), 1)]; s_col = C_MAP[st.selectbox("서브색", list(C_MAP.keys()), 2)]
@@ -166,12 +171,14 @@ with col_main:
     if (mode=="DAILY" and a) or (mode!="DAILY" and (w_data or m_data)):
         try:
             CW, CH = (1080, 1920) if mode == "DAILY" else (1080, 1350)
-            f_t, f_d, f_n, f_l = load_font_cached(font_name, 90), load_font_cached(font_name, 30), load_font_cached(font_name, 60), load_font_cached(font_name, 25)
+            f_t = load_font_cached(font_name, 90)
+            f_d = load_font_cached(font_name, 30)
+            f_n = load_font_cached(font_name, 60)
+            f_l = load_font_cached(font_name, 25)
             
             canvas = make_collage(bg_files, CW, CH)
             overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
 
-            # [핵심 수정] 테두리 그리기 로직 추가
             if b_thick > 0: draw.rectangle([(0,0), (CW-1, CH-1)], outline=m_col, width=b_thick)
 
             if sw_box:
@@ -196,9 +203,13 @@ with col_main:
 
             if sw_vis:
                 v_lyr = None
+                p_pos = (0,0) # 기본 초기화
+                
                 if mode == "DAILY" and a.get('map', {}).get('summary_polyline'):
                     pts = polyline.decode(a['map']['summary_polyline']); lats, lons = zip(*pts)
                     v_lyr = Image.new("RGBA", (vis_sz, vis_sz), (0,0,0,0)); md = ImageDraw.Draw(v_lyr)
+                    
+                    # [hex_to_rgba 사용]
                     def tr(la, lo): return 15+(lo-min(lons))/(max(lons)-min(lons)+1e-5)*(vis_sz-30), (vis_sz-15)-(la-min(lats))/(max(lats)-min(lats)+1e-5)*(vis_sz-30)
                     md.line([tr(la, lo) for la, lo in pts], fill=hex_to_rgba(m_col, 240), width=6)
                     p_pos = (rx, max(5, ry-vis_sz-15)) if orient=="Vertical" else (rx+100, ry+10)
