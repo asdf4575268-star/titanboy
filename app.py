@@ -11,13 +11,9 @@ plt.switch_backend('Agg') # GUI 에러 방지
 CLIENT_ID, CLIENT_SECRET = '202274', '63f6a7007ebe6b405763fc3104e17bb53b468ad0'
 ACTUAL_URL = "https://titanboy-kgcnje3tg3hbfpfsp6uwzc.streamlit.app"
 
-# [누락된 함수 복구]
-def hex_to_rgba(hex_color, alpha):
-    hex_color = hex_color.lstrip('#')
-    return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4)) + (int(alpha),)
-
 @st.cache_resource
 def load_font_cached(name, size):
+    # [수정됨] 폰트가 없으면 다운로드하는 로직 필수 포함
     urls = {
         "BlackHanSans": "https://github.com/google/fonts/raw/main/ofl/blackhansans/BlackHanSans-Regular.ttf",
         "KirangHaerang": "https://github.com/google/fonts/raw/main/ofl/kiranghaerang/KirangHaerang-Regular.ttf",
@@ -171,6 +167,7 @@ with col_main:
     if (mode=="DAILY" and a) or (mode!="DAILY" and (w_data or m_data)):
         try:
             CW, CH = (1080, 1920) if mode == "DAILY" else (1080, 1350)
+            # [요청사항 반영] 제목 90, 날짜 30, 숫자 60, 라벨 25
             f_t = load_font_cached(font_name, 90)
             f_d = load_font_cached(font_name, 30)
             f_n = load_font_cached(font_name, 60)
@@ -203,13 +200,9 @@ with col_main:
 
             if sw_vis:
                 v_lyr = None
-                p_pos = (0,0) # 기본 초기화
-                
                 if mode == "DAILY" and a.get('map', {}).get('summary_polyline'):
                     pts = polyline.decode(a['map']['summary_polyline']); lats, lons = zip(*pts)
                     v_lyr = Image.new("RGBA", (vis_sz, vis_sz), (0,0,0,0)); md = ImageDraw.Draw(v_lyr)
-                    
-                    # [hex_to_rgba 사용]
                     def tr(la, lo): return 15+(lo-min(lons))/(max(lons)-min(lons)+1e-5)*(vis_sz-30), (vis_sz-15)-(la-min(lats))/(max(lats)-min(lats)+1e-5)*(vis_sz-30)
                     md.line([tr(la, lo) for la, lo in pts], fill=hex_to_rgba(m_col, 240), width=6)
                     p_pos = (rx, max(5, ry-vis_sz-15)) if orient=="Vertical" else (rx+100, ry+10)
