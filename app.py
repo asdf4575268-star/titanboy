@@ -265,8 +265,15 @@ with col_main:
                 
             elif mode == "WEEKLY":
                 weeks = sorted(list(set([(datetime.strptime(ac['start_date_local'][:10], "%Y-%m-%d") - timedelta(days=datetime.strptime(ac['start_date_local'][:10], "%Y-%m-%d").weekday())).strftime('%Y-%m-%d') for ac in acts])), reverse=True)
-                sel_week = st.selectbox("📅 주차 선택", weeks, format_func=lambda x: f"{x[:4]}-{datetime.strptime(x, '%Y-%m-%d').isocalendar()[1]}주차")    
-                weekly_data = get_weekly_stats(acts, sel_week)
+                sel_week = st.selectbox("📅 주차 선택", weeks, format_func=lambda x: f"{x[:4]}-{datetime.strptime(x, '%Y-%m-%d').isocalendar()[1]}주차")              
+                weekly_data = get_weekly_stats(acts, sel_week)      
+                if weekly_data:
+                    v_act = f"{datetime.strptime(sel_week, '%Y-%m-%d').isocalendar()[1]} WEEK" # 예: 7 WEEK
+                    v_date = weekly_data['range']   # 예: 02.10 - 02.16
+                    v_dist = weekly_data['total_dist']
+                    v_time = weekly_data['total_time']
+                    v_pace = weekly_data['avg_pace']
+                    v_hr   = weekly_data['avg_hr']
                 
             elif mode == "MONTHLY":
                 months = sorted(list(set([ac['start_date_local'][:7] for ac in acts])), reverse=True)
@@ -386,4 +393,5 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
