@@ -39,8 +39,8 @@ def load_font(name, size):
         "KirangHaerang": "https://github.com/google/fonts/raw/main/ofl/kiranghaerang/KirangHaerang-Regular.ttf",
         "Lacquer": "https://github.com/google/fonts/raw/main/ofl/lacquer/Lacquer-Regular.ttf",
         "IndieFlower": "https://github.com/google/fonts/raw/main/ofl/IndieFlower/IndieFlower-Regular.ttf",
-        "LeagueSpartan": "https://github.com/google/fonts/raw/main/ofl/leaguespartan/LeagueSpartan%5Bwght%5D.ttf",
-        "Montserrat": "https://github.com/google/fonts/raw/main/ofl/montserrat/Montserrat%5Bwght%5D.ttf"
+        "LeagueSpartan": "https://github.com/google/fonts/raw/main/ofl/leaguespartan/static/LeagueSpartan-Bold.ttf",
+        "Montserrat": "https://github.com/google/fonts/raw/main/ofl/montserrat/static/Montserrat-Bold.ttf"
     }
     f_path = f"font_{name}_{size}.ttf"
     
@@ -382,6 +382,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
