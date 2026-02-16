@@ -303,8 +303,8 @@ with col_design:
         # ----------------------
         border_thick = st.slider("프레임 테두리 두께", 0, 50, 0)
         COLOR_OPTS = {"Black": "#000000", "Yellow": "#FFD700", "White": "#FFFFFF", "Orange": "#FF4500", "Blue": "#00BFFF", "Grey": "#AAAAAA"}
-        m_color = COLOR_OPTS[st.selectbox("포인트 컬러", list(COLOR_OPTS.keys()), key="m_col_sel")]
-        sub_color = COLOR_OPTS[st.selectbox("서브 컬러", list(COLOR_OPTS.keys()), index=1, key="s_col_sel")]
+        m_color = COLOR_OPTS[st.selectbox("포인트 컬러", list(COLOR_OPTS.keys()), index=1,  key="m_col_sel")]
+        sub_color = COLOR_OPTS[st.selectbox("서브 컬러", list(COLOR_OPTS.keys()), index=2, key="s_col_sel")]
 
     box_orient = st.radio("박스 방향", ["Vertical", "Horizontal"], horizontal=True)
     sel_font = st.selectbox("폰트", ["BlackHanSans", "Sunflower", "Orbit", "KirangHaerang", "JollyLodger", "Lacquer", "IndieFlower"])
@@ -390,6 +390,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
