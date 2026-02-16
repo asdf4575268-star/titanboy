@@ -358,7 +358,7 @@ with col_main:
 
             # 3. 로고 (항상 표시 또는 로직 유지)
             if log_file:
-                ls, margin = 90, 40
+                ls, margin = 100, 40
                 l_img = ImageOps.fit(Image.open(log_file).convert("RGBA"), (ls, ls))
                 mask = Image.new('L', (ls, ls), 0); ImageDraw.Draw(mask).ellipse((0, 0, ls, ls), fill=255); l_img.putalpha(mask)
                 overlay.paste(l_img, (CW - ls - margin, margin), l_img)
@@ -370,6 +370,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
