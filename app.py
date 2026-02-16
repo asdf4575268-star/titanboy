@@ -296,66 +296,82 @@ with col_design:
         vis_sz_adj = st.slider("지도/그래프 크기", 50, 1080, 180 if mode=="DAILY" else 950)
         vis_alpha = st.slider("지도/그래프 투명도", 0, 255, 240)
         
-# --- [7. 미리보기 렌더링: 테두리 제거 & 안정화 버전] ---
+# --- [7. 미리보기 렌더링] ---
 with col_main:
     st.subheader("🖼️ PREVIEW")
     data_ready = (mode == "DAILY" and a) or (mode == "WEEKLY" and weekly_data) or (mode == "MONTHLY" and monthly_data)
     
     if data_ready:
         try:
-            # 1. 캔버스 해상도 설정
             CW, CH = (1080, 1920) if mode == "DAILY" else (1080, 1350)
+            # 90-30-60-23 가이드 적용
+            f_t, f_d, f_n, f_l = load_font(sel_font, 70), load_font(sel_font, 20), load_font(sel_font, 50), load_font(sel_font, 25)
             
-            # 2. 폰트 안전 로딩 (실패 시 기본 폰트로 즉시 우회)
-            def get_f(n, s):
-                try: return load_font(n, s)
-                except: return ImageFont.load_default()
+            canvas = make_smart_collage(bg_files, (CW, CH)) if bg_files else Image.new("RGBA", (CW, CH), (20, 20, 20, 255))
+            overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
+            items = [("distance", f"{v_dist} km"), ("time", v_time), ("pace", v_pace), ("avg bpm", f"{v_hr} bpm")]
 
-            f_t = get_f(sel_font, 90) # 활동명
-            f_d = get_f(sel_font, 30) # 날짜
-            f_n = get_f(sel_font, 60) # 숫자
-            f_l = get_f(sel_font, 25) # 라벨
-
-            # 3. 배경 이미지 생성
-            final = make_smart_collage(bg_files, (CW, CH)) if bg_files else Image.new("RGB", (CW, CH), (20, 20, 20))
-            final = final.convert("RGBA")
-            
-            # 4. 데이터 오버레이 레이어
-            overlay = Image.new("RGBA", (CW, CH), (0,0,0,0))
-            draw = ImageDraw.Draw(overlay)
-            
+            # 1. 데이터 박스 (show_box가 True일 때만)
             if show_box:
-                # 데이터 박스 그리기
                 draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0,0,0,box_alpha))
-                items = [("distance", f"{v_dist} km"), ("time", v_time), ("pace", v_pace), ("avg bpm", f"{v_hr} bpm")]
-                
                 if box_orient == "Vertical":
-                    # 활동명(90)과 날짜(30)
                     draw_styled_text(draw, (rx + 40, ry + 30), v_act, f_t, m_color, shadow=use_shadow)
                     t_w = draw.textlength(v_act, font=f_t)
                     draw_styled_text(draw, (rx + 40 + t_w + 30, ry + 80), v_date, f_d, "#AAAAAA", shadow=use_shadow)
-                    
                     y_c = ry + 165
                     for lab, val in items:
-                        # 라벨(25)과 숫자(60) / 소문자 규칙 준수
                         draw_styled_text(draw, (rx + 40, y_c), lab.lower(), f_l, "#AAAAAA", shadow=use_shadow)
                         draw_styled_text(draw, (rx + 40, y_c + 35), val.lower(), f_n, sub_color, shadow=use_shadow)
                         y_c += 105
                 else:
-                    # 가로 모드 로직 (필요 시 기존 코드 유지)
-                    pass
+                    title_w = draw.textlength(v_act, f_t)
+                    draw_styled_text(draw, (rx + (rw-title_w)//2, ry+35), v_act, f_t, m_color, shadow=use_shadow)
+                    draw_styled_text(draw, (rx + (rw-draw.textlength(v_date, f_d))//2, ry+135), v_date, f_d, "#AAAAAA", shadow=use_shadow)
+                    sec_w = rw // 4
+                    for i, (lab, val) in enumerate(items):
+                        cx = rx + (i * sec_w) + (sec_w // 2)
+                        draw_styled_text(draw, (cx - draw.textlength(lab.lower(), f_l)//2, ry+200), lab.lower(), f_l, "#AAAAAA", shadow=use_shadow)
+                        draw_styled_text(draw, (cx - draw.textlength(val.lower(), f_n)//2, ry+245), val.lower(), f_n, sub_color, shadow=use_shadow)
 
-            # 5. 최종 합성 및 출력
-            final_img = Image.alpha_composite(final, overlay).convert("RGB")
-            st.image(final_img, width=300)
-            
-            # 다운로드 버튼
-            buf = io.BytesIO()
-            final_img.save(buf, format="JPEG", quality=95)
+            # 2. 지도 및 그래프 (show_vis가 True일 때만)
+            if show_vis:
+                if mode == "DAILY" and a and a.get('map', {}).get('summary_polyline'):
+                    pts = polyline.decode(a['map']['summary_polyline'])
+                    lats, lons = zip(*pts)
+                    vis_sz = vis_sz_adj
+                    vis_layer = Image.new("RGBA", (vis_sz, vis_sz), (0,0,0,0)); m_draw = ImageDraw.Draw(vis_layer)
+                    def tr(la, lo): return 15+(lo-min(lons))/(max(lons)-min(lons)+1e-5)*(vis_sz-30), (vis_sz-15)-(la-min(lats))/(max(lats)-min(lats)+1e-5)*(vis_sz-30)
+                    m_draw.line([tr(la, lo) for la, lo in pts], fill=hex_to_rgba(m_color, vis_alpha), width=6)
+                    
+                    if box_orient == "Vertical": m_pos = (rx, max(5, ry - vis_sz - 15))
+                    else: m_pos = (rx + 100, ry + 10)
+                    overlay.paste(vis_layer, (int(m_pos[0]), int(m_pos[1])), vis_layer)
+                    
+                elif mode in ["WEEKLY", "MONTHLY"] and (weekly_data or monthly_data):
+                    d_obj = weekly_data if mode == "WEEKLY" else monthly_data
+                    # 폰트는 제목용 90px 폰트를 차트 레이블용으로 재활용
+                    chart_img = create_bar_chart(d_obj['dists'], m_color, mode=mode, labels=d_obj.get('labels'), font_path=None)
+                    vis_sz = vis_sz_adj
+                    vis_layer = chart_img.resize((vis_sz, int(chart_img.size[1]*(vis_sz/chart_img.size[0]))), Image.Resampling.LANCZOS)
+                    vis_layer.putalpha(vis_layer.getchannel('A').point(lambda x: x * (vis_alpha / 255)))
+                    overlay.paste(vis_layer, ((CW - vis_layer.width)//2, CH - vis_layer.height - 80), vis_layer)
+
+            # 3. 로고 (항상 표시 또는 로직 유지)
+            if log_file:
+                ls, margin = 100, 40
+                l_img = ImageOps.fit(Image.open(log_file).convert("RGBA"), (ls, ls))
+                mask = Image.new('L', (ls, ls), 0); ImageDraw.Draw(mask).ellipse((0, 0, ls, ls), fill=255); l_img.putalpha(mask)
+                overlay.paste(l_img, (CW - ls - margin, margin), l_img)
+
+            final = Image.alpha_composite(canvas, overlay).convert("RGB")
+            st.image(final, width=300)
+            buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
             st.download_button(f"📸 {mode} DOWNLOAD", buf.getvalue(), f"{mode.lower()}.jpg", use_container_width=True)
             
         except Exception as e:
-            st.error(f"렌더링 중 오류가 발생했습니다. 캐시를 삭제해 보세요: {e}")
+            st.error(f"렌더링 오류 발생: {e}")
+
+
 
 
 
