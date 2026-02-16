@@ -37,28 +37,10 @@ def load_font(name, size):
     fonts = {
         "BlackHanSans": "https://github.com/google/fonts/raw/main/ofl/blackhansans/BlackHanSans-Regular.ttf",
         "KirangHaerang": "https://github.com/google/fonts/raw/main/ofl/kiranghaerang/KirangHaerang-Regular.ttf",
-        "Lacquer": "https://github.com/google/fonts/raw/main/ofl/lacquer/Lacquer-Regular.ttf",
-        "IndieFlower": "https://github.com/google/fonts/raw/main/ofl/IndieFlower/IndieFlower-Regular.ttf",
-        "LeagueSpartan": "https://github.com/google/fonts/raw/main/ofl/leaguespartan/static/LeagueSpartan-Bold.ttf",
-        "Montserrat": "https://github.com/google/fonts/raw/main/ofl/montserrat/static/Montserrat-Bold.ttf"
+        "Lacquer": "https://github.com/google/fonts/raw/main/ofl/lacquer/Lacquer-Regular.ttf"
     }
     f_path = f"font_{name}_{size}.ttf"
     
-    if not os.path.exists(f_path):
-        try:
-            r = requests.get(fonts.get(name, fonts["BlackHanSans"]), timeout=5)
-            with open(f_path, "wb") as f:
-                f.write(r.content)
-        except:
-            # 다운로드 실패 시 기본 폰트 반환하여 렌더링 에러 방지
-            return ImageFont.load_default()
-    try:
-        # 더 선명한 렌더링 엔진을 우선적으로 사용 시도
-        return ImageFont.truetype(f_path, int(size), layout_engine=ImageFont.Layout.BASIC)
-    except:
-        # 엔진 설정이 지원되지 않는 환경일 경우 기본 방식으로 로드
-        return ImageFont.truetype(f_path, int(size))
-            
     return ImageFont.truetype(f_path, int(size))
 
 def get_weekly_stats(activities, target_date_str):
@@ -388,6 +370,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
