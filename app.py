@@ -40,7 +40,7 @@ def load_font(name, size):
         "Lacquer": "https://github.com/google/fonts/raw/main/ofl/lacquer/Lacquer-Regular.ttf"
     }
     f_path = f"font_{name}_{size}.ttf"
-
+    
     return ImageFont.truetype(f_path, int(size))
 
 def get_weekly_stats(activities, target_date_str):
@@ -114,7 +114,7 @@ def make_smart_collage(files, target_size):
 
     if not imgs: 
         return Image.new("RGBA", (tw, th), (30, 30, 30, 255))
-
+    
     n = len(imgs)
     if n == 1:
         return ImageOps.fit(imgs[0], (tw, th), Image.Resampling.LANCZOS)
@@ -125,14 +125,14 @@ def make_smart_collage(files, target_size):
     rows = math.ceil(n / cols)
 
     canvas = Image.new("RGBA", (tw, th), (0, 0, 0, 255))
-
+    
     for i, img in enumerate(imgs):
         r, c = divmod(i, cols)
-
+        
         # 기본 좌표 계산
         x0 = int(c * tw / cols)
         y0 = int(r * th / rows)
-
+        
         # 마지막 줄 사진들이 비어 보이지 않게 너비를 자동 확장
         # (예: 3장일 때 아래줄에 혼자 있는 사진은 가로로 꽉 채움)
         current_row_count = n % cols if (r == rows - 1 and n % cols != 0) else cols
@@ -142,12 +142,12 @@ def make_smart_collage(files, target_size):
             x1 = int(((i % cols) + 1) * row_tw)
         else:
             x1 = int((c + 1) * tw / cols)
-
+            
         y1 = int((r + 1) * th / rows)
-
+        
         cell_w = x1 - x0
         cell_h = y1 - y0
-
+        
         resized_img = ImageOps.fit(img, (cell_w, cell_h), Image.Resampling.LANCZOS)
         canvas.paste(resized_img, (x0, y0))
 
@@ -184,7 +184,7 @@ if "code" in q_params and not st.session_state['access_token']:
                 "grant_type": "authorization_code"
             }
         ).json()
-
+        
         if 'access_token' in res:
             new_token = res['access_token']
             st.session_state['access_token'] = new_token
@@ -214,7 +214,7 @@ acts = st.session_state['cached_acts']
 # --- [5. 메인 화면 구성] ---
 with col_main:
     st.title("TITAN BOY")
-
+    
     # 1. 변수 초기화 (에러 방지: bg_files를 미리 빈 리스트로 선언)
     bg_files = [] 
     log_file = None
@@ -231,13 +231,13 @@ with col_main:
             st.session_state.clear()
             st.query_params.clear()
             st.rerun()
-
+            
         # 2. 파일 업로더 (여기서 변수가 정의됩니다)
         bg_files = st.file_uploader("📸 배경 사진", type=['jpg','jpeg','png'], accept_multiple_files=True)
         log_file = st.file_uploader("🔘 로고", type=['jpg','jpeg','png'])
-
+        
         mode = st.radio("모드 선택", ["DAILY", "WEEKLY", "MONTHLY"], horizontal=True, key="main_mode_sel")
-
+        
         if acts:
             if mode == "DAILY":
                 act_opts = [f"{ac['start_date_local'][:10]} - {ac['name']}" for ac in acts]
@@ -251,17 +251,17 @@ with col_main:
                     v_time = f"{int(m_s//3600):02d}:{int((m_s%3600)//60):02d}:{int(m_s%60):02d}" if m_s >= 3600 else f"{int(m_s//60):02d}:{int(m_s%60):02d}"
                     v_pace = f"{int((m_s/d_km)//60)}'{int((m_s/d_km)%60):02d}\"" if d_km > 0 else "0'00\""
                     v_hr = str(int(a.get('average_heartrate', 0))) if a.get('average_heartrate') else "0"
-
+                
             elif mode == "WEEKLY":
                 weeks = sorted(list(set([(datetime.strptime(ac['start_date_local'][:10], "%Y-%m-%d") - timedelta(days=datetime.strptime(ac['start_date_local'][:10], "%Y-%m-%d").weekday())).strftime('%Y-%m-%d') for ac in acts])), reverse=True)
                 sel_week = st.selectbox("📅 주차 선택", weeks, format_func=lambda x: f"{x[:4]}-{datetime.strptime(x, '%Y-%m-%d').isocalendar()[1]}주차")    
                 weekly_data = get_weekly_stats(acts, sel_week)
-
+                
             elif mode == "MONTHLY":
                 months = sorted(list(set([ac['start_date_local'][:7] for ac in acts])), reverse=True)
                 sel_month = st.selectbox("🗓️ 월 선택", months)
                 monthly_data = get_monthly_stats(acts, f"{sel_month}-01")
-
+                
                 if monthly_data:
                     dt_t = datetime.strptime(f"{sel_month}-01", "%Y-%m-%d")
                     # 월 이름 대문자 (예: FEBRUARY)
@@ -295,29 +295,27 @@ with col_design:
         box_alpha = st.slider("박스 투명도", 0, 255, 0)
         vis_sz_adj = st.slider("지도/그래프 크기", 50, 1080, 180 if mode=="DAILY" else 950)
         vis_alpha = st.slider("지도/그래프 투명도", 0, 255, 240)
-
+        
 # --- [7. 미리보기 렌더링] ---
 with col_main:
     st.subheader("🖼️ PREVIEW")
     data_ready = (mode == "DAILY" and a) or (mode == "WEEKLY" and weekly_data) or (mode == "MONTHLY" and monthly_data)
-
+    
     if data_ready:
         try:
             CW, CH = (1080, 1920) if mode == "DAILY" else (1080, 1350)
             # 90-30-60-23 가이드 적용
             f_t, f_d, f_n, f_l = load_font(sel_font, 70), load_font(sel_font, 20), load_font(sel_font, 50), load_font(sel_font, 25)
-
+            
             canvas = make_smart_collage(bg_files, (CW, CH)) if bg_files else Image.new("RGBA", (CW, CH), (20, 20, 20, 255))
             overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
             items = [("distance", f"{v_dist} km"), ("time", v_time), ("pace", v_pace), ("avg bpm", f"{v_hr} bpm")]
-    if border_thick > 0:
-        draw.rectangle([(0, 0), (CW-1, CH-1)], outline=m_color, width=border_thick)    
 
             if border_thick > 0:
                 # 캔버스 외곽선을 따라 테두리를 그립니다. 
                 # outline=m_color (포인트 컬러 사용), width=border_thick (슬라이더 값 적용)
                 draw.rectangle([(0, 0), (CW-1, CH-1)], outline=m_color, width=border_thick)
-
+            
             # 1. 데이터 박스 (show_box가 True일 때만)
             if show_box:
                 draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0,0,0,box_alpha))
@@ -349,11 +347,11 @@ with col_main:
                     vis_layer = Image.new("RGBA", (vis_sz, vis_sz), (0,0,0,0)); m_draw = ImageDraw.Draw(vis_layer)
                     def tr(la, lo): return 15+(lo-min(lons))/(max(lons)-min(lons)+1e-5)*(vis_sz-30), (vis_sz-15)-(la-min(lats))/(max(lats)-min(lats)+1e-5)*(vis_sz-30)
                     m_draw.line([tr(la, lo) for la, lo in pts], fill=hex_to_rgba(m_color, vis_alpha), width=6)
-
+                    
                     if box_orient == "Vertical": m_pos = (rx, max(5, ry - vis_sz - 15))
                     else: m_pos = (rx + 100, ry + 10)
                     overlay.paste(vis_layer, (int(m_pos[0]), int(m_pos[1])), vis_layer)
-
+                    
                 elif mode in ["WEEKLY", "MONTHLY"] and (weekly_data or monthly_data):
                     d_obj = weekly_data if mode == "WEEKLY" else monthly_data
                     # 폰트는 제목용 90px 폰트를 차트 레이블용으로 재활용
@@ -374,6 +372,6 @@ with col_main:
             st.image(final, width=300)
             buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
             st.download_button(f"📸 {mode} DOWNLOAD", buf.getvalue(), f"{mode.lower()}.jpg", use_container_width=True)
-
+            
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
