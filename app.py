@@ -40,7 +40,7 @@ def load_font(font_type, size):
         "KirangHaerang": "https://github.com/google/fonts/raw/main/ofl/kiranghaerang/KirangHaerang-Regular.ttf",
         "Lacquer": "https://github.com/google/fonts/raw/main/ofl/lacquer/Lacquer-Regular.ttf",
         "IndieFlower": "https://github.com/google/fonts/raw/main/ofl/indieflower/IndieFlower-Regular.ttf",
-        "Playball": "https://github.com/google/fonts/raw/main/ofl/Playball/Playball-Regular.ttf"
+        "Playball": "https://github.com/google/fonts/raw/main/ofl/playball/Playball-Regular.ttf"
     }
     
     f_path = f"font_{font_type}_{int(size)}.ttf"
@@ -381,6 +381,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
