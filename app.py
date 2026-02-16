@@ -29,10 +29,10 @@ def hex_to_rgba(hex_color, alpha):
 
 def draw_styled_text(draw, pos, text, font, fill, shadow=True):
     if shadow:
-        # 그림자 위치를 (3, 3)으로 설정하여 약간의 입체감을 줍니다.
-        draw.text((pos[0] + 3, pos[1] + 3), text, font=font, fill=(0, 0, 0, 180))
+        # 그림자를 3px -> 2px로 줄이고, 검정색을 더 진하게(220) 설정
+        # 이렇게 하면 글자 외곽선이 더 선명하게 대비됩니다.
+        draw.text((pos[0]+2, pos[1]+2), text, font=font, fill=(0, 0, 0, 220))
     draw.text(pos, text, font=font, fill=fill)
-@st.cache_resource
 def load_font(name, size):
     fonts = {
         "BlackHanSans": "https://github.com/google/fonts/raw/main/ofl/blackhansans/BlackHanSans-Regular.ttf",
@@ -382,6 +382,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
