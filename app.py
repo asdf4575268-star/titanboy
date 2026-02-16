@@ -13,7 +13,10 @@ ACTUAL_URL = "https://titanboy-kgcnje3tg3hbfpfsp6uwzc.streamlit.app"
 
 def hex_to_rgba(hex_color, alpha):
     hex_color = hex_color.lstrip('#')
-    return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4)) + (int(alpha),)
+    # RGB 값 추출
+    rgb = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+    # 반드시 (R, G, B, A) 4개의 요소를 가진 튜플 반환
+    return (rgb[0], rgb[1], rgb[2], int(alpha))
 
 @st.cache_resource
 def load_font_cached(name, size):
@@ -171,11 +174,14 @@ with col_main:
 
             # 지도 시각화
             if sw_vis and a and a.get('map', {}).get('summary_polyline'):
-                pts = polyline.decode(a['map']['summary_polyline']); lats, lons = zip(*pts)
-                v_lyr = Image.new("RGBA", (vis_sz, vis_sz), (0,0,0,0)); md = ImageDraw.Draw(v_lyr)
-                def tr(la, lo): return 10+(lo-min(lons))/(max(lons)-min(lons)+1e-5)*(vis_sz-20), (vis_sz-10)-(la-min(lats))/(max(lats)-min(lats)+1e-5)*(vis_sz-20)
-                md.line([tr(la, lo) for la, lo in pts], fill=hex_to_rgba(m_col, 220), width=5)
-                overlay.paste(v_lyr, (rx, ry-vis_sz-20 if orient=="Vertical" else rx+rw-vis_sz, ry+20 if orient=="Vertical" else ry+20), v_lyr)
+                pts = polyline.decode(a['map']['summary_polyline'])
+                lats, lons = zip(*pts)
+                v_lyr = Image.new("RGBA", (vis_sz, vis_sz), (0,0,0,0))
+                md = ImageDraw.Draw(v_lyr)
+    
+            def tr(la, lo): 
+                return (10 + (lo - min(lons)) / (max(lons) - min(lons) + 1e-5) * (vis_sz - 20), 
+                (vis_sz - 10) - (la - min(lats)) / (max(lats) - min(lats) + 1e-5) * (vis_sz - 20))
 
             if log_file:
                 li = ImageOps.fit(Image.open(log_file).convert("RGBA"), (120, 120))
@@ -189,3 +195,4 @@ with col_main:
         except Exception as e: st.error(f"렌더링 에러: {e}")
     else:
         st.info("💡 배경 사진을 업로드하면 미리보기가 생성됩니다.")
+
