@@ -38,7 +38,9 @@ def load_font(name, size):
         "BlackHanSans": "https://github.com/google/fonts/raw/main/ofl/blackhansans/BlackHanSans-Regular.ttf",
         "KirangHaerang": "https://github.com/google/fonts/raw/main/ofl/kiranghaerang/KirangHaerang-Regular.ttf",
         "Lacquer": "https://github.com/google/fonts/raw/main/ofl/lacquer/Lacquer-Regular.ttf",
-        "IndieFlower": "https://github.com/google/fonts/raw/main/ofl/IndieFlower/IndieFlower-Regular.ttf"
+        "IndieFlower": "https://github.com/google/fonts/raw/main/ofl/IndieFlower/IndieFlower-Regular.ttf",
+        "LeagueSpartan": "https://github.com/google/fonts/raw/main/ofl/leaguespartan/LeagueSpartan%5Bwght%5D.ttf",
+        "Montserrat": "https://github.com/google/fonts/raw/main/ofl/montserrat/Montserrat%5Bwght%5D.ttf"
     }
     f_path = f"font_{name}_{size}.ttf"
     
@@ -297,7 +299,7 @@ with col_design:
         sub_color = COLOR_OPTS[st.selectbox("서브 컬러", list(COLOR_OPTS.keys()), index=2, key="s_col_sel")]
 
     box_orient = st.radio("박스 방향", ["Vertical", "Horizontal"], horizontal=True)
-    sel_font = st.selectbox("폰트", ["BlackHanSans", "KirangHaerang", "Lacquer", "IndieFlower"])
+    sel_font = st.selectbox("폰트", ["BlackHanSans", "KirangHaerang", "Lacquer", "IndieFlower", "LeagueSpartan", "Montserrat"])
 
     with st.expander("📍 위치/크기 조절"):
         rx, ry = st.number_input("박스 X", 0, 1080, 40 if box_orient=="Horizontal" else 70), st.number_input("박스 Y", 0, 1920, 150 if box_orient=="Horizontal" else 1250)
@@ -380,6 +382,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
