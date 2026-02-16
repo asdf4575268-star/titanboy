@@ -259,7 +259,14 @@ with col_main:
                     v_act = a['name'].upper()
                     v_date = a['start_date_local'][:10].replace('-', '.')
                     d_km = a.get('distance', 0)/1000; m_s = a.get('moving_time', 0)
-                    v_dist, v_time = f"{d_km:.2f}", f"{m_s//3600:02d}:{(m_s%3600)//60:02d}:{m_s%60:02d}"
+                    v_dist = f"{d_km:.2f}" 
+                    hours = int(m_s // 3600)
+                    minutes = int((m_s % 3600) // 60)
+                    seconds = int(m_s % 60)
+                    if hours > 0:
+                        v_time = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+                    else:
+                        v_time = f"{minutes:02d}:{seconds:02d}"
                     v_pace = f"{int((m_s/d_km)//60)}'{int((m_s/d_km)%60):02d}\"" if d_km > 0 else "0'00\""
                     v_hr = str(int(a.get('average_heartrate', 0))) if a.get('average_heartrate') else "0"
                 
@@ -390,6 +397,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
