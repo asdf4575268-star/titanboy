@@ -310,9 +310,7 @@ with col_design:
     ["Vertical", "Horizontal"], 
     index=default_idx, 
     horizontal=True,
-    key=f"orient_{mode}" )# 모드별로 키를 분리하면 상태 간섭을 방지할 수 있습니다.)
-        
-
+    key=f"orient_{mode}" )     
     sel_font = st.selectbox("폰트", ["BlackHanSans", "KirangHaerang", "Lacquer"])
 
     with st.expander("📍 위치/크기 조절"):
@@ -401,6 +399,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
