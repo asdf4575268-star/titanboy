@@ -256,6 +256,7 @@ with col_main:
                 a = acts[act_opts.index(sel_act)]
                 if a:
                     v_act = a['name'].upper()
+                    dt_obj = datetime.strptime(a['start_date_local'][:19], "%Y-%m-%dT%H:%M:%S")
                     v_time_str = dt_obj.strftime("%I:%M %p")
                     v_date = f"{a['start_date_local'][:10].replace('-', '.')} {v_time_str}"
                     d_km = a.get('distance', 0)/1000; m_s = a.get('moving_time', 0)
@@ -400,6 +401,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
