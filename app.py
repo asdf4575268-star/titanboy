@@ -348,7 +348,7 @@ with col_main:
                 if box_orient == "Vertical":
                     draw_styled_text(draw, (rx + 40, ry + 30), v_act, f_t, m_color, shadow=use_shadow)
                     t_w = draw.textlength(v_act, font=f_t)
-                    draw_styled_text(draw, (rx + 40 + t_w + 30, ry + 80), v_date, f_d, "#AAAAAA", shadow=use_shadow)
+                    draw_styled_text(draw, (rx + 40, ry + 120), v_date, f_d, "#AAAAAA", shadow=use_shadow)
                     y_c = ry + 165
                     for lab, val in items:
                         draw_styled_text(draw, (rx + 40, y_c), lab.lower(), f_l, "#AAAAAA", shadow=use_shadow)
@@ -401,6 +401,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
