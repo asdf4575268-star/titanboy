@@ -305,6 +305,14 @@ with col_design:
         sub_color = COLOR_OPTS[st.selectbox("서브 컬러", list(COLOR_OPTS.keys()), index=2, key="s_col_sel")]
 
     box_orient = st.radio("박스 방향", ["Vertical", "Horizontal"], horizontal=True)
+        default_idx = 0 if mode == "DAILY" else 1
+        box_orient = st.radio(
+        "박스 방향", 
+        ["Vertical", "Horizontal"], 
+        index=default_idx, 
+        horizontal=True,
+        key=f"orient_{mode}"
+        )
     sel_font = st.selectbox("폰트", ["BlackHanSans", "KirangHaerang", "Lacquer"])
 
     with st.expander("📍 위치/크기 조절"):
@@ -393,6 +401,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
