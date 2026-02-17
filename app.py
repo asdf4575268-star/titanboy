@@ -357,7 +357,7 @@ with col_main:
                 else:
                     title_w = draw.textlength(v_act, f_t)
                     draw_styled_text(draw, (rx + (rw-title_w)//2, ry+35), v_act, f_t, m_color, shadow=use_shadow)
-                    draw_styled_text(draw, (rx + (rw-draw.textlength(v_date, f_d))//2, ry+100), v_date, f_d, "#AAAAAA", shadow=use_shadow)
+                    draw_styled_text(draw, (rx + (rw-draw.textlength(v_date, f_d))//2, ry+110), v_date, f_d, "#AAAAAA", shadow=use_shadow)
                     sec_w = rw // 4
                     for i, (lab, val) in enumerate(items):
                         cx = rx + (i * sec_w) + (sec_w // 2)
@@ -401,6 +401,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
