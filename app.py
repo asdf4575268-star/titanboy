@@ -304,15 +304,15 @@ with col_design:
         m_color = COLOR_OPTS[st.selectbox("포인트 컬러", list(COLOR_OPTS.keys()), index=1,  key="m_col_sel")]
         sub_color = COLOR_OPTS[st.selectbox("서브 컬러", list(COLOR_OPTS.keys()), index=2, key="s_col_sel")]
 
-    box_orient = st.radio("박스 방향", ["Vertical", "Horizontal"], horizontal=True)
-        default_idx = 0 if mode == "DAILY" else 1
-        box_orient = st.radio(
-        "박스 방향", 
-        ["Vertical", "Horizontal"], 
-        index=default_idx, 
-        horizontal=True,
-        key=f"orient_{mode}"
-        )
+    box_orient = st.radio(
+    "박스 방향", 
+    ["Vertical", "Horizontal"], 
+    index=default_idx, 
+    horizontal=True,
+    key=f"orient_{mode}" # 모드별로 키를 분리하면 상태 간섭을 방지할 수 있습니다.
+)
+        
+
     sel_font = st.selectbox("폰트", ["BlackHanSans", "KirangHaerang", "Lacquer"])
 
     with st.expander("📍 위치/크기 조절"):
@@ -401,6 +401,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
