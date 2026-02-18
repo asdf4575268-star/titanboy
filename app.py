@@ -288,24 +288,24 @@ with col_main:
                     else:
                         v_diff_str = "첫 기록"
             
-               elif mode == "MONTHLY":
-                    months = sorted(list(set([ac['start_date_local'][:7] for ac in acts])), reverse=True)
-                    sel_month = st.selectbox("🗓️ 월 선택", months)
+            elif mode == "MONTHLY":
+                months = sorted(list(set([ac['start_date_local'][:7] for ac in acts])), reverse=True)
+                sel_month = st.selectbox("🗓️ 월 선택", months)
             
-                   m_data = get_monthly_stats(acts, f"{sel_month}-01") or {}
+                m_data = get_monthly_stats(acts, f"{sel_month}-01") or {}
             
-                    v_date = f"{sel_month} stats"
-                    v_dist = f"{m_data.get('total_dist', 0):.2f}"
-                    v_time = m_data.get('total_time', "00:00:00")
-                    v_pace = m_data.get('avg_pace', "0'00\"")
-                    v_hr = int(m_data.get('avg_hr', 0))
-                    prev_m_str = (datetime.strptime(f"{sel_month}-01", "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m")
-                    p_data = get_monthly_stats(acts, f"{prev_m_str}-01") or {}
+                v_date = f"{sel_month} stats"
+                v_dist = f"{m_data.get('total_dist', 0):.2f}"
+                v_time = m_data.get('total_time', "00:00:00")
+                v_pace = m_data.get('avg_pace', "0'00\"")
+                v_hr = int(m_data.get('avg_hr', 0))
+                prev_m_str = (datetime.strptime(f"{sel_month}-01", "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m")
+                p_data = get_monthly_stats(acts, f"{prev_m_str}-01") or {}
             
-                    p_dist = p_data.get('total_dist', 0)
-                    if p_dist > 0:
-                        diff = float(v_dist) - float(p_dist)
-                        v_diff_str = f"({'+' if diff >= 0 else ''}{diff:.2f} km)"
+                p_dist = p_data.get('total_dist', 0)
+                if p_dist > 0:
+                    diff = float(v_dist) - float(p_dist)
+                    v_diff_str = f"({'+' if diff >= 0 else ''}{diff:.2f} km)"
 # --- [6. 디자인 창 구성] ---
 with col_design:
     st.header("🎨 DESIGN")
@@ -449,6 +449,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
