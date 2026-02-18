@@ -230,7 +230,6 @@ with col_main:
     bg_files = [] 
     log_file = None
     v_act, v_date, v_dist, v_time, v_pace, v_hr = "RUNNING", "2026.02.16", "0.00", "00:00:00", "0'00\"", "0"
-    v_diff_str = ""
     weekly_data, monthly_data, a = None, None, None
 
     if not st.session_state['access_token']:
@@ -247,7 +246,6 @@ with col_main:
         # 2. 파일 업로더 (여기서 변수가 정의됩니다)
         bg_files = st.file_uploader("📸 배경 사진", type=['jpg','jpeg','png'], accept_multiple_files=True)
         log_file = st.file_uploader("🔘 로고", type=['jpg','jpeg','png'])
-        st.file_uploader("📈 그래프 스크린샷", type=['jpg','png','jpeg'], key="user_graph")
         
         mode = st.radio("모드 선택", ["DAILY", "WEEKLY", "MONTHLY"], horizontal=True, key="main_mode_sel")
         
@@ -263,17 +261,14 @@ with col_main:
                     v_date = f"{a['start_date_local'][:10].replace('-', '.')} {v_time_str}"
                     d_km = a.get('distance', 0)/1000; m_s = a.get('moving_time', 0)
                     v_dist = f"{d_km:.2f}" 
-                    v_pace = f"{int((m_s/d_km)//60)}'{int((m_s/d_km)%60):02d}\"" if d_km > 0 else "0'00\""
                     v_time = f"{int(m_s//3600):02d}:{int((m_s%3600)//60):02d}:{int(m_s%60):02d}" if m_s >= 3600 else f"{int(m_s//60):02d}:{int(m_s%60):02d}"
+                    v_pace = f"{int((m_s/d_km)//60)}'{int((m_s/d_km)%60):02d}\"" if d_km > 0 else "0'00\""
                     v_hr = str(int(a.get('average_heartrate', 0))) if a.get('average_heartrate') else "0"
                 
             elif mode == "WEEKLY":
                 weeks = sorted(list(set([(datetime.strptime(ac['start_date_local'][:10], "%Y-%m-%d") - timedelta(days=datetime.strptime(ac['start_date_local'][:10], "%Y-%m-%d").weekday())).strftime('%Y-%m-%d') for ac in acts])), reverse=True)
                 sel_week = st.selectbox("📅 주차 선택", weeks, format_func=lambda x: f"{x[:4]}-{datetime.strptime(x, '%Y-%m-%d').isocalendar()[1]}주차")              
-                weekly_data = get_weekly_stats(acts, sel_week)
-                prev_week_obj = datetime.strptime(sel_week, "%Y-%m-%d") - timedelta(days=7)
-                prev_week_str = prev_week_obj.strftime("%Y-%m-%d")
-                prev_weekly_data = get_weekly_stats(acts, prev_week_str)
+                weekly_data = get_weekly_stats(acts, sel_week)      
                 if weekly_data:
                     v_act = f"{datetime.strptime(sel_week, '%Y-%m-%d').isocalendar()[1]} WEEK" # 예: 7 WEEK
                     v_date = weekly_data['range']   # 예: 02.10 - 02.16
@@ -281,31 +276,17 @@ with col_main:
                     v_time = weekly_data['total_time']
                     v_pace = weekly_data['avg_pace']
                     v_hr   = weekly_data['avg_hr']
-                    v_diff_str = ""
-                    if prev_weekly_data:
-                        diff = float(v_dist) - float(prev_weekly_data['total_dist'])
-                        v_diff_str = f"({'+' if diff >= 0 else ''}{diff:.2f} km)"
-                    else:
-                        v_diff_str = "첫 기록"
-            
+                
             elif mode == "MONTHLY":
                 months = sorted(list(set([ac['start_date_local'][:7] for ac in acts])), reverse=True)
                 sel_month = st.selectbox("🗓️ 월 선택", months)
-            
-                m_data = get_monthly_stats(acts, f"{sel_month}-01") or {}
-            
-                v_date = f"{sel_month} stats"
-                v_dist = f"{m_data.get('total_dist', 0):.2f}"
-                v_time = m_data.get('total_time', "00:00:00")
-                v_pace = m_data.get('avg_pace', "0'00\"")
-                v_hr = int(m_data.get('avg_hr', 0))
-                prev_m_str = (datetime.strptime(f"{sel_month}-01", "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m")
-                p_data = get_monthly_stats(acts, f"{prev_m_str}-01") or {}
-            
-                p_dist = p_data.get('total_dist', 0)
-                if p_dist > 0:
-                    diff = float(v_dist) - float(p_dist)
-                    v_diff_str = f"({'+' if diff >= 0 else ''}{diff:.2f} km)"
+                monthly_data = get_monthly_stats(acts, f"{sel_month}-01")
+                
+                if monthly_data:
+                    dt_t = datetime.strptime(f"{sel_month}-01", "%Y-%m-%d")
+                    # 월 이름 대문자 (예: FEBRUARY)
+                    v_act = dt_t.strftime("%B").upper()
+                    v_date, v_dist, v_time, v_pace, v_hr = monthly_data['range'], monthly_data['total_dist'], monthly_data['total_time'], monthly_data['avg_pace'], monthly_data['avg_hr']
 # --- [6. 디자인 창 구성] ---
 with col_design:
     st.header("🎨 DESIGN")
@@ -354,7 +335,7 @@ with col_main:
             
             canvas = make_smart_collage(bg_files, (CW, CH)) if bg_files else Image.new("RGBA", (CW, CH), (20, 20, 20, 255))
             overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
-            items = [("distance", f"{v_dist} km", v_diff_str), ("time", str(v_time), ""), ("pace", str(v_pace), ""), ("avg bpm", f"{v_hr} bpm", "")]
+            items = [("distance", f"{v_dist} km"), ("time", v_time), ("pace", v_pace), ("avg bpm", f"{v_hr} bpm")]
 
             if border_thick > 0:
                 # 캔버스 외곽선을 따라 테두리를 그립니다. 
@@ -369,49 +350,23 @@ with col_main:
                     t_w = draw.textlength(v_act, font=f_t)
                     draw_styled_text(draw, (rx + 40, ry + 110), v_date, f_d, "#AAAAAA", shadow=use_shadow)
                     y_c = ry + 200
-                    for lab, val, diff in items:
+                    for lab, val in items:
                         draw_styled_text(draw, (rx + 40, y_c), lab.lower(), f_l, "#AAAAAA", shadow=use_shadow)
                         draw_styled_text(draw, (rx + 40, y_c + 35), val.lower(), f_n, sub_color, shadow=use_shadow)
                         y_c += 105
-                else: # Horizontal 모드
+                else:
                     title_w = draw.textlength(v_act, f_t)
                     draw_styled_text(draw, (rx + (rw-title_w)//2, ry+35), v_act, f_t, m_color, shadow=use_shadow)
                     draw_styled_text(draw, (rx + (rw-draw.textlength(v_date, f_d))//2, ry+110), v_date, f_d, "#AAAAAA", shadow=use_shadow)
-                    
                     sec_w = rw // 4
-                    y_items_top = ry + 180
-                    for i, (lab, val, diff) in enumerate(items):
+                    for i, (lab, val) in enumerate(items):
                         cx = rx + (i * sec_w) + (sec_w // 2)
-                        draw_styled_text(draw, (cx - draw.textlength(lab.lower(), f_l)//2, y_items_top), lab.lower(), f_l, "#AAAAAA", shadow=use_shadow)
-                        v_str = val.lower()
-                        draw_styled_text(draw, (cx - draw.textlength(v_str, f_n)//2, y_items_top + 45), v_str, f_n, sub_color, shadow=use_shadow)
-                        if diff:
-                            draw_styled_text(draw, (cx - draw.textlength(diff, f_l)//2, y_items_top + 105), diff, f_l, m_color, shadow=use_shadow)
-    # 2. 지도 및 그래프 (show_vis가 True일 때만)
-            if show_vis:
-                vis_layer = None
-                m_pos = (0, 0)
-                # [추가] 직접 올린 그래프 이미지가 있는 경우 (우선순위 1)
-                if 'user_graph' in st.session_state and st.session_state['user_graph']:
-                    try:
-                        u_img = Image.open(st.session_state['user_graph']).convert("RGBA")
-                        vis_sz = vis_sz_adj
-                        # 가로 세로 비율 유지하며 리사이즈
-                        w_h_ratio = u_img.height / u_img.width
-                        vis_layer = u_img.resize((vis_sz, int(vis_sz * w_h_ratio)), Image.Resampling.LANCZOS)
-                        # 투명도 적용
-                        vis_layer.putalpha(vis_layer.getchannel('A').point(lambda x: x * (vis_alpha / 255)))
-                        
-                        # 박스 방향에 따른 위치 설정
-                        if box_orient == "Vertical":
-                            m_pos = (rx, max(5, ry - vis_layer.height - 20))
-                        else:
-                            # 가로모드일 때는 박스 중앙 부근에 배치
-                            m_pos = (rx + (rw - vis_layer.width)//2, ry - vis_layer.height + 50)
-                    except: pass
+                        draw_styled_text(draw, (cx - draw.textlength(lab.lower(), f_l)//2, ry+160), lab.lower(), f_l, "#AAAAAA", shadow=use_shadow)
+                        draw_styled_text(draw, (cx - draw.textlength(val.lower(), f_n)//2, ry+195), val.lower(), f_n, sub_color, shadow=use_shadow)
 
-                # 기존 DAILY 지도 (그래프가 없을 때)
-                elif mode == "DAILY" and a and a.get('map', {}).get('summary_polyline'):
+            # 2. 지도 및 그래프 (show_vis가 True일 때만)
+            if show_vis:
+                if mode == "DAILY" and a and a.get('map', {}).get('summary_polyline'):
                     pts = polyline.decode(a['map']['summary_polyline'])
                     lats, lons = zip(*pts)
                     vis_sz = vis_sz_adj
@@ -421,19 +376,16 @@ with col_main:
                     
                     if box_orient == "Vertical": m_pos = (rx, max(5, ry - vis_sz - 15))
                     else: m_pos = (rx + 100, ry + 10)
+                    overlay.paste(vis_layer, (int(m_pos[0]), int(m_pos[1])), vis_layer)
                     
-                # 기존 WEEKLY/MONTHLY 차트 (그래프가 없을 때)
                 elif mode in ["WEEKLY", "MONTHLY"] and (weekly_data or monthly_data):
                     d_obj = weekly_data if mode == "WEEKLY" else monthly_data
+                    # 폰트는 제목용 90px 폰트를 차트 레이블용으로 재활용
                     chart_img = create_bar_chart(d_obj['dists'], m_color, mode=mode, labels=d_obj.get('labels'), font_path=None)
                     vis_sz = vis_sz_adj
                     vis_layer = chart_img.resize((vis_sz, int(chart_img.size[1]*(vis_sz/chart_img.size[0]))), Image.Resampling.LANCZOS)
                     vis_layer.putalpha(vis_layer.getchannel('A').point(lambda x: x * (vis_alpha / 255)))
-                    m_pos = ((CW - vis_layer.width)//2, CH - vis_layer.height - 80)
-
-                # 최종 합성
-                if vis_layer:
-                    overlay.paste(vis_layer, (int(m_pos[0]), int(m_pos[1])), vis_layer)
+                    overlay.paste(vis_layer, ((CW - vis_layer.width)//2, CH - vis_layer.height - 80), vis_layer)
 
             # 3. 로고 (항상 표시 또는 로직 유지)
             if log_file:
@@ -449,40 +401,3 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
