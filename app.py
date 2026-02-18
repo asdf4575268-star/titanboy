@@ -254,6 +254,7 @@ with col_main:
                 act_opts = [f"{ac['start_date_local'][:10]} - {ac['name']}" for ac in acts]
                 sel_act = st.selectbox("🏃 활동 선택", act_opts)
                 a = acts[act_opts.index(sel_act)]
+                v_diff_str = ""
                 if a:
                     v_act = a['name'].upper()
                     dt_obj = datetime.strptime(a['start_date_local'][:19], "%Y-%m-%dT%H:%M:%S")
@@ -419,4 +420,5 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
