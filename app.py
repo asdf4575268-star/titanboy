@@ -418,7 +418,7 @@ with col_main:
                         m_pos = (rx, max(5, ry - vis_layer.height - 20))
                     else: 
                         m_pos_x = (CW - vis_layer.width) // 2
-                        m_pos_y = CH - vis_layer.height                      
+                        m_pos_y = CH - vis_layer.height - 50                    
                         m_pos = (m_pos_x, m_pos_y)
                     
                     overlay.paste(vis_layer, (int(m_pos[0]), int(m_pos[1])), vis_layer)
@@ -437,6 +437,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
