@@ -419,15 +419,6 @@ with col_main:
                     
                     overlay.paste(vis_layer, (int(m_pos[0]), int(m_pos[1])), vis_layer)
                     
-                elif mode in ["WEEKLY", "MONTHLY"] and (weekly_data or monthly_data):
-                    d_obj = weekly_data if mode == "WEEKLY" else monthly_data
-                    # 폰트는 제목용 90px 폰트를 차트 레이블용으로 재활용
-                    chart_img = create_bar_chart(d_obj['dists'], m_color, mode=mode, labels=d_obj.get('labels'), font_path=None)
-                    vis_sz = vis_sz_adj
-                    vis_layer = chart_img.resize((vis_sz, int(chart_img.size[1]*(vis_sz/chart_img.size[0]))), Image.Resampling.LANCZOS)
-                    vis_layer.putalpha(vis_layer.getchannel('A').point(lambda x: x * (vis_alpha / 255)))
-                    overlay.paste(vis_layer, ((CW - vis_layer.width)//2, CH - vis_layer.height - 80), vis_layer)
-
             # 3. 로고 (항상 표시 또는 로직 유지)
             if log_file:
                 ls, margin = 100, 40
@@ -442,6 +433,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
