@@ -325,7 +325,8 @@ with col_design:
         m_color = COLOR_OPTS[st.selectbox("포인트 컬러", list(COLOR_OPTS.keys()), index=1,  key="m_col_sel")]
         sub_color = COLOR_OPTS[st.selectbox("서브 컬러", list(COLOR_OPTS.keys()), index=2, key="s_col_sel")]
 
-    default_idx = 0 if mode == "DAILY" else 1
+    current_mode = mode if 'mode' in locals() else "DAILY"
+    default_idx = 0 if current_mode == "DAILY" else 1
     box_orient = st.radio(
     "박스 방향", 
     ["Vertical", "Horizontal"], 
@@ -438,6 +439,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
