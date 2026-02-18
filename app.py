@@ -398,9 +398,15 @@ with col_main:
                     vis_layer = user_img.resize((vis_sz, int(vis_sz * w_h_ratio)), Image.Resampling.LANCZOS)
                     # 투명도 적용
                     vis_layer.putalpha(vis_layer.getchannel('A').point(lambda x: x * (vis_alpha / 255)))
-
-                # 기존 지도/차트 로직 (그래프 파일이 없을 때만 작동하도록 else 처리 가능)
-                elif mode == "DAILY" and a and a.get('map', {}).get('summary_polyline'):
+                
+            if show_vis:
+                if mode == "DAILY" and a and a.get('map', {}).get('summary_polyline'):
+                    pts = polyline.decode(a['map']['summary_polyline'])
+                    lats, lons = zip(*pts)
+                    vis_sz = vis_sz_adj
+                    vis_layer = Image.new("RGBA", (vis_sz, vis_sz), (0,0,0,0)); m_draw = ImageDraw.Draw(vis_layer)
+                    def tr(la, lo): return 15+(lo-min(lons))/(max(lons)-min(lons)+1e-5)*(vis_sz-30), (vis_sz-15)-(la-min(lats))/(max(lats)-min(lats)+1e-5)*(vis_sz-30)
+                    m_draw.line([tr(la, lo) for la, lo in pts], fill=hex_to_rgba(m_color, vis_alpha), width=6)
                     
                     if box_orient == "Vertical": m_pos = (rx, max(5, ry - vis_sz - 15))
                     else: m_pos = (rx + 100, ry + 10)
@@ -428,7 +434,8 @@ with col_main:
             st.download_button(f"📸 {mode} DOWNLOAD", buf.getvalue(), f"{mode.lower()}.jpg", use_container_width=True)
             
         except Exception as e:
-            st.error(f"렌더링 오류 발생: {e}")
+            st.error(f"렌더링 오류 발생: {e}")}")
+
 
 
 
