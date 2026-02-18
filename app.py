@@ -247,9 +247,7 @@ with col_main:
         bg_files = st.file_uploader("📸 배경 사진", type=['jpg','jpeg','png'], accept_multiple_files=True)
         log_file = st.file_uploader("🔘 로고", type=['jpg','jpeg','png'])
         user_graph_file = st.file_uploader("📈 그래프 스크린샷 (선택)", type=['jpg','png','jpeg'], key="user_graph")
-        
-        rx, ry = st.number_input("박스 X", 0, 1080, 40 if box_orient=="Horizontal" else 80), st.number_input("박스 Y", 0, 1920, 250 if box_orient=="Horizontal" else 1200)
-        
+                
         mode = st.radio("모드 선택", ["DAILY", "WEEKLY", "MONTHLY"], horizontal=True, key="main_mode_sel")
         
         if acts:
@@ -423,5 +421,6 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
