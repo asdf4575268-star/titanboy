@@ -274,7 +274,7 @@ with col_main:
                 weekly_data = get_weekly_stats(acts, sel_week)      
                 
                 # 1. 증감량 변수 초기화 (에러 방지)
-                v_diff = "" 
+                v_diff_str = f"({'+' if diff_val >= 0 else ''}{diff_val:.2f} km)"
 
                 if weekly_data:
                     v_act = f"{datetime.strptime(sel_week, '%Y-%m-%d').isocalendar()[1]} WEEK"
@@ -436,6 +436,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
