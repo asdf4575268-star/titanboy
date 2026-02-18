@@ -274,7 +274,6 @@ with col_main:
                 prev_week_str = prev_week_obj.strftime("%Y-%m-%d")
                 prev_weekly_data = get_weekly_stats(acts, prev_week_str)
                 
-                # 에러 방지를 위해 변수 초기화
                 v_diff_str = "" 
 
                 if weekly_data:
@@ -348,7 +347,7 @@ with col_main:
             
             canvas = make_smart_collage(bg_files, (CW, CH)) if bg_files else Image.new("RGBA", (CW, CH), (20, 20, 20, 255))
             overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
-            items = [("distance", (f"{v_dist} km {v_diff_str}")), ("pace", v_pace), ("time", v_time), ("avg bpm", f"{v_hr} bpm")]
+            items = [("distance", f"{v_dist} km", v_diff_str), ("time", str(v_time), ""), ("pace", str(v_pace), ""), ("avg bpm", f"{v_hr} bpm", ""]
 
             if border_thick > 0:
                 # 캔버스 외곽선을 따라 테두리를 그립니다. 
@@ -363,7 +362,7 @@ with col_main:
                     t_w = draw.textlength(v_act, font=f_t)
                     draw_styled_text(draw, (rx + 40, ry + 110), v_date, f_d, "#AAAAAA", shadow=use_shadow)
                     y_c = ry + 200
-                    for lab, val in items:
+                    for lab, val, diff in items:
                         draw_styled_text(draw, (rx + 40, y_c), lab.lower(), f_l, "#AAAAAA", shadow=use_shadow)
                         draw_styled_text(draw, (rx + 40, y_c + 35), val.lower(), f_n, sub_color, shadow=use_shadow)
                         y_c += 105
@@ -374,11 +373,8 @@ with col_main:
                     sec_w = rw // 4
                     for i, (lab, val) in enumerate(items):
                         cx = rx + (i * sec_w) + (sec_w // 2)
-                        draw_styled_text(draw, (cx - draw.textlength(lab.lower(), f_l)//2, y_items_top), lab.lower(), f_l, "#AAAAAA", shadow=use_shadow)
-                        v_str = val.lower()
-                        draw_styled_text(draw, (cx - draw.textlength(v_str, f_n)//2, y_items_top + 45), v_str, f_n, sub_color, shadow=use_shadow)
-                        if diff:
-                            draw_styled_text(draw, (cx - draw.textlength(diff, f_l)//2, y_items_top + 105), diff, f_l, m_color, shadow=use_shadow)
+                        draw_styled_text(draw, (cx - draw.textlength(lab.lower(), f_l)//2, ry+160), lab.lower(), f_l, "#AAAAAA", shadow=use_shadow)
+                        draw_styled_text(draw, (cx - draw.textlength(val.lower(), f_n)//2, ry+195), val.lower(), f_n, sub_color, shadow=use_shadow)
 
             # 2. 지도 및 그래프 (show_vis가 True일 때만)
             if show_vis:
@@ -417,6 +413,3 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
-
-
-
