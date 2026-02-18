@@ -321,6 +321,7 @@ with col_design:
         box_alpha = st.slider("박스 투명도", 0, 255, 0)
         vis_sz_adj = st.slider("지도/그래프 크기", 50, 1080, 180 if mode=="DAILY" else 1080)
         vis_alpha = st.slider("지도/그래프 투명도", 0, 255, 255)
+        st.file_uploader("📈 그래프 스크린샷", type=['jpg','png','jpeg'], key="user_graph")
         
 # --- [7. 미리보기 렌더링] ---
 with col_main:
@@ -427,6 +428,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
