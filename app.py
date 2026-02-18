@@ -72,7 +72,8 @@ def get_weekly_stats(activities, target_date_str):
         avg_hr = int(hr_sum / hr_count) if hr_count > 0 else 0
         avg_pace_sec = (total_time / total_dist) if total_dist > 0 else 0
         return {"dists": weekly_dist, "total_dist": total_dist, "total_time": f"{total_time//3600:02d}:{(total_time%3600)//60:02d}:{total_time%60:02d}", "avg_pace": f"{int(avg_pace_sec//60)}'{int(avg_pace_sec%60):02d}\"", "avg_hr": str(avg_hr), "range": f"{start_of_week.strftime('%m.%d')} - {end_of_week.strftime('%m.%d')}"}    
-            except: return None
+        except: 
+            return None
 
 def get_monthly_stats(activities, target_date_str):
     try:
@@ -431,6 +432,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
