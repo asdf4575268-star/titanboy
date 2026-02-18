@@ -311,6 +311,7 @@ with col_main:
 # --- [6. 디자인 창 구성] ---
 with col_design:
     st.header("🎨 DESIGN")
+    if 'mode' not in locals() and 'mode' not in globals(): mode = "DAILY"
     with st.expander("✍️ 텍스트 수정"):
         v_act = st.text_input("활동명", v_act); v_date = st.text_input("날짜", v_date)
         v_dist = st.text_input("거리 km", v_dist); v_time = st.text_input("시간", v_time)
@@ -441,6 +442,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
