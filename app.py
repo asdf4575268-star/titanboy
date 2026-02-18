@@ -249,6 +249,7 @@ with col_main:
         user_graph_file = st.file_uploader("📈 그래프 스크린샷 (선택)", type=['jpg','png','jpeg'], key="user_graph")
                 
         mode = st.radio("모드 선택", ["DAILY", "WEEKLY", "MONTHLY"], horizontal=True, key="main_mode_sel")
+        v_diff_str = ""
         
         if acts:
             if mode == "DAILY":
@@ -439,6 +440,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
