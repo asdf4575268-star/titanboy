@@ -71,9 +71,8 @@ def get_weekly_stats(activities, target_date_str):
                     if act.get('average_heartrate'): hr_sum += act.get('average_heartrate'); hr_count += 1
         avg_hr = int(hr_sum / hr_count) if hr_count > 0 else 0
         avg_pace_sec = (total_time / total_dist) if total_dist > 0 else 0
-        return {"dists": weekly_dist, "total_dist": total_dist, "total_time": f"{total_time//3600:02d}:{(total_time%3600)//60:02d}:{total_time%60:02d}", "avg_pace": f"{int(avg_pace_sec//60)}'{int(avg_pace_sec%60):02d}\"", "avg_hr": str(avg_hr), "range": f"{start_of_week.strftime('%m.%d')} - {end_of_week.strftime('%m.%d')}"}    
-    except: 
-        return None
+        return {"dists": weekly_dist, "total_dist": f"{total_dist:.2f}", "total_time": f"{total_time//3600:02d}:{(total_time%3600)//60:02d}:{total_time%60:02d}", "avg_pace": f"{int(avg_pace_sec//60)}'{int(avg_pace_sec%60):02d}\"", "avg_hr": str(avg_hr), "range": f"{start_of_week.strftime('%m.%d')} - {end_of_week.strftime('%m.%d')}"}
+    except: return None
 
 def get_monthly_stats(activities, target_date_str):
     try:
@@ -95,8 +94,7 @@ def get_monthly_stats(activities, target_date_str):
         avg_hr = int(hr_sum / hr_count) if hr_count > 0 else 0
         avg_pace_sec = (total_time / total_dist) if total_dist > 0 else 0
         return {"dists": monthly_dist, "total_dist": f"{total_dist:.2f}", "total_time": f"{total_time//3600:02d}:{(total_time%3600)//60:02d}:{total_time%60:02d}", "avg_pace": f"{int(avg_pace_sec//60)}'{int(avg_pace_sec%60):02d}\"", "avg_hr": str(avg_hr), "range": first_day.strftime('%Y.%m'), "labels": [str(i+1) for i in range(num_days)]}
-    except: 
-        return None
+    except: return None
 
 def create_bar_chart(data, color_hex, mode="WEEKLY", labels=None, font_path=None):
     if mode == "WEEKLY": labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -232,7 +230,6 @@ with col_main:
     bg_files = [] 
     log_file = None
     v_act, v_date, v_dist, v_pace, v_time, v_hr = "RUNNING", "2026.02.16", "0.00", "00:00:00", "0'00\"", "0"
-    v_diff_str = ""
     weekly_data, monthly_data, a = None, None, None
 
     if not st.session_state['access_token']:
@@ -272,48 +269,24 @@ with col_main:
                 weeks = sorted(list(set([(datetime.strptime(ac['start_date_local'][:10], "%Y-%m-%d") - timedelta(days=datetime.strptime(ac['start_date_local'][:10], "%Y-%m-%d").weekday())).strftime('%Y-%m-%d') for ac in acts])), reverse=True)
                 sel_week = st.selectbox("📅 주차 선택", weeks, format_func=lambda x: f"{x[:4]}-{datetime.strptime(x, '%Y-%m-%d').isocalendar()[1]}주차")              
                 weekly_data = get_weekly_stats(acts, sel_week)      
-                
-                # 1. 증감량 변수 초기화 (에러 방지)
-                v_diff_str = f"({'+' if diff_val >= 0 else ''}{diff_val:.2f} km)"
-
                 if weekly_data:
-                    v_act = f"{datetime.strptime(sel_week, '%Y-%m-%d').isocalendar()[1]} WEEK"
-                    v_date = weekly_data['range']
-                    v_dist = f"{weekly_data['total_dist']:.2f}" 
+                    v_act = f"{datetime.strptime(sel_week, '%Y-%m-%d').isocalendar()[1]} WEEK" # 예: 7 WEEK
+                    v_date = weekly_data['range']   # 예: 02.10 - 02.16
+                    v_dist = weekly_data['total_dist']
                     v_pace = weekly_data['avg_pace']
                     v_time = weekly_data['total_time']
                     v_hr   = weekly_data['avg_hr']
-                    
-                    # 2. 지난주 데이터와 비교해서 v_diff 생성
-                    prev_week_str = (datetime.strptime(sel_week, "%Y-%m-%d") - timedelta(days=7)).strftime("%Y-%m-%d")
-                    prev_weekly_data = get_weekly_stats(acts, prev_week_str)
-                    
-                    if prev_weekly_data:
-                        # 숫자(float)끼리 뺍니다
-                        diff_val = weekly_data['total_dist'] - prev_weekly_data['total_dist']
-                        v_diff_str = f"({'+' if diff_val >= 0 else ''}{diff_val:.2f} km)"
                 
             elif mode == "MONTHLY":
                 months = sorted(list(set([ac['start_date_local'][:7] for ac in acts])), reverse=True)
                 sel_month = st.selectbox("🗓️ 월 선택", months)
                 monthly_data = get_monthly_stats(acts, f"{sel_month}-01")
-            
-            # [추가] 지난달 데이터 계산
-                curr_date = datetime.strptime(f"{sel_month}-01", "%Y-%m-%d")
-                prev_month_date = (curr_date - timedelta(days=1)).replace(day=1)
-                prev_month_str = prev_month_date.strftime("%Y-%m")
-                prev_monthly_data = get_monthly_stats(acts, f"{prev_month_str}-01")
-            
-                v_diff_str = "" # 초기화
                 
                 if monthly_data:
                     dt_t = datetime.strptime(f"{sel_month}-01", "%Y-%m-%d")
                     # 월 이름 대문자 (예: FEBRUARY)
                     v_act = dt_t.strftime("%B").upper()
                     v_date, v_dist, v_time, v_pace, v_hr = monthly_data['range'], monthly_data['total_dist'], monthly_data['total_time'], monthly_data['avg_pace'], monthly_data['avg_hr']
-                    if prev_monthly_data:
-                        diff_val = float(v_dist) - float(prev_monthly_data['total_dist'])
-                        v_diff_str = f"({'+' if diff >= 0 else ''}{diff:.2f} km)"
 # --- [6. 디자인 창 구성] ---
 with col_design:
     st.header("🎨 DESIGN")
@@ -362,7 +335,7 @@ with col_main:
             
             canvas = make_smart_collage(bg_files, (CW, CH)) if bg_files else Image.new("RGBA", (CW, CH), (20, 20, 20, 255))
             overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
-            items = [("distance", f"{v_dist} km", v_diff_str), ("pace", v_pace, ""), ("time", v_time, ""), ("avg bpm", f"{v_hr} bpm", "")]
+            items = [("distance", f"{v_dist} km"), ("pace", v_pace), ("time", v_time), ("avg bpm", f"{v_hr} bpm")]
 
             if border_thick > 0:
                 # 캔버스 외곽선을 따라 테두리를 그립니다. 
@@ -377,28 +350,20 @@ with col_main:
                     t_w = draw.textlength(v_act, font=f_t)
                     draw_styled_text(draw, (rx + 40, ry + 110), v_date, f_d, "#AAAAAA", shadow=use_shadow)
                     y_c = ry + 200
-                    for lab, val, diff in items:
+                    for lab, val in items:
                         draw_styled_text(draw, (rx + 40, y_c), lab.lower(), f_l, "#AAAAAA", shadow=use_shadow)
                         draw_styled_text(draw, (rx + 40, y_c + 35), val.lower(), f_n, sub_color, shadow=use_shadow)
                         y_c += 105
-                else: # Horizontal 모드
+                else:
                     title_w = draw.textlength(v_act, f_t)
                     draw_styled_text(draw, (rx + (rw-title_w)//2, ry+35), v_act, f_t, m_color, shadow=use_shadow)
                     draw_styled_text(draw, (rx + (rw-draw.textlength(v_date, f_d))//2, ry+110), v_date, f_d, "#AAAAAA", shadow=use_shadow)
-                    
                     sec_w = rw // 4
-                    for i, (lab, val, diff) in enumerate(items):
+                    for i, (lab, val) in enumerate(items):
                         cx = rx + (i * sec_w) + (sec_w // 2)
-                        
-                        # 레이블 위치 (distance, pace 등)
                         draw_styled_text(draw, (cx - draw.textlength(lab.lower(), f_l)//2, ry+160), lab.lower(), f_l, "#AAAAAA", shadow=use_shadow)
-                        
-                        # 수치 위치 (10.50 km 등)
                         draw_styled_text(draw, (cx - draw.textlength(val.lower(), f_n)//2, ry+195), val.lower(), f_n, sub_color, shadow=use_shadow)
-                        
-                        # [핵심] 주간 증감량 위치: 수치(ry+195) 바로 아래인 ry+255에 배치
-                        if diff:
-                            draw_styled_text(draw, (cx - draw.textlength(diff, f_l)//2, ry+255), diff, f_l, m_color, shadow=use_shadow)
+
             # 2. 지도 및 그래프 (show_vis가 True일 때만)
             if show_vis:
                 if mode == "DAILY" and a and a.get('map', {}).get('summary_polyline'):
@@ -436,19 +401,3 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
