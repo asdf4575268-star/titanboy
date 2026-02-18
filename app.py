@@ -269,29 +269,27 @@ with col_main:
             elif mode == "WEEKLY":
                 weeks = sorted(list(set([(datetime.strptime(ac['start_date_local'][:10], "%Y-%m-%d") - timedelta(days=datetime.strptime(ac['start_date_local'][:10], "%Y-%m-%d").weekday())).strftime('%Y-%m-%d') for ac in acts])), reverse=True)
                 sel_week = st.selectbox("📅 주차 선택", weeks, format_func=lambda x: f"{x[:4]}-{datetime.strptime(x, '%Y-%m-%d').isocalendar()[1]}주차")              
+                weekly_data = get_weekly_stats(acts, sel_week)      
                 
-                weekly_data = get_weekly_stats(acts, sel_week)
-                prev_week_obj = datetime.strptime(sel_week, "%Y-%m-%d") - timedelta(days=7)
-                prev_week_str = prev_week_obj.strftime("%Y-%m-%d")
-                prev_weekly_data = get_weekly_stats(acts, prev_week_str)
-                if prev_weekly_data:
-                    v_diff_str = f"({'+' if diff >= 0 else ''}{diff:.2f} km)"
-                
-                # 에러 방지를 위해 변수 초기화
-                v_diff_str = "" 
+                # 1. 증감량 변수 초기화 (에러 방지)
+                v_diff = "" 
 
                 if weekly_data:
                     v_act = f"{datetime.strptime(sel_week, '%Y-%m-%d').isocalendar()[1]} WEEK"
                     v_date = weekly_data['range']
-                    v_dist = weekly_data['total_dist']
-                    v_time = weekly_data['total_time']
+                    v_dist = f"{weekly_data['total_dist']:.2f}" 
                     v_pace = weekly_data['avg_pace']
+                    v_time = weekly_data['total_time']
                     v_hr   = weekly_data['avg_hr']
                     
+                    # 2. 지난주 데이터와 비교해서 v_diff 생성
+                    prev_week_str = (datetime.strptime(sel_week, "%Y-%m-%d") - timedelta(days=7)).strftime("%Y-%m-%d")
+                    prev_weekly_data = get_weekly_stats(acts, prev_week_str)
+                    
                     if prev_weekly_data:
-                        diff = float(v_dist) - float(prev_weekly_data['total_dist'])
-                        # 소문자 규칙에 따라 km도 소문자로 유지
-                        v_diff_str = f"({'+' if diff >= 0 else ''}{diff:.2f} km)"
+                        # 숫자(float)끼리 뺍니다
+                        diff_val = weekly_data['total_dist'] - prev_weekly_data['total_dist']
+                        v_diff = f"({'+' if diff_val >= 0 else ''}{diff_val:.2f} km)"
                 
             elif mode == "MONTHLY":
                 months = sorted(list(set([ac['start_date_local'][:7] for ac in acts])), reverse=True)
@@ -435,6 +433,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
