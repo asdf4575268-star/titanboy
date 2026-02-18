@@ -289,23 +289,23 @@ with col_main:
                         v_diff_str = "첫 기록"
             
             elif mode == "MONTHLY":
-            months = sorted(list(set([ac['start_date_local'][:7] for ac in acts])), reverse=True)
-            sel_month = st.selectbox("🗓️ 월 선택", months)
+                months = sorted(list(set([ac['start_date_local'][:7] for ac in acts])), reverse=True)
+                sel_month = st.selectbox("🗓️ 월 선택", months)
             
-            monthly_data = get_monthly_stats(acts, f"{sel_month}-01")
+                monthly_data = get_monthly_stats(acts, f"{sel_month}-01")
             
-            from datetime import datetime, timedelta
-            curr_date = datetime.strptime(f"{sel_month}-01", "%Y-%m-%d")
-            prev_month_date = (curr_date - timedelta(days=1)).replace(day=1)
-            prev_month_str = prev_month_date.strftime("%Y-%m")
-            prev_monthly_data = get_monthly_stats(acts, f"{prev_month_str}-01")
+                from datetime import datetime, timedelta
+                curr_date = datetime.strptime(f"{sel_month}-01", "%Y-%m-%d")
+                prev_month_date = (curr_date - timedelta(days=1)).replace(day=1)
+                prev_month_str = prev_month_date.strftime("%Y-%m")
+                prev_monthly_data = get_monthly_stats(acts, f"{prev_month_str}-01")
             
-            if monthly_data:
-                v_date = f"{sel_month} stats"
-                v_dist = f"{monthly_data['total_dist']:.2f}"
-                v_time = monthly_data['total_time']
-                v_pace = monthly_data['avg_pace']
-                v_hr = int(monthly_data['avg_hr'])
+                if monthly_data:
+                    v_date = f"{sel_month} stats"
+                    v_dist = f"{monthly_data['total_dist']:.2f}"
+                    v_time = monthly_data['total_time']
+                    v_pace = monthly_data['avg_pace']
+                    v_hr = int(monthly_data['avg_hr'])
                 
                 if prev_monthly_data:
                     diff = float(v_dist) - float(prev_monthly_data['total_dist'])
@@ -453,6 +453,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
