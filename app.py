@@ -230,6 +230,7 @@ with col_main:
     bg_files = [] 
     log_file = None
     v_act, v_date, v_dist, v_time, v_pace, v_hr = "RUNNING", "2026.02.16", "0.00", "00:00:00", "0'00\"", "0"
+    v_diff_str = ""
     weekly_data, monthly_data, a = None, None, None
 
     if not st.session_state['access_token']:
@@ -436,6 +437,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
