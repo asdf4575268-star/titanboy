@@ -417,8 +417,9 @@ with col_main:
                         # 세로 모드: 박스 바로 위
                         m_pos = (rx, max(5, ry - vis_layer.height - 20))
                     else: 
-                        # 가로 모드: 박스 하단 여백 혹은 중앙
-                        m_pos = (rx + (rw - vis_layer.width)//2, ry + rh - vis_layer.height + 80) 
+                        m_pos_x = (CW - vis_layer.width) // 2
+                        m_pos_y = CH - vis_layer.height - 50                      
+                        m_pos = (m_pos_x, m_pos_y)
                     
                     overlay.paste(vis_layer, (int(m_pos[0]), int(m_pos[1])), vis_layer)
 
@@ -436,5 +437,6 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
