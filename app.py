@@ -409,8 +409,7 @@ with col_main:
                     d_obj = weekly_data if mode == "WEEKLY" else monthly_data
                     chart_img = create_bar_chart(d_obj['dists'], m_color, mode=mode, labels=d_obj.get('labels'), font_path=None)
                     target_h = int(CH * 0.7)
-                    vis_layer = chart_img.resize((vis_sz, int(chart_img.size[1]*(vis_sz/chart_img.size[0]))), Image.Resampling.LANCZOS)
-                    vis_layer.putalpha(vis_layer.getchannel('A').point(lambda x: x * (vis_alpha / 255)))
+                    vis_layer = vis_layer.resize((vis_sz, target_h), Image.Resampling.LANCZOS)
 
                 # [C] 최종 합성 위치 결정
                 if vis_layer:
@@ -419,7 +418,7 @@ with col_main:
                         m_pos = (rx, max(5, ry - vis_layer.height - 20))
                     else: 
                         m_pos_x = (CW - vis_layer.width) // 2
-                        m_pos_y = CH - vis_layer.height - 50                      
+                        m_pos_y = CH - vis_layer.height                      
                         m_pos = (m_pos_x, m_pos_y)
                     
                     overlay.paste(vis_layer, (int(m_pos[0]), int(m_pos[1])), vis_layer)
@@ -438,6 +437,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
