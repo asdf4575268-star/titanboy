@@ -309,7 +309,6 @@ with col_main:
 # --- [6. 디자인 창 구성] ---
 with col_design:
     st.header("🎨 DESIGN")
-    if 'mode' not in locals() and 'mode' not in globals(): mode = "DAILY"
     with st.expander("✍️ 텍스트 수정"):
         v_act = st.text_input("활동명", v_act); v_date = st.text_input("날짜", v_date)
         v_dist = st.text_input("거리 km", v_dist); v_time = st.text_input("시간", v_time)
@@ -385,43 +384,19 @@ with col_main:
                         draw_styled_text(draw, (cx - draw.textlength(val.lower(), f_n)//2, ry+195), val.lower(), f_n, sub_color, shadow=use_shadow)
                         if diff: # 가로 모드에서는 수치 바로 아래(ry+250)에 표시
                             draw_styled_text(draw, (cx - draw.textlength(diff, f_l)//2, ry+250), diff, f_l, m_color, shadow=use_shadow)
-            # 1. 지도 및 그래프 레이어 준비 (show_vis가 True일 때)
-            vis_layer = None
+            # 2. 지도 및 그래프 (show_vis가 True일 때만)
             if show_vis:
+                vis_layer = None
                 vis_sz = vis_sz_adj
                 
-                # [A] 사용자 그래프 또는 스트라바 데이터로 vis_layer 생성 (기존 로직 유지)
+                # [A] 사용자가 그래프 이미지를 직접 올린 경우 최우선 표시
                 if user_graph_file:
                     user_img = Image.open(user_graph_file).convert("RGBA")
                     w_h_ratio = user_img.height / user_img.width
                     vis_layer = user_img.resize((vis_sz, int(vis_sz * w_h_ratio)), Image.Resampling.LANCZOS)
-                elif mode == "DAILY" and a and a.get('map', {}).get('summary_polyline'):
-                    pts = polyline.decode(a['map']['summary_polyline'])
-                    lats, lons = zip(*pts)
-                    vis_layer = Image.new("RGBA", (vis_sz, vis_sz), (0,0,0,0)); m_draw = ImageDraw.Draw(vis_layer)
-                    def tr(la, lo): return 15+(lo-min(lons))/(max(lons)-min(lons)+1e-5)*(vis_sz-30), (vis_sz-15)-(la-min(lats))/(max(lats)-min(lats)+1e-5)*(vis_sz-30)
-                    m_draw.line([tr(la, lo) for la, lo in pts], fill=hex_to_rgba(m_color, vis_alpha), width=6)
-                elif mode in ["WEEKLY", "MONTHLY"] and (weekly_data or monthly_data):
-                    d_obj = weekly_data if mode == "WEEKLY" else monthly_data
-                    chart_img = create_bar_chart(d_obj['dists'], m_color, mode=mode, labels=d_obj.get('labels'))
-                    vis_layer = chart_img.resize((vis_sz, int(chart_img.size[1]*(vis_sz/chart_img.size[0]))), Image.Resampling.LANCZOS)
-                
-                if vis_layer:
+                    # 투명도 적용
                     vis_layer.putalpha(vis_layer.getchannel('A').point(lambda x: x * (vis_alpha / 255)))
 
-            # 2. 오버레이 합성 시작
-            overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
-
-            # [핵심] 지도/그래프를 "제목 배경" 위치에 먼저 배치
-            if show_vis and vis_layer:
-                if box_orient == "Vertical":
-                    # 세로 모드: 제목(v_act) 위치 근처에 센터 정렬
-                    m_pos = (rx + (rw - vis_layer.width)//2, ry - 50) 
-                else:
-                    # 가로 모드: 박스 중앙 상단(제목 위치)에 겹치게
-                    m_pos = (rx + (rw - vis_layer.width)//2, ry - (vis_layer.height // 3))
-                
-                overlay.paste(vis_layer, (int(m_pos[0]), int(m_pos[1])), vis_layer)
                 # [B] 직접 올린 게 없으면 기존 스트라바 데이터로 생성
                 elif mode == "DAILY" and a and a.get('map', {}).get('summary_polyline'):
                     pts = polyline.decode(a['map']['summary_polyline'])
@@ -463,5 +438,3 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
-
-
