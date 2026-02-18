@@ -386,13 +386,21 @@ with col_main:
                             draw_styled_text(draw, (cx - draw.textlength(diff, f_l)//2, ry+250), diff, f_l, m_color, shadow=use_shadow)
             # 2. 지도 및 그래프 (show_vis가 True일 때만)
             if show_vis:
-                if mode == "DAILY" and a and a.get('map', {}).get('summary_polyline'):
-                    pts = polyline.decode(a['map']['summary_polyline'])
-                    lats, lons = zip(*pts)
+                vis_layer = None
+                
+                # [추가] 사용자가 그래프 이미지를 직접 올린 경우
+                if user_graph_file:
+                    user_img = Image.open(user_graph_file).convert("RGBA")
+                    # 배경 제거를 원하시면 여기서 처리 가능하지만, 보통 스크린샷 그대로가 예쁩니다.
                     vis_sz = vis_sz_adj
-                    vis_layer = Image.new("RGBA", (vis_sz, vis_sz), (0,0,0,0)); m_draw = ImageDraw.Draw(vis_layer)
-                    def tr(la, lo): return 15+(lo-min(lons))/(max(lons)-min(lons)+1e-5)*(vis_sz-30), (vis_sz-15)-(la-min(lats))/(max(lats)-min(lats)+1e-5)*(vis_sz-30)
-                    m_draw.line([tr(la, lo) for la, lo in pts], fill=hex_to_rgba(m_color, vis_alpha), width=6)
+                    # 비율 유지하며 리사이즈
+                    w_h_ratio = user_img.height / user_img.width
+                    vis_layer = user_img.resize((vis_sz, int(vis_sz * w_h_ratio)), Image.Resampling.LANCZOS)
+                    # 투명도 적용
+                    vis_layer.putalpha(vis_layer.getchannel('A').point(lambda x: x * (vis_alpha / 255)))
+
+                # 기존 지도/차트 로직 (그래프 파일이 없을 때만 작동하도록 else 처리 가능)
+                elif mode == "DAILY" and a and a.get('map', {}).get('summary_polyline'):
                     
                     if box_orient == "Vertical": m_pos = (rx, max(5, ry - vis_sz - 15))
                     else: m_pos = (rx + 100, ry + 10)
@@ -421,6 +429,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
