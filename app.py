@@ -284,8 +284,8 @@ with col_main:
                     if prev_weekly_data:
                         diff = float(v_dist) - float(prev_weekly_data['total_dist'])
                         v_diff_str = f"{'+' if diff >= 0 else ''}{diff:.2f} km"
-            else:
-                v_diff_str = "첫 기록"
+                    else:
+                        v_diff_str = "첫 기록"
             
             elif mode == "MONTHLY":
                 months = sorted(list(set([ac['start_date_local'][:7] for ac in acts])), reverse=True)
@@ -436,6 +436,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
