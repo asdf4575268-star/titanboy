@@ -269,24 +269,41 @@ with col_main:
                 weeks = sorted(list(set([(datetime.strptime(ac['start_date_local'][:10], "%Y-%m-%d") - timedelta(days=datetime.strptime(ac['start_date_local'][:10], "%Y-%m-%d").weekday())).strftime('%Y-%m-%d') for ac in acts])), reverse=True)
                 sel_week = st.selectbox("📅 주차 선택", weeks, format_func=lambda x: f"{x[:4]}-{datetime.strptime(x, '%Y-%m-%d').isocalendar()[1]}주차")              
                 weekly_data = get_weekly_stats(acts, sel_week)      
+                
+                v_diff_str = "" # 초기화
                 if weekly_data:
-                    v_act = f"{datetime.strptime(sel_week, '%Y-%m-%d').isocalendar()[1]} WEEK" # 예: 7 WEEK
-                    v_date = weekly_data['range']   # 예: 02.10 - 02.16
+                    v_act = f"{datetime.strptime(sel_week, '%Y-%m-%d').isocalendar()[1]} WEEK"
+                    v_date = weekly_data['range']
                     v_dist = weekly_data['total_dist']
                     v_pace = weekly_data['avg_pace']
                     v_time = weekly_data['total_time']
                     v_hr   = weekly_data['avg_hr']
+                    
+                    # 지난주와 비교
+                    prev_week_str = (datetime.strptime(sel_week, "%Y-%m-%d") - timedelta(days=7)).strftime("%Y-%m-%d")
+                    prev_weekly_data = get_weekly_stats(acts, prev_week_str)
+                    if prev_weekly_data:
+                        diff_val = float(v_dist) - float(prev_weekly_data['total_dist'])
+                        v_diff_str = f"({'+' if diff_val >= 0 else ''}{diff_val:.2f} km)"
                 
             elif mode == "MONTHLY":
                 months = sorted(list(set([ac['start_date_local'][:7] for ac in acts])), reverse=True)
                 sel_month = st.selectbox("🗓️ 월 선택", months)
                 monthly_data = get_monthly_stats(acts, f"{sel_month}-01")
                 
+                v_diff_str = "" # 초기화
                 if monthly_data:
                     dt_t = datetime.strptime(f"{sel_month}-01", "%Y-%m-%d")
-                    # 월 이름 대문자 (예: FEBRUARY)
                     v_act = dt_t.strftime("%B").upper()
                     v_date, v_dist, v_time, v_pace, v_hr = monthly_data['range'], monthly_data['total_dist'], monthly_data['total_time'], monthly_data['avg_pace'], monthly_data['avg_hr']
+                    
+                    # 지난달과 비교
+                    curr_date = datetime.strptime(f"{sel_month}-01", "%Y-%m-%d")
+                    prev_month_date = (curr_date - timedelta(days=1)).replace(day=1)
+                    prev_monthly_data = get_monthly_stats(acts, prev_month_date.strftime("%Y-%m-%d"))
+                    if prev_monthly_data:
+                        diff_val = float(v_dist) - float(prev_monthly_data['total_dist'])
+                        v_diff_str = f"({'+' if diff_val >= 0 else ''}{diff_val:.2f} km)"
 # --- [6. 디자인 창 구성] ---
 with col_design:
     st.header("🎨 DESIGN")
@@ -335,8 +352,7 @@ with col_main:
             
             canvas = make_smart_collage(bg_files, (CW, CH)) if bg_files else Image.new("RGBA", (CW, CH), (20, 20, 20, 255))
             overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
-            items = [("distance", f"{v_dist} km"), ("pace", v_pace), ("time", v_time), ("avg bpm", f"{v_hr} bpm")]
-
+            items = [("distance", f"{v_dist} km", v_diff_str), ("pace", v_pace, ""), ("time", v_time, ""), ("avg bpm", f"{v_hr} bpm", "")]
             if border_thick > 0:
                 # 캔버스 외곽선을 따라 테두리를 그립니다. 
                 # outline=m_color (포인트 컬러 사용), width=border_thick (슬라이더 값 적용)
@@ -347,23 +363,25 @@ with col_main:
                 draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0,0,0,box_alpha))
                 if box_orient == "Vertical":
                     draw_styled_text(draw, (rx + 40, ry + 30), v_act, f_t, m_color, shadow=use_shadow)
-                    t_w = draw.textlength(v_act, font=f_t)
                     draw_styled_text(draw, (rx + 40, ry + 110), v_date, f_d, "#AAAAAA", shadow=use_shadow)
                     y_c = ry + 200
-                    for lab, val in items:
+                    for lab, val, diff in items:
                         draw_styled_text(draw, (rx + 40, y_c), lab.lower(), f_l, "#AAAAAA", shadow=use_shadow)
                         draw_styled_text(draw, (rx + 40, y_c + 35), val.lower(), f_n, sub_color, shadow=use_shadow)
+                        if diff: # 증감 데이터가 있으면 표시
+                            draw_styled_text(draw, (rx + 230, y_c + 35), diff, f_l, m_color, shadow=use_shadow)
                         y_c += 105
-                else:
+                else: # Horizontal
                     title_w = draw.textlength(v_act, f_t)
                     draw_styled_text(draw, (rx + (rw-title_w)//2, ry+35), v_act, f_t, m_color, shadow=use_shadow)
                     draw_styled_text(draw, (rx + (rw-draw.textlength(v_date, f_d))//2, ry+110), v_date, f_d, "#AAAAAA", shadow=use_shadow)
                     sec_w = rw // 4
-                    for i, (lab, val) in enumerate(items):
+                    for i, (lab, val, diff) in enumerate(items):
                         cx = rx + (i * sec_w) + (sec_w // 2)
                         draw_styled_text(draw, (cx - draw.textlength(lab.lower(), f_l)//2, ry+160), lab.lower(), f_l, "#AAAAAA", shadow=use_shadow)
                         draw_styled_text(draw, (cx - draw.textlength(val.lower(), f_n)//2, ry+195), val.lower(), f_n, sub_color, shadow=use_shadow)
-
+                        if diff: # 가로 모드에서는 수치 바로 아래(ry+250)에 표시
+                            draw_styled_text(draw, (cx - draw.textlength(diff, f_l)//2, ry+250), diff, f_l, m_color, shadow=use_shadow)
             # 2. 지도 및 그래프 (show_vis가 True일 때만)
             if show_vis:
                 if mode == "DAILY" and a and a.get('map', {}).get('summary_polyline'):
@@ -401,3 +419,4 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
