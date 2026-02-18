@@ -71,7 +71,7 @@ def get_weekly_stats(activities, target_date_str):
                     if act.get('average_heartrate'): hr_sum += act.get('average_heartrate'); hr_count += 1
         avg_hr = int(hr_sum / hr_count) if hr_count > 0 else 0
         avg_pace_sec = (total_time / total_dist) if total_dist > 0 else 0
-        return {"dists": weekly_dist, "total_dist"", "total_time": f"{total_time//3600:02d}:{(total_time%3600)//60:02d}:{total_time%60:02d}", "avg_pace": f"{int(avg_pace_sec//60)}'{int(avg_pace_sec%60):02d}\"", "avg_hr": str(avg_hr), "range": f"{start_of_week.strftime('%m.%d')} - {end_of_week.strftime('%m.%d')}"}
+        return {"dists": weekly_dist, "total_dist": f"{total_dist:.2f}", "total_time": f"{total_time//3600:02d}:{(total_time%3600)//60:02d}:{total_time%60:02d}", "avg_pace": f"{int(avg_pace_sec//60)}'{int(avg_pace_sec%60):02d}\"", "avg_hr": str(avg_hr), "range": f"{start_of_week.strftime('%m.%d')} - {end_of_week.strftime('%m.%d')}"}
     except: return None
 
 def get_monthly_stats(activities, target_date_str):
@@ -267,27 +267,15 @@ with col_main:
                 
             elif mode == "WEEKLY":
                 weeks = sorted(list(set([(datetime.strptime(ac['start_date_local'][:10], "%Y-%m-%d") - timedelta(days=datetime.strptime(ac['start_date_local'][:10], "%Y-%m-%d").weekday())).strftime('%Y-%m-%d') for ac in acts])), reverse=True)
-                sel_week = st.selectbox("📅 주차 선택", weeks, format_func=lambda x: f"{x[:4]}-{datetime.strptime(x, '%Y-%m-%d').isocalendar()[1]}주차")
-                weekly_data = get_weekly_stats(acts, sel_week)
-                
-                # [주간 증감량 계산]
-                prev_week_str = (datetime.strptime(sel_week, "%Y-%m-%d") - timedelta(days=7)).strftime("%Y-%m-%d")
-                prev_weekly_data = get_weekly_stats(acts, prev_week_str)
-                
+                sel_week = st.selectbox("📅 주차 선택", weeks, format_func=lambda x: f"{x[:4]}-{datetime.strptime(x, '%Y-%m-%d').isocalendar()[1]}주차")              
+                weekly_data = get_weekly_stats(acts, sel_week)      
                 if weekly_data:
-                    v_act = f"{datetime.strptime(sel_week, '%Y-%m-%d').isocalendar()[1]} WEEK"
-                    v_date = weekly_data['range']
-                    v_dist = f"{weekly_data['total_dist']:.2f}"
-                    v_time = weekly_data['total_time']
+                    v_act = f"{datetime.strptime(sel_week, '%Y-%m-%d').isocalendar()[1]} WEEK" # 예: 7 WEEK
+                    v_date = weekly_data['range']   # 예: 02.10 - 02.16
+                    v_dist = weekly_data['total_dist']
                     v_pace = weekly_data['avg_pace']
+                    v_time = weekly_data['total_time']
                     v_hr   = weekly_data['avg_hr']
-                    
-                    # 증감량 텍스트 생성 (거리 밑에 붙을 용도)
-                    if prev_weekly_data:
-                        diff = weekly_data['total_dist'] - prev_weekly_data['total_dist']
-                        v_diff = f"({'+' if diff >= 0 else ''}{diff:.2f} km)"
-                    else:
-                        v_diff = ""
                 
             elif mode == "MONTHLY":
                 months = sorted(list(set([ac['start_date_local'][:7] for ac in acts])), reverse=True)
@@ -347,7 +335,7 @@ with col_main:
             
             canvas = make_smart_collage(bg_files, (CW, CH)) if bg_files else Image.new("RGBA", (CW, CH), (20, 20, 20, 255))
             overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
-            items = [("distance", f"{v_dist} km", v_diff), ("time", v_time, ""), ("pace", v_pace, ""), ("avg bpm", f"{v_hr} bpm", "")]
+            items = [("distance", f"{v_dist} km"), ("pace", v_pace), ("time", v_time), ("avg bpm", f"{v_hr} bpm")]
 
             if border_thick > 0:
                 # 캔버스 외곽선을 따라 테두리를 그립니다. 
@@ -362,22 +350,19 @@ with col_main:
                     t_w = draw.textlength(v_act, font=f_t)
                     draw_styled_text(draw, (rx + 40, ry + 110), v_date, f_d, "#AAAAAA", shadow=use_shadow)
                     y_c = ry + 200
-                    for i, (l, v, d) in enumerate(items):
-                        draw_styled_text(draw, (rx+40, ry+220+i*110), l.lower(), f_l, "#AAAAAA", use_shadow)
-                        draw_styled_text(draw, (rx+40, ry+255+i*110), v.lower(), f_n, sub_color, use_shadow)
-                        if d: # 증감량이 있을 때만 거리 수치 오른쪽에 작게 표시
-                            draw_styled_text(draw, (rx+280, ry+265+i*110), d, f_l, m_color, use_shadow)
+                    for lab, val in items:
+                        draw_styled_text(draw, (rx + 40, y_c), lab.lower(), f_l, "#AAAAAA", shadow=use_shadow)
+                        draw_styled_text(draw, (rx + 40, y_c + 35), val.lower(), f_n, sub_color, shadow=use_shadow)
+                        y_c += 105
                 else:
                     title_w = draw.textlength(v_act, f_t)
                     draw_styled_text(draw, (rx + (rw-title_w)//2, ry+35), v_act, f_t, m_color, shadow=use_shadow)
                     draw_styled_text(draw, (rx + (rw-draw.textlength(v_date, f_d))//2, ry+110), v_date, f_d, "#AAAAAA", shadow=use_shadow)
                     sec_w = rw // 4
-                    for i, (l, v, d) in enumerate(items):
-                        cx = rx + (i*rw//4) + (rw//8)
-                        draw_styled_text(draw, (cx-draw.textlength(l.lower(), f_l)//2, ry+220), l.lower(), f_l, "#AAAAAA", use_shadow)
-                        draw_styled_text(draw, (cx-draw.textlength(v.lower(), f_n)//2, ry+260), v.lower(), f_n, sub_color, use_shadow)
-                        if d: # 가로 모드에서는 거리 수치 바로 아래 중앙에 표시
-                            draw_styled_text(draw, (cx-draw.textlength(d, f_l)//2, ry+320), d, f_l, m_color, use_shadow)
+                    for i, (lab, val) in enumerate(items):
+                        cx = rx + (i * sec_w) + (sec_w // 2)
+                        draw_styled_text(draw, (cx - draw.textlength(lab.lower(), f_l)//2, ry+160), lab.lower(), f_l, "#AAAAAA", shadow=use_shadow)
+                        draw_styled_text(draw, (cx - draw.textlength(val.lower(), f_n)//2, ry+195), val.lower(), f_n, sub_color, shadow=use_shadow)
 
             # 2. 지도 및 그래프 (show_vis가 True일 때만)
             if show_vis:
@@ -416,5 +401,3 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
-
-
