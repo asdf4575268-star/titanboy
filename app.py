@@ -412,18 +412,22 @@ with col_main:
                     vis_layer = chart_img.resize((vis_sz, int(chart_img.size[1]*(vis_sz/chart_img.size[0]))), Image.Resampling.LANCZOS)
                     vis_layer.putalpha(vis_layer.getchannel('A').point(lambda x: x * (vis_alpha / 255)))
 
-                # [C] 최종 합성 위치 결정 (활동명 제목 배경으로 고정)
+                # [C] 최종 합성 위치 결정 (활동명 길이에 지도를 강제로 맞춤)
                 if vis_layer:
-                    if box_orient == "Vertical": 
-                        m_pos_x = rx + (rw - vis_layer.width) // 2
-                        m_pos_y = ry + 40 - (vis_layer.height // 2)
-                    else: 
-                        m_pos_x = rx + (rw - vis_layer.width) // 2
-                        m_pos_y = ry + 50 - (vis_layer.height // 2)
+                    text_width = draw.textlength(v_act, f_t)
                     
-                    m_pos = (m_pos_x, m_pos_y)
+                    target_w = int(text_width * 1.2)
+                    w_h_ratio = vis_layer.height / vis_layer.width
+                    vis_layer = vis_layer.resize((target_w, int(target_w * w_h_ratio)), Image.Resampling.LANCZOS)
                     
-                    overlay.paste(vis_layer, (int(m_pos[0]), int(m_pos[1])), vis_layer)
+                    if box_orient == "Vertical":
+                        m_pos_x = (rx + 40) + (text_width // 2) - (vis_layer.width // 2)
+                        m_pos_y = (ry + 30) + (90 // 2) - (vis_layer.height // 2) # 90은 글자 크기
+                    else:
+                        m_pos_x = rx + (rw - vis_layer.width) // 2
+                        m_pos_y = ry + 75 - (vis_layer.height // 2)
+
+                    overlay.paste(vis_layer, (int(m_pos_x), int(m_pos_y)), vis_layer)
 
             # 3. 로고 (항상 표시 또는 로직 유지)
             if log_file:
@@ -439,4 +443,5 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
