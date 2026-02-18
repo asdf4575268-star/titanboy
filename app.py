@@ -408,7 +408,7 @@ with col_main:
                 elif mode in ["WEEKLY", "MONTHLY"] and (weekly_data or monthly_data):
                     d_obj = weekly_data if mode == "WEEKLY" else monthly_data
                     chart_img = create_bar_chart(d_obj['dists'], m_color, mode=mode, labels=d_obj.get('labels'), font_path=None)
-                    target_h = int(CH * 0.7)
+                    target_y = int(CH * 0.4)
                     vis_layer = vis_layer.resize((vis_sz, target_h), Image.Resampling.LANCZOS)
 
                 # [C] 최종 합성 위치 결정
@@ -437,6 +437,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
