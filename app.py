@@ -364,9 +364,32 @@ with col_main:
                         draw_styled_text(draw, (cx - draw.textlength(lab.lower(), f_l)//2, ry+160), lab.lower(), f_l, "#AAAAAA", shadow=use_shadow)
                         draw_styled_text(draw, (cx - draw.textlength(val.lower(), f_n)//2, ry+195), val.lower(), f_n, sub_color, shadow=use_shadow)
 
-            # 2. 지도 및 그래프 (show_vis가 True일 때만)
+    # 2. 지도 및 그래프 (show_vis가 True일 때만)
             if show_vis:
-                if mode == "DAILY" and a and a.get('map', {}).get('summary_polyline'):
+                vis_layer = None
+                m_pos = (0, 0)
+
+                # [추가] 직접 올린 그래프 이미지가 있는 경우 (우선순위 1)
+                if 'user_graph' in st.session_state and st.session_state['user_graph']:
+                    try:
+                        u_img = Image.open(st.session_state['user_graph']).convert("RGBA")
+                        vis_sz = vis_sz_adj
+                        # 가로 세로 비율 유지하며 리사이즈
+                        w_h_ratio = u_img.height / u_img.width
+                        vis_layer = u_img.resize((vis_sz, int(vis_sz * w_h_ratio)), Image.Resampling.LANCZOS)
+                        # 투명도 적용
+                        vis_layer.putalpha(vis_layer.getchannel('A').point(lambda x: x * (vis_alpha / 255)))
+                        
+                        # 박스 방향에 따른 위치 설정
+                        if box_orient == "Vertical":
+                            m_pos = (rx, max(5, ry - vis_layer.height - 20))
+                        else:
+                            # 가로모드일 때는 박스 중앙 부근에 배치
+                            m_pos = (rx + (rw - vis_layer.width)//2, ry - vis_layer.height + 50)
+                    except: pass
+
+                # 기존 DAILY 지도 (그래프가 없을 때)
+                elif mode == "DAILY" and a and a.get('map', {}).get('summary_polyline'):
                     pts = polyline.decode(a['map']['summary_polyline'])
                     lats, lons = zip(*pts)
                     vis_sz = vis_sz_adj
@@ -376,16 +399,19 @@ with col_main:
                     
                     if box_orient == "Vertical": m_pos = (rx, max(5, ry - vis_sz - 15))
                     else: m_pos = (rx + 100, ry + 10)
-                    overlay.paste(vis_layer, (int(m_pos[0]), int(m_pos[1])), vis_layer)
                     
+                # 기존 WEEKLY/MONTHLY 차트 (그래프가 없을 때)
                 elif mode in ["WEEKLY", "MONTHLY"] and (weekly_data or monthly_data):
                     d_obj = weekly_data if mode == "WEEKLY" else monthly_data
-                    # 폰트는 제목용 90px 폰트를 차트 레이블용으로 재활용
                     chart_img = create_bar_chart(d_obj['dists'], m_color, mode=mode, labels=d_obj.get('labels'), font_path=None)
                     vis_sz = vis_sz_adj
                     vis_layer = chart_img.resize((vis_sz, int(chart_img.size[1]*(vis_sz/chart_img.size[0]))), Image.Resampling.LANCZOS)
                     vis_layer.putalpha(vis_layer.getchannel('A').point(lambda x: x * (vis_alpha / 255)))
-                    overlay.paste(vis_layer, ((CW - vis_layer.width)//2, CH - vis_layer.height - 80), vis_layer)
+                    m_pos = ((CW - vis_layer.width)//2, CH - vis_layer.height - 80)
+
+                # 최종 합성
+                if vis_layer:
+                    overlay.paste(vis_layer, (int(m_pos[0]), int(m_pos[1])), vis_layer)
 
             # 3. 로고 (항상 표시 또는 로직 유지)
             if log_file:
@@ -401,6 +427,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
