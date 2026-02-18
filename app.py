@@ -291,7 +291,7 @@ with col_main:
                     if prev_weekly_data:
                         # 숫자(float)끼리 뺍니다
                         diff_val = weekly_data['total_dist'] - prev_weekly_data['total_dist']
-                        v_diff = f"({'+' if diff_val >= 0 else ''}{diff_val:.2f} km)"
+                        v_diff_str = f"({'+' if diff_val >= 0 else ''}{diff_val:.2f} km)"
                 
             elif mode == "MONTHLY":
                 months = sorted(list(set([ac['start_date_local'][:7] for ac in acts])), reverse=True)
@@ -436,6 +436,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
