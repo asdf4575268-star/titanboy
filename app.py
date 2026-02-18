@@ -312,7 +312,7 @@ with col_main:
                     v_act = dt_t.strftime("%B").upper()
                     v_date, v_dist, v_time, v_pace, v_hr = monthly_data['range'], monthly_data['total_dist'], monthly_data['total_time'], monthly_data['avg_pace'], monthly_data['avg_hr']
                     if prev_monthly_data:
-                        diff = float(v_dist) - float(prev_monthly_data['total_dist'])
+                        diff_val = float(v_dist) - float(prev_monthly_data['total_dist'])
                         v_diff_str = f"({'+' if diff >= 0 else ''}{diff:.2f} km)"
 # --- [6. 디자인 창 구성] ---
 with col_design:
@@ -436,6 +436,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
