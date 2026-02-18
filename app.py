@@ -229,7 +229,7 @@ with col_main:
     # 1. 변수 초기화 (에러 방지: bg_files를 미리 빈 리스트로 선언)
     bg_files = [] 
     log_file = None
-    v_act, v_date, v_dist, v_time, v_pace, v_hr = "RUNNING", "2026.02.16", "0.00", "00:00:00", "0'00\"", "0"
+    v_act, v_date, v_dist, v_pace, v_time, v_hr = "RUNNING", "2026.02.16", "0.00", "00:00:00", "0'00\"", "0"
     weekly_data, monthly_data, a = None, None, None
 
     if not st.session_state['access_token']:
@@ -261,8 +261,8 @@ with col_main:
                     v_date = f"{a['start_date_local'][:10].replace('-', '.')} {v_time_str}"
                     d_km = a.get('distance', 0)/1000; m_s = a.get('moving_time', 0)
                     v_dist = f"{d_km:.2f}" 
-                    v_time = f"{int(m_s//3600):02d}:{int((m_s%3600)//60):02d}:{int(m_s%60):02d}" if m_s >= 3600 else f"{int(m_s//60):02d}:{int(m_s%60):02d}"
                     v_pace = f"{int((m_s/d_km)//60)}'{int((m_s/d_km)%60):02d}\"" if d_km > 0 else "0'00\""
+                    v_time = f"{int(m_s//3600):02d}:{int((m_s%3600)//60):02d}:{int(m_s%60):02d}" if m_s >= 3600 else f"{int(m_s//60):02d}:{int(m_s%60):02d}"
                     v_hr = str(int(a.get('average_heartrate', 0))) if a.get('average_heartrate') else "0"
                 
             elif mode == "WEEKLY":
@@ -273,8 +273,8 @@ with col_main:
                     v_act = f"{datetime.strptime(sel_week, '%Y-%m-%d').isocalendar()[1]} WEEK" # 예: 7 WEEK
                     v_date = weekly_data['range']   # 예: 02.10 - 02.16
                     v_dist = weekly_data['total_dist']
-                    v_time = weekly_data['total_time']
                     v_pace = weekly_data['avg_pace']
+                    v_time = weekly_data['total_time']
                     v_hr   = weekly_data['avg_hr']
                 
             elif mode == "MONTHLY":
@@ -286,7 +286,7 @@ with col_main:
                     dt_t = datetime.strptime(f"{sel_month}-01", "%Y-%m-%d")
                     # 월 이름 대문자 (예: FEBRUARY)
                     v_act = dt_t.strftime("%B").upper()
-                    v_date, v_dist, v_time, v_pace, v_hr = monthly_data['range'], monthly_data['total_dist'], monthly_data['total_time'], monthly_data['avg_pace'], monthly_data['avg_hr']
+                    v_date, v_dist, v_pace, v_time, v_hr = monthly_data['range'], monthly_data['total_dist'], monthly_data['total_time'], monthly_data['avg_pace'], monthly_data['avg_hr']
 # --- [6. 디자인 창 구성] ---
 with col_design:
     st.header("🎨 DESIGN")
@@ -401,3 +401,4 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
