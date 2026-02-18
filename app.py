@@ -378,7 +378,7 @@ with col_main:
                         v_str = val.lower()
                         draw_styled_text(draw, (cx - draw.textlength(v_str, f_n)//2, y_items_top + 45), v_str, f_n, sub_color, shadow=use_shadow)
                         if diff:
-                            draw_styled_text(draw, (cx - draw.textlength(diff, f_l)//2, y_items_top + 105), diff, f_l, m_color, shadow=use_shadow)
+                            draw_styled_text(draw, (cx - draw.textlength(diff, f_l)//2, y_items_top + 110), diff, f_l, m_color, shadow=use_shadow)
     # 2. 지도 및 그래프 (show_vis가 True일 때만)
             if show_vis:
                 vis_layer = None
@@ -441,6 +441,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
