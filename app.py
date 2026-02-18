@@ -288,25 +288,23 @@ with col_main:
                     else:
                         v_diff_str = "첫 기록"
             
-           elif mode == "MONTHLY":
-            months = sorted(list(set([ac['start_date_local'][:7] for ac in acts])), reverse=True)
-            sel_month = st.selectbox("🗓️ 월 선택", months)
+               elif mode == "MONTHLY":
+                    months = sorted(list(set([ac['start_date_local'][:7] for ac in acts])), reverse=True)
+                    sel_month = st.selectbox("🗓️ 월 선택", months)
             
-            monthly_data = get_monthly_stats(acts, f"{sel_month}-01")
+                    monthly_data = get_monthly_stats(acts, f"{sel_month}-01")
             
-            # 지난 달 데이터 계산
-            curr_date = datetime.strptime(f"{sel_month}-01", "%Y-%m-%d")
-            prev_month_date = (curr_date - timedelta(days=1)).replace(day=1)
-            prev_month_str = prev_month_date.strftime("%Y-%m")
-            prev_monthly_data = get_monthly_stats(acts, f"{prev_month_str}-01")
+                    curr_date = datetime.strptime(f"{sel_month}-01", "%Y-%m-%d")
+                    prev_month_date = (curr_date - timedelta(days=1)).replace(day=1)
+                    prev_month_str = prev_month_date.strftime("%Y-%m")
+                    prev_monthly_data = get_monthly_stats(acts, f"{prev_month_str}-01")
             
-            # [방어 코드] 데이터가 존재할 때만 수치 할당
-            if monthly_data and 'total_dist' in monthly_data:
-                v_date = f"{sel_month} stats"
-                v_dist = f"{monthly_data['total_dist']:.2f}"
-                v_time = monthly_data['total_time']
-                v_pace = monthly_data['avg_pace']
-                v_hr = int(monthly_data.get('avg_hr', 0)) # bpm 정보가 없을 경우 0
+                if monthly_data and 'total_dist' in monthly_data:
+                    v_date = f"{sel_month} stats"
+                    v_dist = f"{monthly_data['total_dist']:.2f}"
+                    v_time = monthly_data['total_time']
+                    v_pace = monthly_data['avg_pace']
+                    v_hr = int(monthly_data.get('avg_hr', 0)) # bpm 정보가 없을 경우 0
                 
                 if prev_monthly_data and 'total_dist' in prev_monthly_data:
                     diff = float(v_dist) - float(prev_monthly_data['total_dist'])
@@ -460,6 +458,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
