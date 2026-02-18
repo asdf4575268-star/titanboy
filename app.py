@@ -267,29 +267,26 @@ with col_main:
                 
             elif mode == "WEEKLY":
                 weeks = sorted(list(set([(datetime.strptime(ac['start_date_local'][:10], "%Y-%m-%d") - timedelta(days=datetime.strptime(ac['start_date_local'][:10], "%Y-%m-%d").weekday())).strftime('%Y-%m-%d') for ac in acts])), reverse=True)
-                sel_week = st.selectbox("📅 주차 선택", weeks, format_func=lambda x: f"{x[:4]}-{datetime.strptime(x, '%Y-%m-%d').isocalendar()[1]}주차")
-                weekly_data = get_weekly_stats(acts, sel_week)
-                prev_week_data = get_weekly_stats(acts, (datetime.strptime(sel_week, "%Y-%m-%d") - timedelta(days=7)).strftime("%Y-%m-%d"))
+                sel_week = st.selectbox("📅 주차 선택", weeks, format_func=lambda x: f"{x[:4]}-{datetime.strptime(x, '%Y-%m-%d').isocalendar()[1]}주차")              
+                weekly_data = get_weekly_stats(acts, sel_week)      
                 if weekly_data:
-                    v_act = f"{datetime.strptime(sel_week, '%Y-%m-%d').isocalendar()[1]} WEEK"
-                    v_date, v_dist, v_time, v_pace, v_hr = weekly_data['range'], weekly_data['total_dist'], weekly_data['total_time'], weekly_data['avg_pace'], weekly_data['avg_hr']
-                    if prev_week_data:
-                        diff = float(v_dist) - float(prev_week_data['total_dist'])
-                        v_diff_str = f"({'+' if diff >= 0 else ''}{diff:.2f} km)"
-
+                    v_act = f"{datetime.strptime(sel_week, '%Y-%m-%d').isocalendar()[1]} WEEK" # 예: 7 WEEK
+                    v_date = weekly_data['range']   # 예: 02.10 - 02.16
+                    v_dist = weekly_data['total_dist']
+                    v_pace = weekly_data['avg_pace']
+                    v_time = weekly_data['total_time']
+                    v_hr   = weekly_data['avg_hr']
+                
             elif mode == "MONTHLY":
                 months = sorted(list(set([ac['start_date_local'][:7] for ac in acts])), reverse=True)
                 sel_month = st.selectbox("🗓️ 월 선택", months)
-                m_data = get_monthly_stats(acts, f"{sel_month}-01")
-                p_month = (datetime.strptime(f"{sel_month}-01", "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m")
-                p_data = get_monthly_stats(acts, f"{p_month}-01")
-                if m_data:
-                    v_act = datetime.strptime(f"{sel_month}-01", "%Y-%m-%d").strftime("%B").upper()
-                    v_date, v_dist, v_time, v_pace, v_hr = m_data['range'], m_data['total_dist'], m_data['total_time'], m_data['avg_pace'], m_data['avg_hr']
-                    monthly_data = m_data
-                    if p_data:
-                        diff = float(v_dist) - float(p_data['total_dist'])
-                        v_diff_str = f"({'+' if diff >= 0 else ''}{diff:.2f} km)"
+                monthly_data = get_monthly_stats(acts, f"{sel_month}-01")
+                
+                if monthly_data:
+                    dt_t = datetime.strptime(f"{sel_month}-01", "%Y-%m-%d")
+                    # 월 이름 대문자 (예: FEBRUARY)
+                    v_act = dt_t.strftime("%B").upper()
+                    v_date, v_dist, v_pace, v_time, v_hr = monthly_data['range'], monthly_data['total_dist'], monthly_data['total_time'], monthly_data['avg_pace'], monthly_data['avg_hr']
 # --- [6. 디자인 창 구성] ---
 with col_design:
     st.header("🎨 DESIGN")
@@ -338,7 +335,8 @@ with col_main:
             
             canvas = make_smart_collage(bg_files, (CW, CH)) if bg_files else Image.new("RGBA", (CW, CH), (20, 20, 20, 255))
             overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
-            items = [("distance", f"{v_dist} km", v_diff_str), ("time", str(v_time), ""), ("pace", str(v_pace), ""), ("avg bpm", f"{v_hr} bpm", "")]
+            items = [("distance", f"{v_dist} km"), ("pace", v_pace), ("time", v_time), ("avg bpm", f"{v_hr} bpm")]
+
             if border_thick > 0:
                 # 캔버스 외곽선을 따라 테두리를 그립니다. 
                 # outline=m_color (포인트 컬러 사용), width=border_thick (슬라이더 값 적용)
@@ -352,7 +350,7 @@ with col_main:
                     t_w = draw.textlength(v_act, font=f_t)
                     draw_styled_text(draw, (rx + 40, ry + 110), v_date, f_d, "#AAAAAA", shadow=use_shadow)
                     y_c = ry + 200
-                    for lab, val, diff in items:
+                    for lab, val in items:
                         draw_styled_text(draw, (rx + 40, y_c), lab.lower(), f_l, "#AAAAAA", shadow=use_shadow)
                         draw_styled_text(draw, (rx + 40, y_c + 35), val.lower(), f_n, sub_color, shadow=use_shadow)
                         y_c += 105
@@ -403,6 +401,4 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
-
-
 
