@@ -360,7 +360,7 @@ with col_main:
             
             canvas = make_smart_collage(bg_files, (CW, CH)) if bg_files else Image.new("RGBA", (CW, CH), (20, 20, 20, 255))
             overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
-            items = [("distance", f"{v_dist} km", v_diff), ("pace", v_pace, ""), ("time", v_time, ""), ("avg bpm", f"{v_hr} bpm", "")]
+            items = [("distance", f"{v_dist} km", v_diff_str), ("pace", v_pace, ""), ("time", v_time, ""), ("avg bpm", f"{v_hr} bpm", "")]
 
             if border_thick > 0:
                 # 캔버스 외곽선을 따라 테두리를 그립니다. 
@@ -389,9 +389,7 @@ with col_main:
                         # 라벨 (distance 등)
                         draw_styled_text(draw, (cx - draw.textlength(lab.lower(), f_l)//2, y_items_top), lab.lower(), f_l, "#AAAAAA", shadow=use_shadow)
                         # 숫자값 (45.20 km 등)
-                        draw_styled_text(draw, (cx - draw.textlength(val.lower(), f_n)//2, y_items_top + 45), val.lower(), f_n, sub_color, shadow=use_shadow)
-                        
-                        # [추가] 증감량 표시 (숫자값보다 40px 아래에 작게 배치)
+                        draw_styled_text(draw, (cx - draw.textlength(val.lower(), f_n)//2, y_items_top + 45), val.lower(), f_n, sub_color, shadow=use_shadow)                     
                         if diff:
                             draw_styled_text(draw, (cx - draw.textlength(diff, f_l)//2, y_items_top + 95), diff, f_l, m_color, shadow=use_shadow)
                         else:
@@ -433,6 +431,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
