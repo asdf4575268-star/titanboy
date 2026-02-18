@@ -365,17 +365,26 @@ with col_main:
                         draw_styled_text(draw, (rx + 40, y_c), lab.lower(), f_l, "#AAAAAA", shadow=use_shadow)
                         draw_styled_text(draw, (rx + 40, y_c + 35), val.lower(), f_n, sub_color, shadow=use_shadow)
                         y_c += 105
-                else:
+                else: # Horizontal 모드
                     title_w = draw.textlength(v_act, f_t)
                     draw_styled_text(draw, (rx + (rw-title_w)//2, ry+35), v_act, f_t, m_color, shadow=use_shadow)
                     draw_styled_text(draw, (rx + (rw-draw.textlength(v_date, f_d))//2, ry+110), v_date, f_d, "#AAAAAA", shadow=use_shadow)
+                    
                     sec_w = rw // 4
+                    y_items_top = ry + 180
                     for i, (lab, val, diff) in enumerate(items):
                         cx = rx + (i * sec_w) + (sec_w // 2)
-                        draw_styled_text(draw, (cx - draw.textlength(lab.lower(), f_l)//2, ry+160), lab.lower(), f_l, "#AAAAAA", shadow=use_shadow)
-                        draw_styled_text(draw, (cx - draw.textlength(val.lower(), f_n)//2, ry+195), val.lower(), f_n, sub_color, shadow=use_shadow)
+                        
+                        # 1. 라벨 (distance 등)
+                        draw_styled_text(draw, (cx - draw.textlength(lab.lower(), f_l)//2, y_items_top), lab.lower(), f_l, "#AAAAAA", shadow=use_shadow)
+                        
+                        # 2. 숫자값 (이미 문자열이므로 .lower()가 안전하게 작동합니다)
+                        v_str = val.lower()
+                        draw_styled_text(draw, (cx - draw.textlength(v_str, f_n)//2, y_items_top + 45), v_str, f_n, sub_color, shadow=use_shadow)
+                        
+                        # 3. 증감량 (아랫줄에 작게 표시)
                         if diff:
-                            draw_styled_text(draw, (cx - draw.textlength(diff, f_l)//2, y_items_top + 95), diff, f_l, m_color, shadow=use_shadow)
+                            draw_styled_text(draw, (cx - draw.textlength(diff, f_l)//2, y_items_top + 105), diff, f_l, m_color, shadow=use_shadow)
 
     # 2. 지도 및 그래프 (show_vis가 True일 때만)
             if show_vis:
@@ -439,6 +448,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
