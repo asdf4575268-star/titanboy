@@ -268,25 +268,43 @@ with col_main:
             elif mode == "WEEKLY":
                 weeks = sorted(list(set([(datetime.strptime(ac['start_date_local'][:10], "%Y-%m-%d") - timedelta(days=datetime.strptime(ac['start_date_local'][:10], "%Y-%m-%d").weekday())).strftime('%Y-%m-%d') for ac in acts])), reverse=True)
                 sel_week = st.selectbox("📅 주차 선택", weeks, format_func=lambda x: f"{x[:4]}-{datetime.strptime(x, '%Y-%m-%d').isocalendar()[1]}주차")              
-                weekly_data = get_weekly_stats(acts, sel_week)      
-                if weekly_data:
-                    v_act = f"{datetime.strptime(sel_week, '%Y-%m-%d').isocalendar()[1]} WEEK" # 예: 7 WEEK
-                    v_date = weekly_data['range']   # 예: 02.10 - 02.16
-                    v_dist = weekly_data['total_dist']
-                    v_time = weekly_data['total_time']
-                    v_pace = weekly_data['avg_pace']
-                    v_hr   = weekly_data['avg_hr']
+                weekly_data = get_weekly_stats(acts, sel_week)
                 
+                # [추가] 지난 주 데이터 가져오기
+                prev_week = (datetime.strptime(sel_week, "%Y-%m-%d") - timedelta(days=7)).strftime("%Y-%m-%d")
+                prev_weekly_data = get_weekly_stats(acts, prev_week)
+
+                if weekly_data:
+                    v_act = f"{datetime.strptime(sel_week, '%Y-%m-%d').isocalendar()[1]} WEEK"
+                    v_date, v_dist, v_time, v_pace, v_hr = weekly_data['range'], weekly_data['total_dist'], weekly_data['total_time'], weekly_data['avg_pace'], weekly_data['avg_hr']
+                    
+                    # [추가] 증감량 계산
+                    if prev_weekly_data:
+                        diff = float(v_dist) - float(prev_weekly_data['total_dist'])
+                        v_diff_str = f"({'+' if diff >= 0 else ''}{diff:.2f} km)"
+
             elif mode == "MONTHLY":
                 months = sorted(list(set([ac['start_date_local'][:7] for ac in acts])), reverse=True)
                 sel_month = st.selectbox("🗓️ 월 선택", months)
-                monthly_data = get_monthly_stats(acts, f"{sel_month}-01")
                 
-                if monthly_data:
+                # [수정] 월간 통계 및 지난달 증감량 (데이터 부재 대비 or {} 적용)
+                m_data = get_monthly_stats(acts, f"{sel_month}-01") or {}
+                prev_m_str = (datetime.strptime(f"{sel_month}-01", "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m")
+                p_data = get_monthly_stats(acts, f"{prev_m_str}-01") or {}
+
+                if m_data:
                     dt_t = datetime.strptime(f"{sel_month}-01", "%Y-%m-%d")
-                    # 월 이름 대문자 (예: FEBRUARY)
                     v_act = dt_t.strftime("%B").upper()
-                    v_date, v_dist, v_time, v_pace, v_hr = monthly_data['range'], monthly_data['total_dist'], monthly_data['total_time'], monthly_data['avg_pace'], monthly_data['avg_hr']
+                    v_date = m_data.get('range', sel_month)
+                    v_dist = f"{float(m_data.get('total_dist', 0)):.2f}"
+                    v_time = m_data.get('total_time', "00:00:00")
+                    v_pace = m_data.get('avg_pace', "0'00\"")
+                    v_hr = str(m_data.get('avg_hr', "0"))
+                    
+                    p_dist = float(p_data.get('total_dist', 0))
+                    if p_dist > 0:
+                        diff = float(v_dist) - p_dist
+                        v_diff_str = f"({'+' if diff >= 0 else ''}{diff:.2f} km)"
 # --- [6. 디자인 창 구성] ---
 with col_design:
     st.header("🎨 DESIGN")
@@ -401,4 +419,5 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
