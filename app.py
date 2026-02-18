@@ -246,6 +246,7 @@ with col_main:
         # 2. 파일 업로더 (여기서 변수가 정의됩니다)
         bg_files = st.file_uploader("📸 배경 사진", type=['jpg','jpeg','png'], accept_multiple_files=True)
         log_file = st.file_uploader("🔘 로고", type=['jpg','jpeg','png'])
+        st.file_uploader("📈 그래프 스크린샷", type=['jpg','png','jpeg'], key="user_graph")
         
         mode = st.radio("모드 선택", ["DAILY", "WEEKLY", "MONTHLY"], horizontal=True, key="main_mode_sel")
         
@@ -321,7 +322,6 @@ with col_design:
         box_alpha = st.slider("박스 투명도", 0, 255, 0)
         vis_sz_adj = st.slider("지도/그래프 크기", 50, 1080, 180 if mode=="DAILY" else 1080)
         vis_alpha = st.slider("지도/그래프 투명도", 0, 255, 255)
-        st.file_uploader("📈 그래프 스크린샷", type=['jpg','png','jpeg'], key="user_graph")
         
 # --- [7. 미리보기 렌더링] ---
 with col_main:
@@ -369,7 +369,6 @@ with col_main:
             if show_vis:
                 vis_layer = None
                 m_pos = (0, 0)
-
                 # [추가] 직접 올린 그래프 이미지가 있는 경우 (우선순위 1)
                 if 'user_graph' in st.session_state and st.session_state['user_graph']:
                     try:
@@ -428,6 +427,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
