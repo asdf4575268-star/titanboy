@@ -269,7 +269,10 @@ with col_main:
             elif mode == "WEEKLY":
                 weeks = sorted(list(set([(datetime.strptime(ac['start_date_local'][:10], "%Y-%m-%d") - timedelta(days=datetime.strptime(ac['start_date_local'][:10], "%Y-%m-%d").weekday())).strftime('%Y-%m-%d') for ac in acts])), reverse=True)
                 sel_week = st.selectbox("📅 주차 선택", weeks, format_func=lambda x: f"{x[:4]}-{datetime.strptime(x, '%Y-%m-%d').isocalendar()[1]}주차")              
-                weekly_data = get_weekly_stats(acts, sel_week)      
+                weekly_data = get_weekly_stats(acts, sel_week)
+                prev_week_obj = datetime.strptime(sel_week, "%Y-%m-%d") - timedelta(days=7)
+                prev_week_str = prev_week_obj.strftime("%Y-%m-%d")
+                prev_weekly_data = get_weekly_stats(acts, prev_week_str)
                 if weekly_data:
                     v_act = f"{datetime.strptime(sel_week, '%Y-%m-%d').isocalendar()[1]} WEEK" # 예: 7 WEEK
                     v_date = weekly_data['range']   # 예: 02.10 - 02.16
@@ -277,6 +280,12 @@ with col_main:
                     v_time = weekly_data['total_time']
                     v_pace = weekly_data['avg_pace']
                     v_hr   = weekly_data['avg_hr']
+                    v_diff_str = ""
+                    if prev_weekly_data:
+                        diff = float(v_dist) - float(prev_weekly_data['total_dist'])
+                        v_diff_str = f"{'+' if diff >= 0 else ''}{diff:.2f} km"
+        else:
+            v_diff_str = "첫 기록"
                 
             elif mode == "MONTHLY":
                 months = sorted(list(set([ac['start_date_local'][:7] for ac in acts])), reverse=True)
@@ -336,7 +345,7 @@ with col_main:
             
             canvas = make_smart_collage(bg_files, (CW, CH)) if bg_files else Image.new("RGBA", (CW, CH), (20, 20, 20, 255))
             overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
-            items = [("distance", f"{v_dist} km"), ("pace", v_pace), ("time", v_time), ("avg bpm", f"{v_hr} bpm")]
+            items = [("distance", f"{v_dist} km {v_diff_str}"), ("pace", v_pace), ("time", v_time), ("avg bpm", f"{v_hr} bpm")]
 
             if border_thick > 0:
                 # 캔버스 외곽선을 따라 테두리를 그립니다. 
@@ -427,6 +436,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
