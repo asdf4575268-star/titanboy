@@ -141,7 +141,7 @@ acts = st.session_state['cached_acts']
 # --- [5. 메인 화면 구성] ---
 with col_main:
     st.title("TITAN BOY")
-    v_act, v_date, v_dist, v_pace, v_time, v_hr, v_diff_str = "RUNNING", "2026.02.16", "0.00", "00:00:00", "0'00\"", "0", ""
+    v_act, v_date, v_dist, v_pace, v_time, v_hr, v_diff_str = "RUNNING", "2026.02.16", "0.00", "0'00\"", "00:00:00",  "0", ""
     weekly_data, monthly_data, a = None, None, None
 
     if not st.session_state['access_token']:
@@ -270,4 +270,5 @@ with col_main:
             buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
             st.download_button(f"📸 {mode} DOWNLOAD", buf.getvalue(), f"{mode.lower()}.jpg", use_container_width=True)
         except Exception as e: st.error(f"렌더링 오류 발생: {e}")
+
 
