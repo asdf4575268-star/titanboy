@@ -226,8 +226,7 @@ acts = st.session_state['cached_acts']
 with col_main:
     st.title("TITAN BOY")
     
-    mode = st.radio("모드 선택", ["DAILY", "WEEKLY", "MONTHLY"], horizontal=True, key="main_mode_sel")
-
+    # 1. 변수 초기화 (에러 방지: bg_files를 미리 빈 리스트로 선언)
     bg_files = [] 
     log_file = None
     v_act, v_date, v_dist, v_pace, v_time, v_hr = "RUNNING", "2026.02.16", "0.00", "00:00:00", "0'00\"", "0"
@@ -250,7 +249,6 @@ with col_main:
         user_graph_file = st.file_uploader("📈 그래프 스크린샷 (선택)", type=['jpg','png','jpeg'], key="user_graph")
                 
         mode = st.radio("모드 선택", ["DAILY", "WEEKLY", "MONTHLY"], horizontal=True, key="main_mode_sel")
-        v_diff_str = ""
         
         if acts:
             if mode == "DAILY":
@@ -311,7 +309,6 @@ with col_main:
 # --- [6. 디자인 창 구성] ---
 with col_design:
     st.header("🎨 DESIGN")
-    if 'mode' not in locals() and 'mode' not in globals(): mode = "DAILY"
     with st.expander("✍️ 텍스트 수정"):
         v_act = st.text_input("활동명", v_act); v_date = st.text_input("날짜", v_date)
         v_dist = st.text_input("거리 km", v_dist); v_time = st.text_input("시간", v_time)
@@ -328,8 +325,7 @@ with col_design:
         m_color = COLOR_OPTS[st.selectbox("포인트 컬러", list(COLOR_OPTS.keys()), index=1,  key="m_col_sel")]
         sub_color = COLOR_OPTS[st.selectbox("서브 컬러", list(COLOR_OPTS.keys()), index=2, key="s_col_sel")]
 
-    current_mode = mode if 'mode' in locals() else "DAILY"
-    default_idx = 0 if current_mode == "DAILY" else 1
+    default_idx = 0 if mode == "DAILY" else 1
     box_orient = st.radio(
     "박스 방향", 
     ["Vertical", "Horizontal"], 
@@ -442,11 +438,3 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
-
-
-
-
-
-
-
-
