@@ -141,7 +141,7 @@ acts = st.session_state['cached_acts']
 # --- [5. 메인 화면 구성] ---
 with col_main:
     st.title("TITAN BOY")
-    v_act, v_date, v_dist, v_time, v_pace, v_hr, v_diff_str = "RUNNING", "2026.02.16", "0.00", "00:00:00", "0'00\"", "0", ""
+    v_act, v_date, v_dist, v_pace, v_time, v_hr, v_diff_str = "RUNNING", "2026.02.16", "0.00", "00:00:00", "0'00\"", "0", ""
     weekly_data, monthly_data, a = None, None, None
 
     if not st.session_state['access_token']:
@@ -172,7 +172,7 @@ with col_main:
                 prev_week_data = get_weekly_stats(acts, (datetime.strptime(sel_week, "%Y-%m-%d") - timedelta(days=7)).strftime("%Y-%m-%d"))
                 if weekly_data:
                     v_act = f"{datetime.strptime(sel_week, '%Y-%m-%d').isocalendar()[1]} WEEK"
-                    v_date, v_dist, v_time, v_pace, v_hr = weekly_data['range'], weekly_data['total_dist'], weekly_data['total_time'], weekly_data['avg_pace'], weekly_data['avg_hr']
+                    v_date, v_dist, v_pace, v_time, v_hr = weekly_data['range'], weekly_data['total_dist'], weekly_data['total_time'], weekly_data['avg_pace'], weekly_data['avg_hr']
                     if prev_week_data:
                         diff = float(v_dist) - float(prev_week_data['total_dist'])
                         v_diff_str = f"({'+' if diff >= 0 else ''}{diff:.2f} km)"
@@ -185,7 +185,7 @@ with col_main:
                 p_data = get_monthly_stats(acts, f"{p_month}-01")
                 if m_data:
                     v_act = datetime.strptime(f"{sel_month}-01", "%Y-%m-%d").strftime("%B").upper()
-                    v_date, v_dist, v_time, v_pace, v_hr = m_data['range'], m_data['total_dist'], m_data['total_time'], m_data['avg_pace'], m_data['avg_hr']
+                    v_date, v_dist, v_pace, v_time, v_hr = m_data['range'], m_data['total_dist'], m_data['total_time'], m_data['avg_pace'], m_data['avg_hr']
                     monthly_data = m_data
                     if p_data:
                         diff = float(v_dist) - float(p_data['total_dist'])
@@ -222,7 +222,7 @@ with col_main:
             f_t, f_d, f_n, f_l = load_font(sel_font, 90), load_font(sel_font, 30), load_font(sel_font, 60), load_font(sel_font, 23)
             canvas = make_smart_collage(bg_files, (CW, CH)) if bg_files else Image.new("RGBA", (CW, CH), (20, 20, 20, 255))
             overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
-            items = [("distance", f"{v_dist} km", v_diff_str), ("time", str(v_time), ""), ("pace", str(v_pace), ""), ("avg bpm", f"{v_hr} bpm", "")]
+            items = [("distance", f"{v_dist} km", v_diff_str), ("pace", str(v_pace), ""), ("time", str(v_time), ""), ("avg bpm", f"{v_hr} bpm", "")]
 
             if border_thick > 0: draw.rectangle([(0, 0), (CW-1, CH-1)], outline=m_color, width=border_thick)
             if show_box:
@@ -270,3 +270,4 @@ with col_main:
             buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
             st.download_button(f"📸 {mode} DOWNLOAD", buf.getvalue(), f"{mode.lower()}.jpg", use_container_width=True)
         except Exception as e: st.error(f"렌더링 오류 발생: {e}")
+
