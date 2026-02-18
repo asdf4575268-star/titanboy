@@ -412,15 +412,16 @@ with col_main:
                     vis_layer = chart_img.resize((vis_sz, int(chart_img.size[1]*(vis_sz/chart_img.size[0]))), Image.Resampling.LANCZOS)
                     vis_layer.putalpha(vis_layer.getchannel('A').point(lambda x: x * (vis_alpha / 255)))
 
-                # [C] 최종 합성 위치 결정
+                # [C] 최종 합성 위치 결정 (활동명 제목 배경으로 고정)
                 if vis_layer:
                     if box_orient == "Vertical": 
-                        # 세로 모드: 박스 바로 위
-                        m_pos = (rx, max(5, ry - vis_layer.height - 20))
+                        m_pos_x = rx + (rw - vis_layer.width) // 2
+                        m_pos_y = ry + 40 - (vis_layer.height // 2)
                     else: 
-                        m_pos_x = (CW - vis_layer.width) // 2
-                        m_pos_y = CH - vis_layer.height - 50                      
-                        m_pos = (m_pos_x, m_pos_y)
+                        m_pos_x = rx + (rw - vis_layer.width) // 2
+                        m_pos_y = ry + 50 - (vis_layer.height // 2)
+                    
+                    m_pos = (m_pos_x, m_pos_y)
                     
                     overlay.paste(vis_layer, (int(m_pos[0]), int(m_pos[1])), vis_layer)
 
@@ -438,3 +439,4 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
