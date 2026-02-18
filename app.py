@@ -346,7 +346,7 @@ with col_main:
             
             canvas = make_smart_collage(bg_files, (CW, CH)) if bg_files else Image.new("RGBA", (CW, CH), (20, 20, 20, 255))
             overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
-            items = [("distance", f"{v_dist} km {v_diff_str}"), ("pace", v_pace), ("time", v_time), ("avg bpm", f"{v_hr} bpm")]
+            items = [("distance", f"{v_dist} km", v_diff_str), ("time", str(v_time), ""), ("pace", str(v_pace), ""), ("avg bpm", f"{v_hr} bpm", "")]
 
             if border_thick > 0:
                 # 캔버스 외곽선을 따라 테두리를 그립니다. 
@@ -442,6 +442,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
