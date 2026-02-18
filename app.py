@@ -281,7 +281,7 @@ with col_main:
                     v_pace = weekly_data['avg_pace']
                     v_hr   = weekly_data['avg_hr']
                 
-                v_diff_str = ""
+                    v_diff_str = ""
                     if prev_weekly_data:
                         diff = float(v_dist) - float(prev_weekly_data['total_dist'])
                         v_diff_str = f"{'+' if diff >= 0 else ''}{diff:.2f} km"
@@ -437,6 +437,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
