@@ -226,7 +226,8 @@ acts = st.session_state['cached_acts']
 with col_main:
     st.title("TITAN BOY")
     
-    # 1. 변수 초기화 (에러 방지: bg_files를 미리 빈 리스트로 선언)
+    mode = st.radio("모드 선택", ["DAILY", "WEEKLY", "MONTHLY"], horizontal=True, key="main_mode_sel")
+
     bg_files = [] 
     log_file = None
     v_act, v_date, v_dist, v_pace, v_time, v_hr = "RUNNING", "2026.02.16", "0.00", "00:00:00", "0'00\"", "0"
@@ -440,6 +441,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
