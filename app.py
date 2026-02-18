@@ -262,8 +262,8 @@ with col_main:
                     v_date = f"{a['start_date_local'][:10].replace('-', '.')} {v_time_str}"
                     d_km = a.get('distance', 0)/1000; m_s = a.get('moving_time', 0)
                     v_dist = f"{d_km:.2f}" 
-                    v_time = f"{int(m_s//3600):02d}:{int((m_s%3600)//60):02d}:{int(m_s%60):02d}" if m_s >= 3600 else f"{int(m_s//60):02d}:{int(m_s%60):02d}"
                     v_pace = f"{int((m_s/d_km)//60)}'{int((m_s/d_km)%60):02d}\"" if d_km > 0 else "0'00\""
+                    v_time = f"{int(m_s//3600):02d}:{int((m_s%3600)//60):02d}:{int(m_s%60):02d}" if m_s >= 3600 else f"{int(m_s//60):02d}:{int(m_s%60):02d}"
                     v_hr = str(int(a.get('average_heartrate', 0))) if a.get('average_heartrate') else "0"
                 
             elif mode == "WEEKLY":
@@ -336,7 +336,7 @@ with col_main:
             
             canvas = make_smart_collage(bg_files, (CW, CH)) if bg_files else Image.new("RGBA", (CW, CH), (20, 20, 20, 255))
             overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
-            items = [("distance", f"{v_dist} km"), ("time", v_time), ("pace", v_pace), ("avg bpm", f"{v_hr} bpm")]
+            items = [("distance", f"{v_dist} km"), ("pace", v_pace), ("time", v_time), ("avg bpm", f"{v_hr} bpm")]
 
             if border_thick > 0:
                 # 캔버스 외곽선을 따라 테두리를 그립니다. 
@@ -427,6 +427,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
