@@ -374,6 +374,9 @@ with col_main:
                         cx = rx + (i * sec_w) + (sec_w // 2)
                         draw_styled_text(draw, (cx - draw.textlength(lab.lower(), f_l)//2, ry+160), lab.lower(), f_l, "#AAAAAA", shadow=use_shadow)
                         draw_styled_text(draw, (cx - draw.textlength(val.lower(), f_n)//2, ry+195), val.lower(), f_n, sub_color, shadow=use_shadow)
+                        if diff:
+                            # f_l(라벨 폰트 크기)를 사용하여 작게 표시
+                            draw_styled_text(draw, (cx - draw.textlength(diff, f_l)//2, y_items_top + 95), diff, f_l, m_color, shadow=use_shadow)
 
     # 2. 지도 및 그래프 (show_vis가 True일 때만)
             if show_vis:
@@ -437,6 +440,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
