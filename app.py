@@ -301,7 +301,7 @@ with col_design:
         show_box = st.toggle("데이터 박스 표시", value=True, key="sw_box")
         use_shadow = st.toggle("글자 그림자 효과", value=True, key="sw_shadow")
         # ----------------------
-        border_thick = st.slider("프레임 테두리 두께", 0, 50, 0)
+        border_thick = st.slider("프레임 테두리 두께", 0, 50, 10)
         COLOR_OPTS = {"Black": "#000000", "Yellow": "#FFD700", "White": "#FFFFFF", "Orange": "#FF4500", "Blue": "#00BFFF", "Grey": "#AAAAAA"}
         m_color = COLOR_OPTS[st.selectbox("포인트 컬러", list(COLOR_OPTS.keys()), index=1,  key="m_col_sel")]
         sub_color = COLOR_OPTS[st.selectbox("서브 컬러", list(COLOR_OPTS.keys()), index=2, key="s_col_sel")]
@@ -401,3 +401,4 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
