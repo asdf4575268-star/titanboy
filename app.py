@@ -481,7 +481,7 @@ with col_main:
             components.html(share_btn_html, height=65)
            # 3. [다운로드] 버튼 (공유 버튼과 수직 정렬 맞춤)
             st.download_button(
-                label=f"📸 {mode} 이미지 저장하기", 
+                label=f"📸 {mode} DOWLOAD", 
                 data=img_bytes, 
                 file_name=f"{mode.lower()}.jpg", 
                 use_container_width=True
@@ -492,6 +492,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
