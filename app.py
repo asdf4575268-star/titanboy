@@ -436,7 +436,9 @@ with col_main:
             st.image(final, width=360)
             buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
             st.download_button(f"📸 {mode} DOWNLOAD", buf.getvalue(), f"{mode.lower()}.jpg", use_container_width=True)
+            st.link_button("📸 인스타그램 열기", "https://www.instagram.com/")
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
