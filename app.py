@@ -479,10 +479,16 @@ with col_main:
                 </script>
             """
             components.html(share_btn_html, height=65)
-           st.download_button(label=f"📸 {mode} DOWNLOAD", data=img_bytes, file_name=f"{mode.lower()}.jpg", use_container_width=True)
+           st.download_button(
+                label=f"📸 {mode} 이미지 저장하기", 
+                data=img_bytes, 
+                file_name=f"{mode.lower()}.jpg", 
+                use_container_width=True
+            )
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
