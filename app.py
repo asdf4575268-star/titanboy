@@ -437,10 +437,11 @@ with col_main:
             buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
             c1, c2 = st.columns(2)
             c1.download_button(f"📸 {mode} DOWNLOAD", buf.getvalue(), f"{mode.lower()}.jpg", use_container_width=True)
-            c2.link_button("📱 인스타그램", "https://www.instagram.com/", use_container_width=True)
+            c2.link_button("📱 instagram", "https://www.instagram.com/", use_container_width=True)
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
