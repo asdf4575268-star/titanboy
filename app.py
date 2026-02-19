@@ -6,6 +6,9 @@ from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 from matplotlib import font_manager
+import base64
+import streamlit.components.v1 as components
+
 
 # --- [1. 기본 설정 및 API] ---
 API_CONFIGS = {
@@ -435,12 +438,27 @@ with col_main:
             final = Image.alpha_composite(canvas, overlay).convert("RGB")
             st.image(final, width=360)
             buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
+            img_64 = base64.b64encode(buf.getvalue()).decode()
+            share_btn_html = f"""
+                <button onclick="share()" style="width:100%; padding:10px; background:#000; color:#fff; border-radius:5px; border:none; cursor:pointer; font-weight:bold;">
+                📲 바로 공유하기 (인스타/카톡)
+                </button>
+                <script>
+                async function share() {{
+                    const blob = await (await fetch('data:image/jpeg;base64,{img_64}')).blob();
+                    const file = new File([blob], 'run_record.jpg', {{type: 'image/jpeg'}});
+                    if (navigator.share) {{await navigator.share({{files: [file]}});}} else {{alert('공유 기능을 지원하지 않는 브라우저입니다.');}}
+                    }}
+                </script>
+                """
+                components.html(share_btn_html, height=50)
             c1, c2 = st.columns(2)
             c1.download_button(f"📸 {mode} DOWNLOAD", buf.getvalue(), f"{mode.lower()}.jpg", use_container_width=True)
             c2.link_button("📱 instagram", "https://www.instagram.com/", use_container_width=True)
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
