@@ -107,7 +107,7 @@ def create_bar_chart(data, color_hex, mode="WEEKLY", labels=None, font_path=None
     for s in ['top', 'right', 'left']: ax.spines[s].set_visible(False)
     ax.tick_params(axis='x', colors='white')
     if prop:
-        for label in ax.get_xticklabels(): label.set_fontproperties(prop); label.set_fontsize(10 if =="MONTHLY" else 14)
+        for label in ax.get_xticklabels(): label.set_fontproperties(prop); label.set_fontsize(10 if mode == "MONTHLY" else 14)
     ax.tick_params(axis='y', left=False, labelleft=False)
     plt.tight_layout(); buf = io.BytesIO(); plt.savefig(buf, format='png', transparent=True); buf.seek(0); plt.close(fig)
     return Image.open(buf)
@@ -439,4 +439,5 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
