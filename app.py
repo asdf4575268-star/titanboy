@@ -479,23 +479,11 @@ with col_main:
                 </script>
             """
             components.html(share_btn_html, height=65)
-
-            # 4. [다운로드] & [인스타 열기] 나란히 배치
-            c1, c2 = st.columns(2)
-            c1.download_button(
-                label=f"📸 {mode} DOWNLOAD", 
-                data=img_bytes, 
-                file_name=f"{mode.lower()}.jpg", 
-                use_container_width=True
-            )
-            c2.link_button(
-                label="📱 instagram", 
-                url="https://www.instagram.com/", 
-                use_container_width=True
-            )
+           st.download_button(label=f"📸 {mode} DOWNLOAD", data=img_bytes, file_name=f"{mode.lower()}.jpg", use_container_width=True)
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
