@@ -107,7 +107,7 @@ def create_bar_chart(data, color_hex, mode="WEEKLY", labels=None, font_path=None
     for s in ['top', 'right', 'left']: ax.spines[s].set_visible(False)
     ax.tick_params(axis='x', colors='white')
     if prop:
-        for label in ax.get_xticklabels(): label.set_fontproperties(prop); label.set_fontsize(10 if mode=="MONTHLY" else 14)
+        for label in ax.get_xticklabels(): label.set_fontproperties(prop); label.set_fontsize(10 if =="MONTHLY" else 14)
     ax.tick_params(axis='y', left=False, labelleft=False)
     plt.tight_layout(); buf = io.BytesIO(); plt.savefig(buf, format='png', transparent=True); buf.seek(0); plt.close(fig)
     return Image.open(buf)
@@ -325,6 +325,7 @@ with col_design:
         m_color = COLOR_OPTS[st.selectbox("포인트 컬러", list(COLOR_OPTS.keys()), index=1,  key="m_col_sel")]
         sub_color = COLOR_OPTS[st.selectbox("서브 컬러", list(COLOR_OPTS.keys()), index=2, key="s_col_sel")]
 
+    mode = st.sidebar.selectbox("선택하세요", ["DAILY", "WEEKLY", "MONTHLY"])
     default_idx = 0 if mode == "DAILY" else 1
     box_orient = st.radio(
     "박스 방향", 
@@ -438,3 +439,4 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
