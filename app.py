@@ -435,29 +435,68 @@ with col_main:
                 mask = Image.new('L', (ls, ls), 0); ImageDraw.Draw(mask).ellipse((0, 0, ls, ls), fill=255); l_img.putalpha(mask)
                 overlay.paste(l_img, (CW - ls - margin, margin), l_img)
 
+            # 1. 이미지 결과 출력
             final = Image.alpha_composite(canvas, overlay).convert("RGB")
             st.image(final, width=360)
-            buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
-            img_64 = base64.b64encode(buf.getvalue()).decode()
+            
+            # 2. 이미지 데이터 준비
+            buf = io.BytesIO()
+            final.save(buf, format="JPEG", quality=95)
+            img_bytes = buf.getvalue()
+            img_64 = base64.b64encode(img_bytes).decode()
+
+            # 3. [공유하기] 버튼 (HTML/JS) - 디자인 보강
             share_btn_html = f"""
-                <button onclick="share()" style="width:100%; padding:10px; background:#000; color:#fff; border-radius:5px; border:none; cursor:pointer; font-weight:bold;">
-                📲 바로 공유하기 (인스타/카톡)
-                </button>
+                <div style="margin-bottom: 10px;">
+                    <button onclick="share()" style="
+                        width:100%; padding:12px; 
+                        background: linear-gradient(45deg, #405de6, #5851db, #833ab4, #c13584, #e1306c, #fd1d1d);
+                        color:white; border-radius:8px; border:none; 
+                        cursor:pointer; font-weight:bold; font-size:16px;
+                        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+                    ">
+                        📲 인스타 스토리로 바로 보내기
+                    </button>
+                </div>
                 <script>
                 async function share() {{
-                    const blob = await (await fetch('data:image/jpeg;base64,{img_64}')).blob();
-                    const file = new File([blob], 'run_record.jpg', {{type: 'image/jpeg'}});
-                    if (navigator.share) {{await navigator.share({{files: [file]}});}} else {{alert('공유 기능을 지원하지 않는 브라우저입니다.');}}
+                    try {{
+                        const blob = await (await fetch('data:image/jpeg;base64,{img_64}')).blob();
+                        const file = new File([blob], 'run_record.jpg', {{type: 'image/jpeg'}});
+                        if (navigator.share) {{
+                            await navigator.share({{
+                                files: [file],
+                                title: 'TITAN BOY RUN',
+                                text: '오늘의 러닝 기록!'
+                            }});
+                        }} else {{
+                            alert('현재 브라우저가 공유 기능을 지원하지 않습니다. 아래 다운로드 버튼을 이용해주세요.');
+                        }}
+                    }} catch (e) {{
+                        console.log('공유 취소 또는 오류:', e);
                     }}
+                }}
                 </script>
-                """
-                components.html(share_btn_html, height=50)
+            """
+            components.html(share_btn_html, height=65)
+
+            # 4. [다운로드] & [인스타 열기] 나란히 배치
             c1, c2 = st.columns(2)
-            c1.download_button(f"📸 {mode} DOWNLOAD", buf.getvalue(), f"{mode.lower()}.jpg", use_container_width=True)
-            c2.link_button("📱 instagram", "https://www.instagram.com/", use_container_width=True)
+            c1.download_button(
+                label=f"📸 {mode} DOWNLOAD", 
+                data=img_bytes, 
+                file_name=f"{mode.lower()}.jpg", 
+                use_container_width=True
+            )
+            c2.link_button(
+                label="📱 instagram", 
+                url="https://www.instagram.com/", 
+                use_container_width=True
+            )
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
