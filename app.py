@@ -309,39 +309,40 @@ with col_main:
 # --- [6. 디자인 창 구성] ---
 with col_design:
     st.header("🎨 DESIGN")
+    
+    # [수정] 모드 선택을 사이드바 하나로 통합하여 충돌 방지
+    mode = st.sidebar.selectbox("📅 분석 모드", ["DAILY", "WEEKLY", "MONTHLY"], key="main_mode")
+    
     with st.expander("✍️ 텍스트 수정"):
-        v_act = st.text_input("활동명", v_act); v_date = st.text_input("날짜", v_date)
-        v_dist = st.text_input("거리 km", v_dist); v_time = st.text_input("시간", v_time)
-        v_pace = st.text_input("페이스", v_pace); v_hr = st.text_input("심박 bpm", v_hr)
+        v_act = st.text_input("활동명", v_act)
+        v_date = st.text_input("날짜", v_date)
+        v_dist = st.text_input("거리 km", v_dist)
+        v_time = st.text_input("시간", v_time)
+        v_pace = st.text_input("페이스", v_pace)
+        v_hr = st.text_input("심박 bpm", v_hr)
 
     with st.expander("💄 매거진 스타일", expanded=True):
-        # --- [추가된 스위치들] ---
-        show_vis = st.toggle("지도/그래프 표시", value=True, key="sw_vis")
-        show_box = st.toggle("데이터 박스 표시", value=True, key="sw_box")
-        use_shadow = st.toggle("글자 그림자 효과", value=True, key="sw_shadow")
-        # ----------------------
+        show_vis = st.toggle("지도/그래프 표시", value=True)
+        show_box = st.toggle("데이터 박스 표시", value=True)
+        use_shadow = st.toggle("글자 그림자 효과", value=True)
         border_thick = st.slider("프레임 테두리 두께", 0, 50, 0)
+        
         COLOR_OPTS = {"Black": "#000000", "Yellow": "#FFD700", "White": "#FFFFFF", "Orange": "#FF4500", "Blue": "#00BFFF", "Grey": "#AAAAAA"}
-        m_color = COLOR_OPTS[st.selectbox("포인트 컬러", list(COLOR_OPTS.keys()), index=1,  key="m_col_sel")]
-        sub_color = COLOR_OPTS[st.selectbox("서브 컬러", list(COLOR_OPTS.keys()), index=2, key="s_col_sel")]
+        m_color = COLOR_OPTS[st.selectbox("포인트 컬러", list(COLOR_OPTS.keys()), index=1)]
+        sub_color = COLOR_OPTS[st.selectbox("서브 컬러", list(COLOR_OPTS.keys()), index=2)]
 
-    mode = st.sidebar.selectbox("선택하세요", ["DAILY", "WEEKLY", "MONTHLY"])
+    # 박스 방향 설정
     default_idx = 0 if mode == "DAILY" else 1
-    box_orient = st.radio(
-    "박스 방향", 
-    ["Vertical", "Horizontal"], 
-    index=default_idx, 
-    horizontal=True,
-    key=f"orient_{mode}" )     
+    box_orient = st.radio("박스 방향", ["Vertical", "Horizontal"], index=default_idx, horizontal=True)
     sel_font = st.selectbox("폰트", ["BlackHanSans", "KirangHaerang", "Lacquer"])
 
     with st.expander("📍 위치/크기 조절"):
         rx, ry = st.number_input("박스 X", 0, 1080, 40 if box_orient=="Horizontal" else 80), st.number_input("박스 Y", 0, 1920, 250 if box_orient=="Horizontal" else 1200)
         rw, rh = st.number_input("박스 너비", 100, 1080, 1000 if box_orient=="Horizontal" else 450), st.number_input("박스 높이", 100, 1920, 350 if box_orient=="Horizontal" else 650)
-        box_alpha = st.slider("박스 투명도", 0, 255, 0)
-        vis_sz_adj = st.slider("지도/그래프 크기", 50, 1080, 180 if mode=="DAILY" else 1080)
+        box_alpha = st.slider("박스 투명도", 0, 255, 120) # 기본 투명도 살짝 부여
+        vis_sz_adj = st.slider("지도/그래프 크기", 50, 1080, 180 if mode=="DAILY" else 800)
         vis_alpha = st.slider("지도/그래프 투명도", 0, 255, 255)
-        
+
 # --- [7. 미리보기 렌더링] ---
 with col_main:
     st.subheader("🖼️ PREVIEW")
@@ -349,95 +350,86 @@ with col_main:
     
     if data_ready:
         try:
+            # 해상도 설정
             CW, CH = (1080, 1920) if mode == "DAILY" else (1080, 1350)
-            # 90-30-60-23 가이드 적용
-            f_t, f_d, f_n, f_l = load_font(sel_font, 70), load_font(sel_font, 30), load_font(sel_font, 50), load_font(sel_font, 25)
             
+            # [사용자 요청 반영] 글자 크기: 활동명 90, 날짜 30, 숫자 60
+            f_act = load_font(sel_font, 90)
+            f_date = load_font(sel_font, 30)
+            f_num = load_font(sel_font, 60)
+            f_lab = load_font(sel_font, 23) # 라벨은 작게 유지
+            
+            # 배경 생성
             canvas = make_smart_collage(bg_files, (CW, CH)) if bg_files else Image.new("RGBA", (CW, CH), (20, 20, 20, 255))
-            overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
+            overlay = Image.new("RGBA", (CW, CH), (0,0,0,0))
+            draw = ImageDraw.Draw(overlay)
+            
+            # 단위는 모두 소문자로 (km, bpm)
             items = [("distance", f"{v_dist} km", v_diff_str), ("pace", v_pace, ""), ("time", v_time, ""), ("avg bpm", f"{v_hr} bpm", "")]
+            
             if border_thick > 0:
-                # 캔버스 외곽선을 따라 테두리를 그립니다. 
-                # outline=m_color (포인트 컬러 사용), width=border_thick (슬라이더 값 적용)
                 draw.rectangle([(0, 0), (CW-1, CH-1)], outline=m_color, width=border_thick)
             
-            # 1. 데이터 박스 (show_box가 True일 때만)
+            # 1. 데이터 박스 렌더링
             if show_box:
                 draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0,0,0,box_alpha))
                 if box_orient == "Vertical":
-                    draw_styled_text(draw, (rx + 40, ry + 30), v_act, f_t, m_color, shadow=use_shadow)
-                    draw_styled_text(draw, (rx + 40, ry + 110), v_date, f_d, "#AAAAAA", shadow=use_shadow)
-                    y_c = ry + 200
+                    draw_styled_text(draw, (rx + 40, ry + 30), v_act, f_act, m_color, shadow=use_shadow)
+                    draw_styled_text(draw, (rx + 40, ry + 130), v_date, f_date, "#AAAAAA", shadow=use_shadow)
+                    y_c = ry + 220
                     for lab, val, diff in items:
-                        draw_styled_text(draw, (rx + 40, y_c), lab.lower(), f_l, "#AAAAAA", shadow=use_shadow)
-                        draw_styled_text(draw, (rx + 40, y_c + 35), val.lower(), f_n, sub_color, shadow=use_shadow)
-                        if diff: # 증감 데이터가 있으면 표시
-                            draw_styled_text(draw, (rx + 230, y_c + 35), diff, f_l, m_color, shadow=use_shadow)
-                        y_c += 105
+                        draw_styled_text(draw, (rx + 40, y_c), lab.lower(), f_lab, "#AAAAAA", shadow=use_shadow)
+                        draw_styled_text(draw, (rx + 40, y_c + 30), val.lower(), f_num, sub_color, shadow=use_shadow)
+                        if diff:
+                            draw_styled_text(draw, (rx + 300, y_c + 30), diff, f_lab, m_color, shadow=use_shadow)
+                        y_c += 110
                 else: # Horizontal
-                    title_w = draw.textlength(v_act, f_t)
-                    draw_styled_text(draw, (rx + (rw-title_w)//2, ry+35), v_act, f_t, m_color, shadow=use_shadow)
-                    draw_styled_text(draw, (rx + (rw-draw.textlength(v_date, f_d))//2, ry+110), v_date, f_d, "#AAAAAA", shadow=use_shadow)
+                    title_w = draw.textlength(v_act, f_act)
+                    draw_styled_text(draw, (rx + (rw-title_w)//2, ry+35), v_act, f_act, m_color, shadow=use_shadow)
+                    draw_styled_text(draw, (rx + (rw-draw.textlength(v_date, f_date))//2, ry+135), v_date, f_date, "#AAAAAA", shadow=use_shadow)
                     sec_w = rw // 4
                     for i, (lab, val, diff) in enumerate(items):
                         cx = rx + (i * sec_w) + (sec_w // 2)
-                        draw_styled_text(draw, (cx - draw.textlength(lab.lower(), f_l)//2, ry+160), lab.lower(), f_l, "#AAAAAA", shadow=use_shadow)
-                        draw_styled_text(draw, (cx - draw.textlength(val.lower(), f_n)//2, ry+195), val.lower(), f_n, sub_color, shadow=use_shadow)
-                        if diff: # 가로 모드에서는 수치 바로 아래(ry+250)에 표시
-                            draw_styled_text(draw, (cx - draw.textlength(diff, f_l)//2, ry+250), diff, f_l, m_color, shadow=use_shadow)
-            # 2. 지도 및 그래프 (show_vis가 True일 때만)
+                        draw_styled_text(draw, (cx - draw.textlength(lab.lower(), f_lab)//2, ry+200), lab.lower(), f_lab, "#AAAAAA", shadow=use_shadow)
+                        draw_styled_text(draw, (cx - draw.textlength(val.lower(), f_num)//2, ry+235), val.lower(), f_num, sub_color, shadow=use_shadow)
+                        if diff:
+                            draw_styled_text(draw, (cx - draw.textlength(diff, f_lab)//2, ry+305), diff, f_lab, m_color, shadow=use_shadow)
+
+            # 2. 시각화(지도/그래프) 레이어
             if show_vis:
                 vis_layer = None
-                vis_sz = vis_sz_adj
-                
-                # [A] 사용자가 그래프 이미지를 직접 올린 경우 최우선 표시
                 if user_graph_file:
                     user_img = Image.open(user_graph_file).convert("RGBA")
-                    w_h_ratio = user_img.height / user_img.width
-                    vis_layer = user_img.resize((vis_sz, int(vis_sz * w_h_ratio)), Image.Resampling.LANCZOS)
-                    # 투명도 적용
-                    vis_layer.putalpha(vis_layer.getchannel('A').point(lambda x: x * (vis_alpha / 255)))
-
-                # [B] 직접 올린 게 없으면 기존 스트라바 데이터로 생성
+                    ratio = user_img.height / user_img.width
+                    vis_layer = user_img.resize((vis_sz_adj, int(vis_sz_adj * ratio)), Image.Resampling.LANCZOS)
                 elif mode == "DAILY" and a and a.get('map', {}).get('summary_polyline'):
                     pts = polyline.decode(a['map']['summary_polyline'])
                     lats, lons = zip(*pts)
-                    vis_layer = Image.new("RGBA", (vis_sz, vis_sz), (0,0,0,0)); m_draw = ImageDraw.Draw(vis_layer)
-                    def tr(la, lo): return 15+(lo-min(lons))/(max(lons)-min(lons)+1e-5)*(vis_sz-30), (vis_sz-15)-(la-min(lats))/(max(lats)-min(lats)+1e-5)*(vis_sz-30)
-                    m_draw.line([tr(la, lo) for la, lo in pts], fill=hex_to_rgba(m_color, vis_alpha), width=6)
-                    
-                elif mode in ["WEEKLY", "MONTHLY"] and (weekly_data or monthly_data):
+                    vis_layer = Image.new("RGBA", (vis_sz_adj, vis_sz_adj), (0,0,0,0))
+                    m_draw = ImageDraw.Draw(vis_layer)
+                    def tr(la, lo): return 15+(lo-min(lons))/(max(lons)-min(lons)+1e-5)*(vis_sz_adj-30), (vis_sz_adj-15)-(la-min(lats))/(max(lats)-min(lats)+1e-5)*(vis_sz_adj-30)
+                    m_draw.line([tr(la, lo) for la, lo in pts], fill=hex_to_rgba(m_color, vis_alpha), width=8)
+                elif mode in ["WEEKLY", "MONTHLY"]:
                     d_obj = weekly_data if mode == "WEEKLY" else monthly_data
-                    chart_img = create_bar_chart(d_obj['dists'], m_color, mode=mode, labels=d_obj.get('labels'), font_path=None)
-                    target_h = int(CH * 0.7)
-                    vis_layer = chart_img.resize((vis_sz, int(chart_img.size[1]*(vis_sz/chart_img.size[0]))), Image.Resampling.LANCZOS)
-                    vis_layer.putalpha(vis_layer.getchannel('A').point(lambda x: x * (vis_alpha / 255)))
-
-                # [C] 최종 합성 위치 결정
+                    if d_obj:
+                        chart_img = create_bar_chart(d_obj['dists'], m_color, mode=mode, labels=d_obj.get('labels'))
+                        vis_layer = chart_img.resize((vis_sz_adj, int(chart_img.size[1]*(vis_sz_adj/chart_img.size[0]))), Image.Resampling.LANCZOS)
+                
                 if vis_layer:
-                    if box_orient == "Vertical": 
-                        # 세로 모드: 박스 바로 위
-                        m_pos = (rx, max(5, ry - vis_layer.height - 20))
-                    else: 
-                        m_pos_x = (CW - vis_layer.width) // 2
-                        m_pos_y = CH - vis_layer.height - 50                      
-                        m_pos = (m_pos_x, m_pos_y)
-                    
+                    vis_layer.putalpha(vis_layer.getchannel('A').point(lambda x: x * (vis_alpha / 255)))
+                    m_pos = (rx, max(5, ry - vis_layer.height - 30)) if box_orient == "Vertical" else ((CW - vis_layer.width)//2, CH - vis_layer.height - 80)
                     overlay.paste(vis_layer, (int(m_pos[0]), int(m_pos[1])), vis_layer)
 
-            # 3. 로고 (항상 표시 또는 로직 유지)
-            if log_file:
-                ls, margin = 100, 40
-                l_img = ImageOps.fit(Image.open(log_file).convert("RGBA"), (ls, ls))
-                mask = Image.new('L', (ls, ls), 0); ImageDraw.Draw(mask).ellipse((0, 0, ls, ls), fill=255); l_img.putalpha(mask)
-                overlay.paste(l_img, (CW - ls - margin, margin), l_img)
-
+            # 최종 합성
             final = Image.alpha_composite(canvas, overlay).convert("RGB")
-            st.image(final, width=360)
-            buf = io.BytesIO(); final.save(buf, format="JPEG", quality=95)
+            st.image(final, use_container_width=True) # 사진을 계속 확인할 수 있게 구성
+            
+            buf = io.BytesIO()
+            final.save(buf, format="JPEG", quality=95)
             st.download_button(f"📸 {mode} DOWNLOAD", buf.getvalue(), f"{mode.lower()}.jpg", use_container_width=True)
             
         except Exception as e:
-            st.error(f"렌더링 오류 발생: {e}")
+            st.error(f"렌더링 오류: {e}")
+
 
 
