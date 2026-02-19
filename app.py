@@ -455,7 +455,7 @@ with col_main:
                         cursor:pointer; font-weight:bold; font-size:16px;
                         box-shadow: 0 4px 10px rgba(0,0,0,0.2);
                     ">
-                        📲 INSTAGRAM
+                        📲 공유
                     </button>
                 </div>
                 <script>
@@ -496,6 +496,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
