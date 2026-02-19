@@ -229,6 +229,7 @@ with col_main:
     # 1. 변수 초기화 (에러 방지: bg_files를 미리 빈 리스트로 선언)
     bg_files = [] 
     log_file = None
+    mode = "DAILY"
     v_act, v_date, v_dist, v_pace, v_time, v_hr = "RUNNING", "2026.02.16", "0.00", "00:00:00", "0'00\"", "0"
     weekly_data, monthly_data, a = None, None, None
 
@@ -438,3 +439,4 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
