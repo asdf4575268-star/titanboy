@@ -278,7 +278,7 @@ with col_main:
                 
                 v_diff_str = "" # 초기화
                 if weekly_data:
-                    v_act = f"{datetime.strptime(sel_week, '%Y-%m-%d').isocalendar()[1]} WEEK"
+                    v_act = f"{datetime.strptime(sel_week, '%Y-%m-%d').isocalendar()[1]}th WEEK"
                     v_date = weekly_data['range']
                     v_dist = weekly_data['total_dist']
                     v_pace = weekly_data['avg_pace']
@@ -488,6 +488,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
