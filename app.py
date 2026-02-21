@@ -340,7 +340,7 @@ with col_design:
     with st.expander("📍 위치/크기 조절"):
         rx, ry = st.number_input("박스 X", 0, 1080, 40 if box_orient=="Horizontal" else 80), st.number_input("박스 Y", 0, 1920, 250 if box_orient=="Horizontal" else 1200)
         rw, rh = st.number_input("박스 너비", 100, 1080, 1000 if box_orient=="Horizontal" else 450), st.number_input("박스 높이", 100, 1920, 350 if box_orient=="Horizontal" else 650)
-        box_alpha = st.slider("박스 투명도", 0, 255, 0)
+        box_alpha = st.slider("박스 투명도", 0, 255, 100)
         vis_sz_adj = st.slider("지도/그래프 크기", 50, 1080, 180 if mode=="DAILY" else 1080)
         vis_alpha = st.slider("지도/그래프 투명도", 0, 255, 255)
         
@@ -488,6 +488,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
