@@ -171,17 +171,34 @@ def make_smart_collage(files, target_size):
 # --- [3. 레이아웃 선언 (최상단 고정)] ---
 col_main, col_design = st.columns([1.6, 1], gap="medium")
 
-# --- [4. 인증 및 데이터 연동 - 자동 갱신(Refresh) 버전] ---
+# --- [4. 인증 및 데이터 연동 - 로컬 DB 최적화 버전] ---
 import sqlite3
+import time
 
-# DB에 토큰 저장/로드 함수
-def handle_token_db(mode="load", data=None):
-    conn = sqlite3.connect("archive_prism_total_v5.db")
+# 1. DB 파일 생성 및 테이블 초기화 (코드 시작 시 무조건 실행)
+DB_PATH = "archive_prism_total_v5.db"
+
+def init_db():
+    conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
-    cur.execute("CREATE TABLE IF NOT EXISTS strava_tokens (id INTEGER PRIMARY KEY, access_token TEXT, refresh_token TEXT, expires_at INTEGER)")
-    
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS strava_tokens (
+            id INTEGER PRIMARY KEY, 
+            access_token TEXT, 
+            refresh_token TEXT, 
+            expires_at INTEGER
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+init_db() # 프로그램 실행 시 DB 파일이 없으면 즉시 생성함
+
+def handle_token_db(mode="load", data=None):
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
     if mode == "save" and data:
-        cur.execute("DELETE FROM strava_tokens") # 기존 토큰 삭제
+        cur.execute("DELETE FROM strava_tokens")
         cur.execute("INSERT INTO strava_tokens (access_token, refresh_token, expires_at) VALUES (?, ?, ?)",
                     (data['access_token'], data['refresh_token'], data['expires_at']))
         conn.commit()
@@ -192,52 +209,38 @@ def handle_token_db(mode="load", data=None):
         return row
     conn.close()
 
-# 1. 앱 시작 시 DB에서 기존 토큰 불러오기
+# 2. 토큰 관리 로직
 if 'access_token' not in st.session_state:
-    saved_token = handle_token_db("load")
-    if saved_token:
-        access_token, refresh_token, expires_at = saved_token
-        # 토큰 만료 10분 전인지 확인
-        if datetime.now().timestamp() > (expires_at - 600):
-            # 만료되었다면 Refresh Token으로 자동 갱신
+    saved = handle_token_db("load")
+    if saved:
+        access_token, refresh_token, expires_at = saved
+        # 만료 30분 전이면 자동 갱신
+        if time.time() > (expires_at - 1800):
             try:
                 res = requests.post("https://www.strava.com/oauth/token", data={
                     "client_id": CLIENT_ID, "client_secret": CLIENT_SECRET,
                     "grant_type": "refresh_token", "refresh_token": refresh_token
                 }).json()
                 if 'access_token' in res:
-                    handle_token_db("save", res) # 새 토큰 DB 저장
+                    handle_token_db("save", res)
                     st.session_state['access_token'] = res['access_token']
-                else: st.session_state['access_token'] = None
-            except: st.session_state['access_token'] = None
+            except:
+                st.session_state['access_token'] = None
         else:
             st.session_state['access_token'] = access_token
-    else:
-        st.session_state['access_token'] = None
 
-# 2. URL 파라미터 처리 (최초 로그인 시)
-q_params = st.query_params
-if "code" in q_params and not st.session_state['access_token']:
+# 3. URL 파라미터 (최초 인증 완료 후 처리)
+if "code" in st.query_params and not st.session_state.get('access_token'):
+    code = st.query_params["code"]
     res = requests.post("https://www.strava.com/oauth/token", data={
         "client_id": CLIENT_ID, "client_secret": CLIENT_SECRET,
-        "code": q_params["code"], "grant_type": "authorization_code"
+        "code": code, "grant_type": "authorization_code"
     }).json()
     if 'access_token' in res:
-        handle_token_db("save", res) # DB에 영구 저장
+        handle_token_db("save", res)
         st.session_state['access_token'] = res['access_token']
-        st.query_params.clear()
+        st.query_params.clear() # code 사용 후 제거
         st.rerun()
-
-# 3. 데이터 로딩
-if st.session_state['access_token'] and 'cached_acts' not in st.session_state:
-    headers = {'Authorization': f"Bearer {st.session_state['access_token']}"}
-    r = requests.get("https://www.strava.com/api/v3/athlete/activities?per_page=50", headers=headers)
-    if r.status_code == 200:
-        st.session_state['cached_acts'] = r.json()
-    else:
-        st.session_state['access_token'] = None # 오류 시 재로그인 유도
-
-acts = st.session_state.get('cached_acts', [])
 
 # --- [5. 메인 화면 구성] ---
 with col_main:
@@ -502,6 +505,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
