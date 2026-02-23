@@ -9,7 +9,7 @@ from matplotlib import font_manager
 import base64
 import streamlit.components.v1 as components
 import sqlite3
-
+import time
 
 # --- [1. 기본 설정 및 API] ---
 API_CONFIGS = {
@@ -20,7 +20,8 @@ CURRENT_CFG = API_CONFIGS["PRIMARY"]
 CLIENT_ID, CLIENT_SECRET = CURRENT_CFG["ID"], CURRENT_CFG["SECRET"]
 ACTUAL_URL = "https://titanboy-kgcnje3tg3hbfpfsp6uwzc.streamlit.app"
 
-st.set_page_config(page_title="TITAN BOY", layout="wide")
+# 모바일 친화적 페이지 설정 (centered 추천, 기존 wide 유지 가능)
+st.set_page_config(page_title="TITAN BOY", layout="centered")
 mpl.use('Agg')
 
 # --- [2. 유틸리티 함수] ---
@@ -33,10 +34,9 @@ def hex_to_rgba(hex_color, alpha):
 
 def draw_styled_text(draw, pos, text, font, fill, shadow=True):
     if shadow:
-        # 그림자를 3px -> 2px로 줄이고, 검정색을 더 진하게(220) 설정
-        # 이렇게 하면 글자 외곽선이 더 선명하게 대비됩니다.
         draw.text((pos[0]+2, pos[1]+2), text, font=font, fill=(0, 0, 0, 220))
     draw.text(pos, text, font=font, fill=fill)
+
 def load_font(name, size):
     fonts = {
         "BlackHanSans": "https://github.com/google/fonts/raw/main/ofl/blackhansans/BlackHanSans-Regular.ttf",
@@ -44,15 +44,13 @@ def load_font(name, size):
         "Lacquer": "https://github.com/google/fonts/raw/main/ofl/lacquer/Lacquer-Regular.ttf"
     }
     f_path = f"font_{name}.ttf"
-    # 파일이 없으면 다운로드 시도
     if not os.path.exists(f_path):
         try:
             r = requests.get(fonts[name])
             with open(f_path, "wb") as f:
                 f.write(r.content)
         except:
-            return ImageFont.load_default() # 다운로드 실패 시 기본 폰트 반환
-    
+            return ImageFont.load_default()
     try:
         return ImageFont.truetype(f_path, int(size))
     except:
@@ -126,7 +124,6 @@ def make_smart_collage(files, target_size):
             imgs.append(img.convert("RGBA"))
         except:
             continue
-
     if not imgs: 
         return Image.new("RGBA", (tw, th), (30, 30, 30, 255))
     
@@ -134,22 +131,15 @@ def make_smart_collage(files, target_size):
     if n == 1:
         return ImageOps.fit(imgs[0], (tw, th), Image.Resampling.LANCZOS)
 
-    # [핵심] 사진 개수에 따라 행/열을 동적으로 결정
-    # 최대한 정사각형에 가깝거나 세로로 긴 매거진 비율 유지
     cols = math.ceil(math.sqrt(n))
     rows = math.ceil(n / cols)
-
     canvas = Image.new("RGBA", (tw, th), (0, 0, 0, 255))
     
     for i, img in enumerate(imgs):
         r, c = divmod(i, cols)
-        
-        # 기본 좌표 계산
         x0 = int(c * tw / cols)
         y0 = int(r * th / rows)
         
-        # 마지막 줄 사진들이 비어 보이지 않게 너비를 자동 확장
-        # (예: 3장일 때 아래줄에 혼자 있는 사진은 가로로 꽉 채움)
         current_row_count = n % cols if (r == rows - 1 and n % cols != 0) else cols
         if r == rows - 1 and n % cols != 0:
             row_tw = tw / current_row_count
@@ -159,25 +149,15 @@ def make_smart_collage(files, target_size):
             x1 = int((c + 1) * tw / cols)
             
         y1 = int((r + 1) * th / rows)
-        
-        cell_w = x1 - x0
-        cell_h = y1 - y0
-        
+        cell_w, cell_h = x1 - x0, y1 - y0
         resized_img = ImageOps.fit(img, (cell_w, cell_h), Image.Resampling.LANCZOS)
         canvas.paste(resized_img, (x0, y0))
 
     return canvas
 
-# --- [3. 레이아웃 선언 (최상단 고정)] ---
-col_main, col_design = st.columns([1.6, 1], gap="medium")
-
-# --- [4. 인증 및 데이터 연동 - 에러 방지 및 자동 로그인] ---
-import sqlite3
-import time
-
-# 1. DB 및 변수 초기화
+# --- [3. 인증 및 데이터 연동 - 에러 방지 및 자동 로그인] ---
 DB_PATH = "archive_prism_total_v5.db"
-acts = []  # 에러 방지: 변수를 미리 빈 리스트로 선언
+acts = [] 
 
 def init_db():
     try:
@@ -216,12 +196,10 @@ def handle_token_db(mode="load", data=None):
     except:
         return None
 
-# 2. 토큰 및 세션 관리
 if 'access_token' not in st.session_state:
     saved = handle_token_db("load")
     if saved:
         a_token, r_token, exp_at = saved
-        # 토큰 만료 30분 전 체크
         if time.time() > (exp_at - 1800):
             try:
                 res = requests.post("https://www.strava.com/oauth/token", data={
@@ -235,7 +213,6 @@ if 'access_token' not in st.session_state:
         else:
             st.session_state['access_token'] = a_token
 
-# 3. URL 파라미터 처리 (최초 인증 시)
 if "code" in st.query_params:
     code = st.query_params["code"]
     res = requests.post("https://www.strava.com/oauth/token", data={
@@ -248,45 +225,56 @@ if "code" in st.query_params:
         st.query_params.clear()
         st.rerun()
 
-# 4. 데이터 로드 (acts 변수 할당)
 if st.session_state.get('access_token'):
     if not st.session_state.get('cached_acts'):
         headers = {'Authorization': f"Bearer {st.session_state['access_token']}"}
         r = requests.get("https://www.strava.com/api/v3/athlete/activities?per_page=50", headers=headers)
         if r.status_code == 200:
             st.session_state['cached_acts'] = r.json()
-        elif r.status_code == 401: # 토큰 만료 시 재로그인 유도
+        elif r.status_code == 401: 
             st.session_state.clear()
             st.rerun()
-    
     acts = st.session_state.get('cached_acts', [])
-# --- [5. 메인 화면 구성] ---
-with col_main:
-    st.title("TITAN BOY")
-    
-    # 1. 변수 초기화 (에러 방지: bg_files를 미리 빈 리스트로 선언)
-    bg_files = [] 
-    log_file = None
-    mode = "DAILY"
-    v_act, v_date, v_dist, v_pace, v_time, v_hr = "RUNNING", "2026.02.16", "0.00", "00:00:00", "0'00\"", "0"
-    weekly_data, monthly_data, a = None, None, None
 
-    if not st.session_state['access_token']:
-        auth_url = (f"https://www.strava.com/oauth/authorize?client_id={CLIENT_ID}"
-                    f"&response_type=code&redirect_uri={ACTUAL_URL}"
-                    f"&scope=read,activity:read_all&approval_prompt=force")
-        st.link_button("🚀 Strava 연동하기", auth_url, use_container_width=True)
-    else:
+# --- [4. 메인 화면 구성 및 UI 레이아웃 (모바일 친화형 1 Column)] ---
+st.title("TITAN BOY 🏃‍♂️")
+
+# 변수 초기화
+bg_files = [] 
+log_file = None
+user_graph_file = None
+mode = "DAILY"
+v_act, v_date, v_dist, v_pace, v_time, v_hr = "RUNNING", "2026.02.16", "0.00", "00:00:00", "0'00\"", "0"
+weekly_data, monthly_data, a = None, None, None
+v_diff_str = ""
+
+if not st.session_state.get('access_token'):
+    auth_url = (f"https://www.strava.com/oauth/authorize?client_id={CLIENT_ID}"
+                f"&response_type=code&redirect_uri={ACTUAL_URL}"
+                f"&scope=read,activity:read_all&approval_prompt=force")
+    st.link_button("🚀 Strava 연동하기", auth_url, use_container_width=True)
+else:
+    # 우측 정렬 느낌으로 로그아웃 배치
+    c1, c2 = st.columns([3, 1])
+    with c2:
         if st.button("🔓 로그아웃", use_container_width=True):
             st.session_state.clear()
             st.query_params.clear()
             st.rerun()
-            
-        # 2. 파일 업로더 (여기서 변수가 정의됩니다)
+
+    # --- Section 1: 데이터 및 파일 업로드 ---
+    with st.expander("📂 1. 데이터 및 사진 설정", expanded=True):
+        st.markdown("**이미지 업로드**")
         bg_files = st.file_uploader("📸 배경 사진", type=['jpg','jpeg','png'], accept_multiple_files=True)
-        log_file = st.file_uploader("🔘 로고", type=['jpg','jpeg','png'])
-        user_graph_file = st.file_uploader("📈 그래프 스크린샷 (선택)", type=['jpg','png','jpeg'], key="user_graph")
+        
+        c_up1, c_up2 = st.columns(2)
+        with c_up1:
+            log_file = st.file_uploader("🔘 로고", type=['jpg','jpeg','png'])
+        with c_up2:
+            user_graph_file = st.file_uploader("📈 그래프(선택)", type=['jpg','png','jpeg'], key="user_graph")
                 
+        st.markdown("---")
+        st.markdown("**러닝 데이터 선택**")
         mode = st.radio("모드 선택", ["DAILY", "WEEKLY", "MONTHLY"], horizontal=True, key="main_mode_sel")
         
         if acts:
@@ -294,7 +282,6 @@ with col_main:
                 act_opts = [f"{ac['start_date_local'][:10]} - {ac['name']}" for ac in acts]
                 sel_act = st.selectbox("🏃 활동 선택", act_opts)
                 a = acts[act_opts.index(sel_act)]
-                v_diff_str = ""
                 if a:
                     v_act = a['name'].upper()
                     dt_obj = datetime.strptime(a['start_date_local'][:19], "%Y-%m-%dT%H:%M:%S")
@@ -305,13 +292,11 @@ with col_main:
                     v_pace = f"{int((m_s/d_km)//60)}'{int((m_s/d_km)%60):02d}\"" if d_km > 0 else "0'00\""
                     v_time = f"{int(m_s//3600):02d}:{int((m_s%3600)//60):02d}:{int(m_s%60):02d}" if m_s >= 3600 else f"{int(m_s//60):02d}:{int(m_s%60):02d}"
                     v_hr = str(int(a.get('average_heartrate', 0))) if a.get('average_heartrate') else "0"
-                
+            
             elif mode == "WEEKLY":
                 weeks = sorted(list(set([(datetime.strptime(ac['start_date_local'][:10], "%Y-%m-%d") - timedelta(days=datetime.strptime(ac['start_date_local'][:10], "%Y-%m-%d").weekday())).strftime('%Y-%m-%d') for ac in acts])), reverse=True)
                 sel_week = st.selectbox("📅 주차 선택", weeks, format_func=lambda x: f"{x[:4]}-{datetime.strptime(x, '%Y-%m-%d').isocalendar()[1]}주차")              
                 weekly_data = get_weekly_stats(acts, sel_week)      
-                
-                v_diff_str = "" # 초기화
                 if weekly_data:
                     v_act = f"{datetime.strptime(sel_week, '%Y-%m-%d').isocalendar()[1]}th WEEK"
                     v_date = weekly_data['range']
@@ -320,85 +305,97 @@ with col_main:
                     v_time = weekly_data['total_time']
                     v_hr   = weekly_data['avg_hr']
                     
-                    # 지난주와 비교
                     prev_week_str = (datetime.strptime(sel_week, "%Y-%m-%d") - timedelta(days=7)).strftime("%Y-%m-%d")
                     prev_weekly_data = get_weekly_stats(acts, prev_week_str)
                     if prev_weekly_data:
                         diff_val = float(v_dist) - float(prev_weekly_data['total_dist'])
                         v_diff_str = f"({'+' if diff_val >= 0 else ''}{diff_val:.2f} km)"
-                
+            
             elif mode == "MONTHLY":
                 months = sorted(list(set([ac['start_date_local'][:7] for ac in acts])), reverse=True)
                 sel_month = st.selectbox("🗓️ 월 선택", months)
                 monthly_data = get_monthly_stats(acts, f"{sel_month}-01")
-                
-                v_diff_str = "" # 초기화
                 if monthly_data:
                     dt_t = datetime.strptime(f"{sel_month}-01", "%Y-%m-%d")
                     v_act = dt_t.strftime("%B").upper()
                     v_date, v_dist, v_time, v_pace, v_hr = monthly_data['range'], monthly_data['total_dist'], monthly_data['total_time'], monthly_data['avg_pace'], monthly_data['avg_hr']
                     
-                    # 지난달과 비교
                     curr_date = datetime.strptime(f"{sel_month}-01", "%Y-%m-%d")
                     prev_month_date = (curr_date - timedelta(days=1)).replace(day=1)
                     prev_monthly_data = get_monthly_stats(acts, prev_month_date.strftime("%Y-%m-%d"))
                     if prev_monthly_data:
                         diff_val = float(v_dist) - float(prev_monthly_data['total_dist'])
                         v_diff_str = f"({'+' if diff_val >= 0 else ''}{diff_val:.2f} km)"
-# --- [6. 디자인 창 구성] ---
-with col_design:
-    with st.expander("✍️ 텍스트 수정"):
-        v_act = st.text_input("활동명", v_act); v_date = st.text_input("날짜", v_date)
-        v_dist = st.text_input("거리 km", v_dist); v_time = st.text_input("시간", v_time)
-        v_pace = st.text_input("페이스", v_pace); v_hr = st.text_input("심박 bpm", v_hr)
 
-    with st.expander("💄 매거진 스타일", expanded=True):
-        # --- [추가된 스위치들] ---
-        show_vis = st.toggle("지도/그래프 표시", value=True, key="sw_vis")
-        show_box = st.toggle("데이터 박스 표시", value=True, key="sw_box")
-        use_shadow = st.toggle("글자 그림자 효과", value=True, key="sw_shadow")
-        # ----------------------
+    # --- Section 2: 디자인 및 텍스트 수정 ---
+    with st.expander("🎨 2. 디자인 및 텍스트 수정", expanded=False):
+        st.markdown("**텍스트 수정**")
+        c_txt1, c_txt2 = st.columns(2)
+        with c_txt1:
+            v_act = st.text_input("활동명", v_act)
+            v_dist = st.text_input("거리 km", v_dist)
+            v_pace = st.text_input("페이스", v_pace)
+        with c_txt2:
+            v_date = st.text_input("날짜", v_date)
+            v_time = st.text_input("시간", v_time)
+            v_hr = st.text_input("심박 bpm", v_hr)
+
+        st.markdown("---")
+        st.markdown("**매거진 스타일 옵션**")
+        c_tog1, c_tog2 = st.columns(2)
+        with c_tog1:
+            show_vis = st.toggle("지도/그래프 표시", value=True, key="sw_vis")
+            show_box = st.toggle("데이터 박스 표시", value=True, key="sw_box")
+        with c_tog2:
+            use_shadow = st.toggle("글자 그림자 효과", value=True, key="sw_shadow")
+            
         border_thick = st.slider("프레임 테두리 두께", 0, 50, 0)
+        
         COLOR_OPTS = {"Black": "#000000", "Yellow": "#FFD700", "White": "#FFFFFF", "Orange": "#FF4500", "Blue": "#00BFFF", "Grey": "#AAAAAA"}
-        m_color = COLOR_OPTS[st.selectbox("포인트 컬러", list(COLOR_OPTS.keys()), index=1,  key="m_col_sel")]
-        sub_color = COLOR_OPTS[st.selectbox("서브 컬러", list(COLOR_OPTS.keys()), index=2, key="s_col_sel")]
+        c_col1, c_col2 = st.columns(2)
+        with c_col1:
+            m_color = COLOR_OPTS[st.selectbox("포인트 컬러", list(COLOR_OPTS.keys()), index=1,  key="m_col_sel")]
+        with c_col2:
+            sub_color = COLOR_OPTS[st.selectbox("서브 컬러", list(COLOR_OPTS.keys()), index=2, key="s_col_sel")]
 
-    default_idx = 0 if mode == "DAILY" else 1
-    box_orient = st.radio(
-    "박스 방향", 
-    ["Vertical", "Horizontal"], 
-    index=default_idx, 
-    horizontal=True,
-    key=f"orient_{mode}" )     
-    sel_font = st.selectbox("폰트", ["BlackHanSans", "KirangHaerang", "Lacquer"])
+        default_idx = 0 if mode == "DAILY" else 1
+        c_opt1, c_opt2 = st.columns(2)
+        with c_opt1:
+            box_orient = st.radio("박스 방향", ["Vertical", "Horizontal"], index=default_idx, horizontal=True, key=f"orient_{mode}")     
+        with c_opt2:
+            sel_font = st.selectbox("폰트", ["BlackHanSans", "KirangHaerang", "Lacquer"])
 
-    with st.expander("📍 위치/크기 조절"):
-        rx, ry = st.number_input("박스 X", 0, 1080, 40 if box_orient=="Horizontal" else 80), st.number_input("박스 Y", 0, 1920, 250 if box_orient=="Horizontal" else 1200)
-        rw, rh = st.number_input("박스 너비", 100, 1080, 1000 if box_orient=="Horizontal" else 450), st.number_input("박스 높이", 100, 1920, 350 if box_orient=="Horizontal" else 650)
+        st.markdown("**위치 및 크기 조절**")
+        c_pos1, c_pos2 = st.columns(2)
+        with c_pos1:
+            rx = st.number_input("박스 X", 0, 1080, 40 if box_orient=="Horizontal" else 80)
+            rw = st.number_input("박스 너비", 100, 1080, 1000 if box_orient=="Horizontal" else 450)
+        with c_pos2:
+            ry = st.number_input("박스 Y", 0, 1920, 250 if box_orient=="Horizontal" else 1200)
+            rh = st.number_input("박스 높이", 100, 1920, 350 if box_orient=="Horizontal" else 650)
+            
         box_alpha = st.slider("박스 투명도", 0, 255, 100)
         vis_sz_adj = st.slider("지도/그래프 크기", 50, 1080, 180 if mode=="DAILY" else 1080)
         vis_alpha = st.slider("지도/그래프 투명도", 0, 255, 255)
-        
-# --- [7. 미리보기 렌더링] ---
-with col_main:
-    st.subheader("🖼️ PREVIEW")
+
+    # --- Section 3: 미리보기 및 다운로드/공유 ---
+    st.markdown("---")
+    st.subheader("🖼️ 미리보기 및 저장")
+    
     data_ready = (mode == "DAILY" and a) or (mode == "WEEKLY" and weekly_data) or (mode == "MONTHLY" and monthly_data)
     
     if data_ready:
         try:
             CW, CH = (1080, 1920) if mode == "DAILY" else (1080, 1350)
-            # 90-30-60-23 가이드 적용
             f_t, f_d, f_n, f_l = load_font(sel_font, 70), load_font(sel_font, 30), load_font(sel_font, 50), load_font(sel_font, 25)
             
             canvas = make_smart_collage(bg_files, (CW, CH)) if bg_files else Image.new("RGBA", (CW, CH), (20, 20, 20, 255))
             overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
             items = [("distance", f"{v_dist} km", v_diff_str), ("pace", v_pace, ""), ("time", v_time, ""), ("avg bpm", f"{v_hr} bpm", "")]
+            
             if border_thick > 0:
-                # 캔버스 외곽선을 따라 테두리를 그립니다. 
-                # outline=m_color (포인트 컬러 사용), width=border_thick (슬라이더 값 적용)
                 draw.rectangle([(0, 0), (CW-1, CH-1)], outline=m_color, width=border_thick)
             
-            # 1. 데이터 박스 (show_box가 True일 때만)
             if show_box:
                 draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0,0,0,box_alpha))
                 if box_orient == "Vertical":
@@ -408,10 +405,10 @@ with col_main:
                     for lab, val, diff in items:
                         draw_styled_text(draw, (rx + 40, y_c), lab.lower(), f_l, "#AAAAAA", shadow=use_shadow)
                         draw_styled_text(draw, (rx + 40, y_c + 35), val.lower(), f_n, sub_color, shadow=use_shadow)
-                        if diff: # 증감 데이터가 있으면 표시
+                        if diff: 
                             draw_styled_text(draw, (rx + 230, y_c + 35), diff, f_l, m_color, shadow=use_shadow)
                         y_c += 105
-                else: # Horizontal
+                else: 
                     title_w = draw.textlength(v_act, f_t)
                     draw_styled_text(draw, (rx + (rw-title_w)//2, ry+35), v_act, f_t, m_color, shadow=use_shadow)
                     draw_styled_text(draw, (rx + (rw-draw.textlength(v_date, f_d))//2, ry+110), v_date, f_d, "#AAAAAA", shadow=use_shadow)
@@ -420,22 +417,19 @@ with col_main:
                         cx = rx + (i * sec_w) + (sec_w // 2)
                         draw_styled_text(draw, (cx - draw.textlength(lab.lower(), f_l)//2, ry+160), lab.lower(), f_l, "#AAAAAA", shadow=use_shadow)
                         draw_styled_text(draw, (cx - draw.textlength(val.lower(), f_n)//2, ry+195), val.lower(), f_n, sub_color, shadow=use_shadow)
-                        if diff: # 가로 모드에서는 수치 바로 아래(ry+250)에 표시
+                        if diff: 
                             draw_styled_text(draw, (cx - draw.textlength(diff, f_l)//2, ry+250), diff, f_l, m_color, shadow=use_shadow)
-            # 2. 지도 및 그래프 (show_vis가 True일 때만)
+                            
             if show_vis:
                 vis_layer = None
                 vis_sz = vis_sz_adj
                 
-                # [A] 사용자가 그래프 이미지를 직접 올린 경우 최우선 표시
                 if user_graph_file:
                     user_img = Image.open(user_graph_file).convert("RGBA")
                     w_h_ratio = user_img.height / user_img.width
                     vis_layer = user_img.resize((vis_sz, int(vis_sz * w_h_ratio)), Image.Resampling.LANCZOS)
-                    # 투명도 적용
                     vis_layer.putalpha(vis_layer.getchannel('A').point(lambda x: x * (vis_alpha / 255)))
 
-                # [B] 직접 올린 게 없으면 기존 스트라바 데이터로 생성
                 elif mode == "DAILY" and a and a.get('map', {}).get('summary_polyline'):
                     pts = polyline.decode(a['map']['summary_polyline'])
                     lats, lons = zip(*pts)
@@ -450,102 +444,76 @@ with col_main:
                     vis_layer = chart_img.resize((vis_sz, int(chart_img.size[1]*(vis_sz/chart_img.size[0]))), Image.Resampling.LANCZOS)
                     vis_layer.putalpha(vis_layer.getchannel('A').point(lambda x: x * (vis_alpha / 255)))
 
-                # [C] 최종 합성 위치 결정
                 if vis_layer:
                     if box_orient == "Vertical": 
-                        # 세로 모드: 박스 바로 위
                         m_pos = (rx, max(5, ry - vis_layer.height - 20))
                     else: 
                         m_pos_x = (CW - vis_layer.width) // 2
                         m_pos_y = CH - vis_layer.height - 50                      
                         m_pos = (m_pos_x, m_pos_y)
-                    
                     overlay.paste(vis_layer, (int(m_pos[0]), int(m_pos[1])), vis_layer)
 
-            # 3. 로고 (항상 표시 또는 로직 유지)
             if log_file:
                 ls, margin = 100, 40
                 l_img = ImageOps.fit(Image.open(log_file).convert("RGBA"), (ls, ls))
                 mask = Image.new('L', (ls, ls), 0); ImageDraw.Draw(mask).ellipse((0, 0, ls, ls), fill=255); l_img.putalpha(mask)
                 overlay.paste(l_img, (CW - ls - margin, margin), l_img)
 
-            # 1. 이미지 결과 출력
             final = Image.alpha_composite(canvas, overlay).convert("RGB")
-            st.image(final, width=360)
             
-            # 2. 이미지 데이터 준비
+            # 모바일 최적화를 위해 이미지를 컨테이너 폭에 맞게 출력 (기존 고정 width 제거)
+            st.image(final, use_container_width=True)
+            
             buf = io.BytesIO()
             final.save(buf, format="JPEG", quality=95)
             img_bytes = buf.getvalue()
             img_64 = base64.b64encode(img_bytes).decode()
 
-            # 3. [공유하기] 버튼 (HTML/JS) - 디자인 보강
-            share_btn_html = f"""
-                <div style="margin-bottom: 10px;">
-                    <button onclick="share()" style="
-                        width:100%; padding:12px; 
-                        background: linear-gradient(45deg, #405de6, #5851db, #833ab4, #c13584, #e1306c, #fd1d1d);
-                        color:white; border-radius:8px; border:none; 
-                        cursor:pointer; font-weight:bold; font-size:16px;
-                        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-                    ">
-                        📲 공유
-                    </button>
-                </div>
-                <script>
-                async function share() {{
-                    try {{
-                        const blob = await (await fetch('data:image/jpeg;base64,{img_64}')).blob();
-                        const file = new File([blob], 'run_record.jpg', {{type: 'image/jpeg'}});
-                        if (navigator.share) {{
-                            await navigator.share({{
-                                files: [file],
-                                title: 'TITAN BOY RUN',
-                                text: '오늘의 러닝 기록!'
-                            }});
-                        }} else {{
-                            alert('현재 브라우저가 공유 기능을 지원하지 않습니다. 아래 다운로드 버튼을 이용해주세요.');
+            # 공유 및 다운로드 버튼 (2열 배치)
+            c_btn1, c_btn2 = st.columns(2)
+            with c_btn1:
+                share_btn_html = f"""
+                    <div style="margin-bottom: 10px;">
+                        <button onclick="share()" style="
+                            width:100%; padding:12px; 
+                            background: linear-gradient(45deg, #405de6, #5851db, #833ab4, #c13584, #e1306c, #fd1d1d);
+                            color:white; border-radius:8px; border:none; 
+                            cursor:pointer; font-weight:bold; font-size:16px;
+                            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+                        ">
+                            📲 공유
+                        </button>
+                    </div>
+                    <script>
+                    async function share() {{
+                        try {{
+                            const blob = await (await fetch('data:image/jpeg;base64,{img_64}')).blob();
+                            const file = new File([blob], 'run_record.jpg', {{type: 'image/jpeg'}});
+                            if (navigator.share) {{
+                                await navigator.share({{
+                                    files: [file],
+                                    title: 'TITAN BOY RUN',
+                                    text: '오늘의 러닝 기록!'
+                                }});
+                            }} else {{
+                                alert('현재 브라우저가 공유 기능을 지원하지 않습니다. 다운로드 버튼을 이용해주세요.');
+                            }}
+                        }} catch (e) {{
+                            console.log('공유 취소 또는 오류:', e);
                         }}
-                    }} catch (e) {{
-                        console.log('공유 취소 또는 오류:', e);
                     }}
-                }}
-                </script>
-            """
-            components.html(share_btn_html, height=65)
-           # 3. [다운로드] 버튼 (공유 버튼과 수직 정렬 맞춤)
-            st.download_button(
-                label=f"📸 {mode} DOWLOAD", 
-                data=img_bytes, 
-                file_name=f"{mode.lower()}.jpg", 
-                use_container_width=True
-            )
+                    </script>
+                """
+                components.html(share_btn_html, height=65)
+                
+            with c_btn2:
+                # 다운로드 버튼 스타일을 공유버튼 크기와 맞추기 위해 컨테이너 폭을 활용
+                st.download_button(
+                    label=f"📸 {mode} 저장", 
+                    data=img_bytes, 
+                    file_name=f"{mode.lower()}.jpg", 
+                    use_container_width=True
+                )
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
