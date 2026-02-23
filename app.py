@@ -241,7 +241,6 @@ if "code" in st.query_params and not st.session_state.get('access_token'):
         st.session_state['access_token'] = res['access_token']
         st.query_params.clear() # code 사용 후 제거
         st.rerun()
-
 # --- [5. 메인 화면 구성] ---
 with col_main:
     st.title("TITAN BOY")
@@ -505,6 +504,7 @@ with col_main:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
 
