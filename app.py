@@ -243,7 +243,35 @@ if st.session_state.get('access_token'):
     acts = st.session_state.get('cached_acts', [])
 
 # --- [4. 메인 화면 구성 및 UI 레이아웃 (모바일 친화형 1 Column)] ---
-st.title("TITAN BOY 🏃‍♂️")
+def get_base64(path):
+    with open(path, "rb") as f:
+        return base64.b64encode(f.read()).decode()
+
+logo_base64 = get_base64("logo.png")
+
+st.markdown("""
+<style>
+.header-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.header-wrap h1 {
+    margin: 0;
+    letter-spacing: -1px;
+}
+</style>
+""", unsafe_allow_html=True)
+
+st.markdown(
+    f"""
+    <div class="header-wrap">
+        <img src="data:image/png;base64,{logo_base64}" width="90">
+        <h1>TITAN BOY</h1>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
 # 변수 초기화
 bg_files = [] 
@@ -523,5 +551,6 @@ else:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
 
