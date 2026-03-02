@@ -21,13 +21,14 @@ CLIENT_ID, CLIENT_SECRET = CURRENT_CFG["ID"], CURRENT_CFG["SECRET"]
 ACTUAL_URL = "https://titanboy-kgcnje3tg3hbfpfsp6uwzc.streamlit.app"
 
 # 모바일 친화적 페이지 설정 (centered 추천, 기존 wide 유지 가능)
+logo = Image.open("logo.png")
 st.set_page_config(
-    layout="centered", # 모바일 친화적 레이아웃
-    page_title="TITAN BOY", 
-    page_icon="🏃‍♂️",
+    layout="centered",
+    page_title="TITAN BOY",
+    page_icon=logo,
     initial_sidebar_state="collapsed"
 )
-mpl.use('Agg')
+mpl.use("Agg")
 
 # --- [2. 유틸리티 함수] ---
 def logout_and_clear():
@@ -522,4 +523,5 @@ else:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
