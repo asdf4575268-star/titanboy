@@ -561,7 +561,7 @@ else:
 
             # 로고 배치를 데이터 박스 우측 상단으로 이동
             if log_file:
-                ls, margin = 100, 20
+                ls, margin = 60, 20
                 l_img = ImageOps.fit(Image.open(log_file).convert("RGBA"), (ls, ls))
                 mask = Image.new('L', (ls, ls), 0); ImageDraw.Draw(mask).ellipse((0, 0, ls, ls), fill=255); l_img.putalpha(mask)
                 
@@ -624,3 +624,4 @@ else:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
