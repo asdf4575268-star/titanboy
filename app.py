@@ -145,9 +145,6 @@ def create_bar_chart(data, color_hex, mode="WEEKLY", labels=None, font_path=None
     x_pos = np.arange(len(labels))
     prop = font_manager.FontProperties(fname=font_path) if font_path else None
     
-    # plt.subplots 호출 시 필요한 모듈들을 직접 사용하도록 수정
-    import matplotlib.pyplot as plt
-    
     fig, ax = plt.subplots(figsize=(10, 5.0), dpi=150)
     fig.patch.set_alpha(0); ax.patch.set_alpha(0)
     bars = ax.bar(x_pos, data, color=color_hex, width=0.6)
@@ -445,8 +442,10 @@ else:
         with c_opt1:
             box_orient = st.radio("박스 방향", ["Vertical", "Horizontal"], index=default_idx, horizontal=True, key=f"orient_{mode}")     
         with c_opt2:
-            # 폰트 목록 복원됨!
-            sel_font = st.selectbox("폰트", ["BlackHanSans", "KirangHaerang", "Lacquer", "Condiment", "Bangers", "BagelFatOne"])
+            font_list = ["BlackHanSans", "KirangHaerang", "Lacquer", "Condiment", "Bangers", "BagelFatOne"]
+            # 폰트 기본값 종목별 자동 지정
+            def_font_idx = font_list.index("Lacquer") if v_type in ["WeightTraining", "Workout"] else font_list.index("Bangers")
+            sel_font = st.selectbox("폰트", font_list, index=def_font_idx)
 
         st.markdown("**위치 및 크기 조절**")
         c_pos1, c_pos2 = st.columns(2)
@@ -492,13 +491,11 @@ else:
                     draw_styled_text(draw, (rx + 40, ry + 110), v_date, f_d, "#AAAAAA", shadow=use_shadow)
                     y_c = ry + 200
                     for lab, val, diff in items:
-                        # 라벨(lab) 출력 생략하고 값의 높이를 살짝 올려서 정렬
                         draw_styled_text(draw, (rx + 40, y_c + 15), val.lower(), f_n, sub_color, shadow=use_shadow)
                         if diff: 
                             draw_styled_text(draw, (rx + 230, y_c + 15), diff, f_l, m_color, shadow=use_shadow)
                         y_c += 95
                 else: 
-                    # 가로모드 왼쪽 상단 워크아웃 세션/시간 표시 (WEEKLY, MONTHLY)
                     if mode in ["WEEKLY", "MONTHLY"] and v_type == "Run":
                         d_data = weekly_data if mode == "WEEKLY" else monthly_data
                         if d_data and d_data.get('other_count', 0) > 0:
@@ -506,7 +503,7 @@ else:
                             wo_text = f"{d_data['other_count']} sessions / {int(d_data['other_total_time'])} min"
                             if dumb_icon:
                                 overlay.paste(dumb_icon, (rx + 25, ry + 25), dumb_icon)
-                                draw_styled_text(draw, (rx + 55, ry + 25), wo_text, f_l, "#AAAAAA", shadow=use_shadow)
+                                draw_styled_text(draw, (rx + 55, ry + 27), wo_text, f_l, "#AAAAAA", shadow=use_shadow)
                             else:
                                 draw_styled_text(draw, (rx + 25, ry + 27), wo_text, f_l, "#AAAAAA", shadow=use_shadow)
                     
@@ -516,12 +513,10 @@ else:
                     sec_w = rw // len(items) if len(items) > 0 else rw
                     for i, (lab, val, diff) in enumerate(items):
                         cx = rx + (i * sec_w) + (sec_w // 2)
-                        # 라벨(lab) 출력 생략
                         draw_styled_text(draw, (cx - draw.textlength(val.lower(), f_n)//2, ry+175), val.lower(), f_n, sub_color, shadow=use_shadow)
                         if diff: 
                             draw_styled_text(draw, (cx - draw.textlength(diff, f_l)//2, ry+230), diff, f_l, m_color, shadow=use_shadow)
 
-                # --- [추가된 부분: 데일리 모드 전용 오른쪽 하단 아이콘] ---
                 if mode == "DAILY":
                     daily_icon_name = "dumbbell" if v_type in ["WeightTraining", "Workout"] else "run"
                     daily_icon = get_icon_pil(daily_icon_name, size=(60, 60))
@@ -529,7 +524,6 @@ else:
                         icon_x = int(rx + rw - 60 - 20)
                         icon_y = int(ry + rh - 60 - 20)
                         overlay.paste(daily_icon, (icon_x, icon_y), daily_icon)
-                # -------------------------------------------------------------
                             
             if show_vis:
                 vis_layer = None
@@ -565,11 +559,15 @@ else:
                         m_pos = (m_pos_x, m_pos_y)
                     overlay.paste(vis_layer, (int(m_pos[0]), int(m_pos[1])), vis_layer)
 
+            # 로고 배치를 데이터 박스 우측 상단으로 이동
             if log_file:
-                ls, margin = 100, 40
+                ls, margin = 100, 20
                 l_img = ImageOps.fit(Image.open(log_file).convert("RGBA"), (ls, ls))
                 mask = Image.new('L', (ls, ls), 0); ImageDraw.Draw(mask).ellipse((0, 0, ls, ls), fill=255); l_img.putalpha(mask)
-                overlay.paste(l_img, (CW - ls - margin, margin), l_img)
+                
+                logo_x = int(rx + rw - ls - margin)
+                logo_y = int(ry + margin)
+                overlay.paste(l_img, (logo_x, logo_y), l_img)
 
             final = Image.alpha_composite(canvas, overlay).convert("RGB")
             
@@ -626,7 +624,3 @@ else:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
-
-
-
-
