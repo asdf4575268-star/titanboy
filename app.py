@@ -67,21 +67,19 @@ def load_font(name, size):
         return ImageFont.load_default()
 
 def get_icon(name):
-    # 다운로드가 안정적인 icons8 링크 사용 (흰색 아이콘)
     urls = {
-        "run": "https://img.icons8.com/ios-filled/100/ffffff/running.png",
-        "dumbbell": "https://img.icons8.com/ios-filled/100/ffffff/dumbbell.png"
+        "run": "https://img.icons8.com/ios-filled/150/ffffff/running.png",
+        "dumbbell": "https://img.icons8.com/ios-filled/150/ffffff/dumbbell.png"
     }
     f_path = f"icon_{name}.png"
     
     if not os.path.exists(f_path):
         try:
-            # 봇 차단을 막기 위해 User-Agent 헤더 추가
-            headers = {'User-Agent': 'Mozilla/5.0'}
-            r = requests.get(urls[name], headers=headers)
-            if r.status_code == 200:
-                with open(f_path, "wb") as f:
-                    f.write(r.content)
+            # 봇 차단을 더 확실히 피하기 위해 urllib 사용
+            import urllib.request
+            req = urllib.request.Request(urls[name], headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
+            with urllib.request.urlopen(req) as response, open(f_path, 'wb') as out_file:
+                out_file.write(response.read())
         except Exception as e:
             print(f"아이콘 다운로드 실패: {e}")
             return None
@@ -188,33 +186,37 @@ def create_bar_chart(data1, color1, data2=None, color2=None, mode="WEEKLY", labe
     fig, ax = plt.subplots(figsize=(10, 5.0), dpi=150)
     fig.patch.set_alpha(0); ax.patch.set_alpha(0)
     
-    bars1 = ax.bar(x_pos, data1, color=color1, width=0.6)
+    # 첫 번째 데이터 (달리기)
+    bars1 = ax.bar(x_pos, data1, color=color1, width=0.6, zorder=3)
     
+    # 두 번째 데이터 (기타 운동 - 누적)
     if data2 is not None and color2 is not None:
-        bars2 = ax.bar(x_pos, data2, bottom=data1, color=color2, width=0.6)
+        bars2 = ax.bar(x_pos, data2, bottom=data1, color=color2, width=0.6, zorder=3)
         
-    run_img = get_icon("run")
-    dumb_img = get_icon("dumbbell")
-    
-    max_val = max([d1 + (d2 if d2 else 0) for d1, d2 in zip(data1, data2 or [0]*len(data1))]) if data1 else 1
-    min_threshold = max_val * 0.08 
-    
-    # 월간(MONTHLY)은 막대가 많고 얇으므로 아이콘 크기를 작게(0.15), 주간(WEEKLY)은 0.3으로 설정
-    zoom_factor = 0.3 if mode == "WEEKLY" else 0.15
-    
-    if run_img:
-        for i, val in enumerate(data1):
-            if val > min_threshold:
-                imagebox = OffsetImage(run_img, zoom=zoom_factor, alpha=0.9) 
-                ab = AnnotationBbox(imagebox, (i, val / 2), frameon=False)
-                ax.add_artist(ab)
-                
-    if data2 is not None and color2 is not None and dumb_img:
-        for i, val in enumerate(data2):
-            if val > min_threshold:
-                imagebox = OffsetImage(dumb_img, zoom=zoom_factor, alpha=0.9)
-                ab = AnnotationBbox(imagebox, (i, data1[i] + (val / 2)), frameon=False)
-                ax.add_artist(ab)
+    # === WEEKLY 모드일 때만 아이콘 표시 ===
+    if mode == "WEEKLY":
+        run_img = get_icon("run")
+        dumb_img = get_icon("dumbbell")
+        
+        max_val = max([d1 + (d2 if d2 else 0) for d1, d2 in zip(data1, data2 or [0]*len(data1))]) if data1 else 1
+        min_threshold = max_val * 0.08 
+        
+        zoom_factor = 0.25 # 150px 해상도에 맞춘 줌 비율
+        
+        if run_img:
+            for i, val in enumerate(data1):
+                if val > min_threshold:
+                    imagebox = OffsetImage(run_img, zoom=zoom_factor, alpha=0.9) 
+                    # zorder=10을 주어 무조건 막대그래프(zorder=3) 위로 올라오게 설정
+                    ab = AnnotationBbox(imagebox, (i, val / 2), frameon=False, pad=0, zorder=10)
+                    ax.add_artist(ab)
+                    
+        if data2 is not None and color2 is not None and dumb_img:
+            for i, val in enumerate(data2):
+                if val > min_threshold:
+                    imagebox = OffsetImage(dumb_img, zoom=zoom_factor, alpha=0.9)
+                    ab = AnnotationBbox(imagebox, (i, data1[i] + (val / 2)), frameon=False, pad=0, zorder=10)
+                    ax.add_artist(ab)
 
     ax.set_xticks(x_pos); ax.set_xticklabels(labels)
     for s in ['top', 'right', 'left']: ax.spines[s].set_visible(False)
@@ -682,3 +684,4 @@ else:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
