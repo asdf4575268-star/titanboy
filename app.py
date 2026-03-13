@@ -10,6 +10,7 @@ import base64
 import streamlit.components.v1 as components
 import sqlite3
 import time
+from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 
 # --- [1. 기본 설정 및 API] ---
 API_CONFIGS = {
@@ -65,6 +66,29 @@ def load_font(name, size):
     except:
         return ImageFont.load_default()
 
+def get_icon(name):
+    # 구글 Material Design 무료 아이콘 (흰색) URL
+    urls = {
+        "run": "https://raw.githubusercontent.com/google/material-design-icons/master/png/maps/directions_run/materialicons/48dp/2x/baseline_directions_run_white_48dp.png",
+        "dumbbell": "https://raw.githubusercontent.com/google/material-design-icons/master/png/places/fitness_center/materialicons/48dp/2x/baseline_fitness_center_white_48dp.png"
+    }
+    f_path = f"icon_{name}.png"
+    
+    # 파일이 없으면 다운로드
+    if not os.path.exists(f_path):
+        try:
+            r = requests.get(urls[name])
+            with open(f_path, "wb") as f:
+                f.write(r.content)
+        except Exception as e:
+            print(f"아이콘 다운로드 실패: {e}")
+            return None
+            
+    try:
+        return Image.open(f_path).convert("RGBA")
+    except:
+        return None
+    
 def get_weekly_stats(activities, target_date_str, target_type="Run"):
     try:
         target_date = datetime.strptime(target_date_str, "%Y-%m-%d")
@@ -149,20 +173,49 @@ def create_bar_chart(data1, color1, data2=None, color2=None, mode="WEEKLY", labe
     fig, ax = plt.subplots(figsize=(10, 5.0), dpi=150)
     fig.patch.set_alpha(0); ax.patch.set_alpha(0)
     
-    # 첫 번째 데이터 (예: 달리기 시간)
+    # 첫 번째 데이터 (달리기)
     bars1 = ax.bar(x_pos, data1, color=color1, width=0.6)
     
-    # 두 번째 데이터가 있으면 누적(bottom=data1)으로 그리기 (예: 다른 운동 시간)
+    # 두 번째 데이터 (기타 운동 - 누적)
     if data2 is not None and color2 is not None:
         bars2 = ax.bar(x_pos, data2, bottom=data1, color=color2, width=0.6)
         
+    # 아이콘 로드
+    run_img = get_icon("run")
+    dumb_img = get_icon("dumbbell")
+    
+    # 그래프의 최대값을 구해 바가 너무 낮을 때는 아이콘을 그리지 않도록 방어 로직 추가
+    max_val = max([d1 + (d2 if d2 else 0) for d1, d2 in zip(data1, data2 or [0]*len(data1))]) if data1 else 1
+    min_threshold = max_val * 0.08 # 전체 높이의 8% 이상일 때만 아이콘 표시
+    
+    # 달리기 아이콘 배치 (바의 중앙)
+    if run_img:
+        for i, val in enumerate(data1):
+            if val > min_threshold:
+                # zoom 값으로 아이콘 크기 조절 (필요시 수정)
+                imagebox = OffsetImage(run_img, zoom=0.3, alpha=0.8) 
+                # (x위치, y위치 = 높이의 절반)
+                ab = AnnotationBbox(imagebox, (i, val / 2), frameon=False)
+                ax.add_artist(ab)
+                
+    # 덤벨 아이콘 배치 (두 번째 바의 중앙)
+    if data2 is not None and color2 is not None and dumb_img:
+        for i, val in enumerate(data2):
+            if val > min_threshold:
+                imagebox = OffsetImage(dumb_img, zoom=0.3, alpha=0.8)
+                # (x위치, y위치 = 밑바탕 높이 + 내 높이의 절반)
+                ab = AnnotationBbox(imagebox, (i, data1[i] + (val / 2)), frameon=False)
+                ax.add_artist(ab)
+
     ax.set_xticks(x_pos); ax.set_xticklabels(labels)
     for s in ['top', 'right', 'left']: ax.spines[s].set_visible(False)
     ax.tick_params(axis='x', colors='white')
+    
     if prop:
         for label in ax.get_xticklabels(): 
             label.set_fontproperties(prop)
             label.set_fontsize(10 if mode=="MONTHLY" else 14)
+            
     ax.tick_params(axis='y', left=False, labelleft=False)
     
     plt.tight_layout(); buf = io.BytesIO(); plt.savefig(buf, format='png', transparent=True); buf.seek(0); plt.close(fig)
@@ -620,4 +673,5 @@ else:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
