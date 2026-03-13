@@ -21,7 +21,7 @@ CURRENT_CFG = API_CONFIGS["PRIMARY"]
 CLIENT_ID, CLIENT_SECRET = CURRENT_CFG["ID"], CURRENT_CFG["SECRET"]
 ACTUAL_URL = "https://titanboy-kgcnje3tg3hbfpfsp6uwzc.streamlit.app"
 
-# 모바일 친화적 페이지 설정 (centered 추천, 기존 wide 유지 가능)
+# 모바일 친화적 페이지 설정
 logo = Image.open("logo.png")
 st.set_page_config(
     layout="centered",
@@ -66,52 +66,47 @@ def load_font(name, size):
     except:
         return ImageFont.load_default()
 
+@st.cache_data(show_spinner=False)
 def get_icon(name):
-    # 다운로드가 안정적인 icons8 링크 사용 (흰색 아이콘)
     urls = {
         "run": "https://img.icons8.com/ios-filled/150/ffffff/running.png",
         "dumbbell": "https://img.icons8.com/ios-filled/150/ffffff/dumbbell.png"
     }
-    
     try:
-        # 봇 차단을 피하기 위한 헤더 추가
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
         r = requests.get(urls[name], headers=headers, timeout=5)
-        
         if r.status_code == 200:
-            # 파일을 로컬에 저장하지 않고, BytesIO를 통해 메모리에서 바로 이미지로 변환
             img = Image.open(io.BytesIO(r.content)).convert("RGBA")
-            # Matplotlib의 OffsetImage가 가장 안정적으로 인식하는 numpy 배열로 변환하여 반환
             return np.array(img)
     except Exception as e:
         print(f"아이콘 다운로드 실패: {e}")
-        
     return None
-    
+
 def get_weekly_stats(activities, target_date_str, target_type="Run"):
     try:
         target_date = datetime.strptime(target_date_str, "%Y-%m-%d")
         start_of_week = target_date - timedelta(days=target_date.weekday())
         end_of_week = start_of_week + timedelta(days=6)
         
-        run_times = [0.0] * 7
+        # 달리기는 거리(km), 기타 운동은 시간(min)으로 분리 저장
+        run_dists = [0.0] * 7
         other_times = [0.0] * 7
+        
         total_dist, total_time, hr_sum, hr_count = 0.0, 0, 0, 0
         
         for act in activities:
             act_date = datetime.strptime(act['start_date_local'][:10], "%Y-%m-%d")
             if start_of_week <= act_date <= end_of_week:
-                time_min = act.get('moving_time', 0) / 60
-                
                 if act.get('type') == 'Run':
-                    run_times[act_date.weekday()] += time_min
                     dist = act.get('distance', 0) / 1000
+                    run_dists[act_date.weekday()] += dist
                     total_dist += dist
                     total_time += act.get('moving_time', 0)
                     if act.get('average_heartrate'): 
                         hr_sum += act.get('average_heartrate')
                         hr_count += 1
                 elif act.get('type') in ['WeightTraining', 'Workout']:
+                    time_min = act.get('moving_time', 0) / 60
                     other_times[act_date.weekday()] += time_min
                     
         avg_hr = int(hr_sum / hr_count) if hr_count > 0 else 0
@@ -120,7 +115,7 @@ def get_weekly_stats(activities, target_date_str, target_type="Run"):
         dist_str = f"{total_dist:.2f}"
         
         return {
-            "run_times": run_times, 
+            "run_dists": run_dists, 
             "other_times": other_times, 
             "total_dist": dist_str, 
             "total_time": f"{total_time//3600:02d}:{(total_time%3600)//60:02d}:{total_time%60:02d}", 
@@ -140,24 +135,23 @@ def get_monthly_stats(activities, target_date_str, target_type="Run"):
         last_day = next_month - timedelta(days=next_month.day)
         num_days = last_day.day
         
-        run_times = [0.0] * num_days
+        run_dists = [0.0] * num_days
         other_times = [0.0] * num_days
         total_dist, total_time, hr_sum, hr_count = 0.0, 0, 0, 0
         
         for act in activities:
             act_date = datetime.strptime(act['start_date_local'][:10], "%Y-%m-%d")
             if first_day <= act_date <= last_day:
-                time_min = act.get('moving_time', 0) / 60
-                
                 if act.get('type') == 'Run':
-                    run_times[act_date.day - 1] += time_min
                     dist = act.get('distance', 0) / 1000
+                    run_dists[act_date.day - 1] += dist
                     total_dist += dist
                     total_time += act.get('moving_time', 0)
                     if act.get('average_heartrate'): 
                         hr_sum += act.get('average_heartrate')
                         hr_count += 1
                 elif act.get('type') in ['WeightTraining', 'Workout']:
+                    time_min = act.get('moving_time', 0) / 60
                     other_times[act_date.day - 1] += time_min
                     
         avg_hr = int(hr_sum / hr_count) if hr_count > 0 else 0
@@ -166,7 +160,7 @@ def get_monthly_stats(activities, target_date_str, target_type="Run"):
         dist_str = f"{total_dist:.2f}"
         
         return {
-            "run_times": run_times, 
+            "run_dists": run_dists, 
             "other_times": other_times, 
             "total_dist": dist_str, 
             "total_time": f"{total_time//3600:02d}:{(total_time%3600)//60:02d}:{total_time%60:02d}", 
@@ -177,58 +171,66 @@ def get_monthly_stats(activities, target_date_str, target_type="Run"):
         }
     except: return None
 
+# --- 혼합 그래프 (막대: 시간, 꺾은선: 거리) ---
 def create_bar_chart(data1, color1, data2=None, color2=None, mode="WEEKLY", labels=None, font_path=None):
+    # data1 = 달리기 거리 (km)
+    # data2 = 기타 운동 시간 (min)
     if mode == "WEEKLY": labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
     x_pos = np.arange(len(labels))
     prop = font_manager.FontProperties(fname=font_path) if font_path else None
     
-    fig, ax = plt.subplots(figsize=(10, 5.0), dpi=150)
-    fig.patch.set_alpha(0); ax.patch.set_alpha(0)
+    fig, ax1 = plt.subplots(figsize=(10, 5.0), dpi=150)
+    fig.patch.set_alpha(0); ax1.patch.set_alpha(0)
     
-    # 첫 번째 데이터 (달리기)
-    bars1 = ax.bar(x_pos, data1, color=color1, width=0.6, zorder=3)
-    
-    # 두 번째 데이터 (기타 운동 - 누적)
-    if data2 is not None and color2 is not None:
-        bars2 = ax.bar(x_pos, data2, bottom=data1, color=color2, width=0.6, zorder=3)
+    # 1. 기타 운동 시간 (막대 그래프)
+    if data2 is not None and color2 is not None and sum(data2) > 0:
+        bars2 = ax1.bar(x_pos, data2, color=color2, width=0.6, alpha=0.8, zorder=3)
         
-    # === WEEKLY 모드일 때만 아이콘 표시 ===
+    # 2. 달리기 거리 (꺾은선 그래프 - 이중 축 사용)
+    ax2 = ax1.twinx()
+    ax2.patch.set_alpha(0)
+    if sum(data1) > 0:
+        # 꺾은선 그래프: 선과 마커(점) 함께 표시
+        ax2.plot(x_pos, data1, color=color1, marker='o', linewidth=3, markersize=8, zorder=4)
+        
+    # === WEEKLY 모드 아이콘 배치 ===
     if mode == "WEEKLY":
         run_img_arr = get_icon("run")
         dumb_img_arr = get_icon("dumbbell")
+        zoom_factor = 0.23
         
-        max_val = max([d1 + (d2 if d2 else 0) for d1, d2 in zip(data1, data2 or [0]*len(data1))]) if data1 else 1
-        min_threshold = max_val * 0.08 # 그래프가 너무 낮을 땐 아이콘 생략
-        
-        zoom_factor = 0.25 # 아이콘 크기
-        
-        # 달리기 아이콘
-        if run_img_arr is not None:
-            for i, val in enumerate(data1):
-                if val > min_threshold:
-                    imagebox = OffsetImage(run_img_arr, zoom=zoom_factor, alpha=0.9) 
-                    ab = AnnotationBbox(imagebox, (i, val / 2), frameon=False, pad=0, zorder=10)
-                    ax.add_artist(ab)
-                    
-        # 덤벨 아이콘
-        if data2 is not None and color2 is not None and dumb_img_arr is not None:
+        # 덤벨 아이콘 (막대의 정중앙)
+        if data2 is not None and color2 is not None and dumb_img_arr is not None and sum(data2) > 0:
+            max_val2 = max(data2) if max(data2) > 0 else 1
+            min_threshold2 = max_val2 * 0.08
             for i, val in enumerate(data2):
-                if val > min_threshold:
+                if val > min_threshold2:
                     imagebox = OffsetImage(dumb_img_arr, zoom=zoom_factor, alpha=0.9)
-                    ab = AnnotationBbox(imagebox, (i, data1[i] + (val / 2)), frameon=False, pad=0, zorder=10)
-                    ax.add_artist(ab)
+                    ab = AnnotationBbox(imagebox, (i, val / 2), frameon=False, pad=0, zorder=10)
+                    ax1.add_artist(ab)
+                    
+        # 달리기 아이콘 (꺾은선 마커 바로 위)
+        if run_img_arr is not None and sum(data1) > 0:
+            max_val1 = max(data1) if max(data1) > 0 else 1
+            offset = max_val1 * 0.08 # 점과 겹치지 않게 살짝 위로 띄움
+            for i, val in enumerate(data1):
+                if val > 0: # 뛴 날만 표시
+                    imagebox = OffsetImage(run_img_arr, zoom=zoom_factor, alpha=0.9)
+                    ab = AnnotationBbox(imagebox, (i, val + offset), frameon=False, pad=0, zorder=10)
+                    ax2.add_artist(ab)
 
-    ax.set_xticks(x_pos); ax.set_xticklabels(labels)
-    for s in ['top', 'right', 'left']: ax.spines[s].set_visible(False)
-    ax.tick_params(axis='x', colors='white')
-    
+    # 축과 테두리 정리
+    ax1.set_xticks(x_pos); ax1.set_xticklabels(labels)
+    for ax in [ax1, ax2]:
+        for s in ['top', 'right', 'left']: ax.spines[s].set_visible(False)
+        ax.tick_params(axis='y', left=False, right=False, labelleft=False, labelright=False)
+        
+    ax1.tick_params(axis='x', colors='white')
     if prop:
-        for label in ax.get_xticklabels(): 
+        for label in ax1.get_xticklabels(): 
             label.set_fontproperties(prop)
             label.set_fontsize(10 if mode=="MONTHLY" else 14)
             
-    ax.tick_params(axis='y', left=False, labelleft=False)
-    
     plt.tight_layout(); buf = io.BytesIO(); plt.savefig(buf, format='png', transparent=True); buf.seek(0); plt.close(fig)
     return Image.open(buf)
 
@@ -354,7 +356,7 @@ if st.session_state.get('access_token'):
             st.rerun()
     acts = st.session_state.get('cached_acts', [])
 
-# --- [4. 메인 화면 구성 및 UI 레이아웃 (모바일 친화형 1 Column)] ---
+# --- [4. 메인 화면 구성 및 UI 레이아웃] ---
 def get_base64(path):
     with open(path, "rb") as f:
         return base64.b64encode(f.read()).decode()
@@ -391,7 +393,7 @@ log_file = None
 user_graph_file = None
 mode = "DAILY"
 v_act, v_date, v_dist, v_pace, v_time, v_hr, v_type = "RUNNING", "2026.02.16", "0.00", "00:00:00", "0'00\"", "0", "Run"
-v_memo = "" # 메모용 변수 추가
+v_memo = "" 
 weekly_data, monthly_data, a = None, None, None
 v_diff_str = ""
 
@@ -508,9 +510,9 @@ else:
         COLOR_OPTS = {"Black": "#000000", "Yellow": "#FFD700", "White": "#FFFFFF", "Orange": "#FF4500", "Blue": "#00BFFF", "Grey": "#AAAAAA"}
         c_col1, c_col2 = st.columns(2)
         with c_col1:
-            m_color = COLOR_OPTS[st.selectbox("포인트 컬러", list(COLOR_OPTS.keys()), index=1,  key="m_col_sel")]
+            m_color = COLOR_OPTS[st.selectbox("포인트 컬러 (달리기/거리)", list(COLOR_OPTS.keys()), index=1,  key="m_col_sel")]
         with c_col2:
-            sub_color = COLOR_OPTS[st.selectbox("서브 컬러", list(COLOR_OPTS.keys()), index=2, key="s_col_sel")]
+            sub_color = COLOR_OPTS[st.selectbox("서브 컬러 (기타운동/시간)", list(COLOR_OPTS.keys()), index=2, key="s_col_sel")]
 
         default_idx = 0 if mode == "DAILY" else 1
         c_opt1, c_opt2 = st.columns(2)
@@ -577,7 +579,6 @@ else:
                     for i, (lab, val, diff) in enumerate(items):
                         cx = rx + (i * sec_w) + (sec_w // 2)
                         draw_styled_text(draw, (cx - draw.textlength(lab.lower(), f_l)//2, ry+160), lab.lower(), f_l, "#AAAAAA", shadow=use_shadow)
-                        # 긴 메모가 들어갈 수 있으므로 폰트 크기 조절 등을 고려할 수 있으나 현재는 동일 서식 유지
                         draw_styled_text(draw, (cx - draw.textlength(val.lower(), f_n)//2, ry+195), val.lower(), f_n, sub_color, shadow=use_shadow)
                         if diff: 
                             draw_styled_text(draw, (cx - draw.textlength(diff, f_l)//2, ry+250), diff, f_l, m_color, shadow=use_shadow)
@@ -602,9 +603,10 @@ else:
                     
                 elif mode in ["WEEKLY", "MONTHLY"] and (weekly_data or monthly_data):
                     d_obj = weekly_data if mode == "WEEKLY" else monthly_data
+                    # === 수정된 데이터 전달 (달리기는 거리 데이터 사용) ===
                     chart_img = create_bar_chart(
-                        data1=d_obj['run_times'], color1=m_color, 
-                        data2=d_obj['other_times'], color2=sub_color, # sub_color를 다른 운동 색상으로 활용
+                        data1=d_obj['run_dists'], color1=m_color, 
+                        data2=d_obj['other_times'], color2=sub_color,
                         mode=mode, 
                         labels=d_obj.get('labels'), 
                         font_path=None
@@ -684,5 +686,3 @@ else:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
-
-
