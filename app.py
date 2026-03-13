@@ -67,27 +67,26 @@ def load_font(name, size):
         return ImageFont.load_default()
 
 def get_icon(name):
+    # 다운로드가 안정적인 icons8 링크 사용 (흰색 아이콘)
     urls = {
         "run": "https://img.icons8.com/ios-filled/150/ffffff/running.png",
         "dumbbell": "https://img.icons8.com/ios-filled/150/ffffff/dumbbell.png"
     }
-    f_path = f"icon_{name}.png"
     
-    if not os.path.exists(f_path):
-        try:
-            # 봇 차단을 더 확실히 피하기 위해 urllib 사용
-            import urllib.request
-            req = urllib.request.Request(urls[name], headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
-            with urllib.request.urlopen(req) as response, open(f_path, 'wb') as out_file:
-                out_file.write(response.read())
-        except Exception as e:
-            print(f"아이콘 다운로드 실패: {e}")
-            return None
-            
     try:
-        return Image.open(f_path).convert("RGBA")
-    except:
-        return None
+        # 봇 차단을 피하기 위한 헤더 추가
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+        r = requests.get(urls[name], headers=headers, timeout=5)
+        
+        if r.status_code == 200:
+            # 파일을 로컬에 저장하지 않고, BytesIO를 통해 메모리에서 바로 이미지로 변환
+            img = Image.open(io.BytesIO(r.content)).convert("RGBA")
+            # Matplotlib의 OffsetImage가 가장 안정적으로 인식하는 numpy 배열로 변환하여 반환
+            return np.array(img)
+    except Exception as e:
+        print(f"아이콘 다운로드 실패: {e}")
+        
+    return None
     
 def get_weekly_stats(activities, target_date_str, target_type="Run"):
     try:
@@ -195,26 +194,27 @@ def create_bar_chart(data1, color1, data2=None, color2=None, mode="WEEKLY", labe
         
     # === WEEKLY 모드일 때만 아이콘 표시 ===
     if mode == "WEEKLY":
-        run_img = get_icon("run")
-        dumb_img = get_icon("dumbbell")
+        run_img_arr = get_icon("run")
+        dumb_img_arr = get_icon("dumbbell")
         
         max_val = max([d1 + (d2 if d2 else 0) for d1, d2 in zip(data1, data2 or [0]*len(data1))]) if data1 else 1
-        min_threshold = max_val * 0.08 
+        min_threshold = max_val * 0.08 # 그래프가 너무 낮을 땐 아이콘 생략
         
-        zoom_factor = 0.25 # 150px 해상도에 맞춘 줌 비율
+        zoom_factor = 0.25 # 아이콘 크기
         
-        if run_img:
+        # 달리기 아이콘
+        if run_img_arr is not None:
             for i, val in enumerate(data1):
                 if val > min_threshold:
-                    imagebox = OffsetImage(run_img, zoom=zoom_factor, alpha=0.9) 
-                    # zorder=10을 주어 무조건 막대그래프(zorder=3) 위로 올라오게 설정
+                    imagebox = OffsetImage(run_img_arr, zoom=zoom_factor, alpha=0.9) 
                     ab = AnnotationBbox(imagebox, (i, val / 2), frameon=False, pad=0, zorder=10)
                     ax.add_artist(ab)
                     
-        if data2 is not None and color2 is not None and dumb_img:
+        # 덤벨 아이콘
+        if data2 is not None and color2 is not None and dumb_img_arr is not None:
             for i, val in enumerate(data2):
                 if val > min_threshold:
-                    imagebox = OffsetImage(dumb_img, zoom=zoom_factor, alpha=0.9)
+                    imagebox = OffsetImage(dumb_img_arr, zoom=zoom_factor, alpha=0.9)
                     ab = AnnotationBbox(imagebox, (i, data1[i] + (val / 2)), frameon=False, pad=0, zorder=10)
                     ax.add_artist(ab)
 
@@ -684,4 +684,5 @@ else:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
