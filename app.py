@@ -47,7 +47,10 @@ def load_font(name, size):
     fonts = {
         "BlackHanSans": "https://github.com/google/fonts/raw/main/ofl/blackhansans/BlackHanSans-Regular.ttf",
         "KirangHaerang": "https://github.com/google/fonts/raw/main/ofl/kiranghaerang/KirangHaerang-Regular.ttf",
-        "Lacquer": "https://github.com/google/fonts/raw/main/ofl/lacquer/Lacquer-Regular.ttf"
+        "Lacquer": "https://github.com/google/fonts/raw/main/ofl/lacquer/Lacquer-Regular.ttf",
+        "Condiment": "https://github.com/google/fonts/raw/main/ofl/condiment/Condiment-Regular.ttf",
+        "Bangers": "https://github.com/google/fonts/raw/main/ofl/bangers/Bangers-Regular.ttf",
+        "BagelFatOne": "https://github.com/google/fonts/raw/main/ofl/bagelfatone/BagelFatOne-Regular.ttf"
     }
     f_path = f"font_{name}.ttf"
     if not os.path.exists(f_path):
@@ -413,7 +416,7 @@ else:
         with c_opt1:
             box_orient = st.radio("박스 방향", ["Vertical", "Horizontal"], index=default_idx, horizontal=True, key=f"orient_{mode}")     
         with c_opt2:
-            sel_font = st.selectbox("폰트", ["BlackHanSans", "KirangHaerang", "Lacquer"])
+            sel_font = st.selectbox("폰트", ["BlackHanSans", "KirangHaerang", "Lacquer", "Condiment", "Bangers", "BagelFatOne"])
 
         st.markdown("**위치 및 크기 조절**")
         c_pos1, c_pos2 = st.columns(2)
