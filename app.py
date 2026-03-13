@@ -70,24 +70,50 @@ def get_weekly_stats(activities, target_date_str, target_type="Run"):
         target_date = datetime.strptime(target_date_str, "%Y-%m-%d")
         start_of_week = target_date - timedelta(days=target_date.weekday())
         end_of_week = start_of_week + timedelta(days=6)
-        weekly_dist = [0.0] * 7
+        
+        # 두 가지 데이터를 담을 배열 초기화
+        run_times = [0.0] * 7
+        other_times = [0.0] * 7
+        
         total_dist, total_time, hr_sum, hr_count = 0.0, 0, 0, 0
+        
         for act in activities:
-            if act.get('type') == target_type:
-                act_date = datetime.strptime(act['start_date_local'][:10], "%Y-%m-%d")
-                if start_of_week <= act_date <= end_of_week:
+            act_date = datetime.strptime(act['start_date_local'][:10], "%Y-%m-%d")
+            if start_of_week <= act_date <= end_of_week:
+                time_min = act.get('moving_time', 0) / 60
+                
+                # 달리기인 경우
+                if act.get('type') == 'Run':
+                    run_times[act_date.weekday()] += time_min
                     dist = act.get('distance', 0) / 1000
-                    time_min = act.get('moving_time', 0) / 60
-                    chart_val = dist if target_type == "Run" else time_min
-                    weekly_dist[act_date.weekday()] += chart_val
-                    total_dist += dist; total_time += act.get('moving_time', 0)
-                    if act.get('average_heartrate'): hr_sum += act.get('average_heartrate'); hr_count += 1
+                    total_dist += dist
+                    total_time += act.get('moving_time', 0)
+                    if act.get('average_heartrate'): 
+                        hr_sum += act.get('average_heartrate')
+                        hr_count += 1
+                # 다른 운동인 경우 (WeightTraining, Workout 등)
+                elif act.get('type') in ['WeightTraining', 'Workout']:
+                    other_times[act_date.weekday()] += time_min
+                    # 다른 운동의 시간이나 심박수도 메인 통계에 합산하고 싶다면 아래 주석 해제
+                    # total_time += act.get('moving_time', 0)
+                    
         avg_hr = int(hr_sum / hr_count) if hr_count > 0 else 0
         avg_pace_sec = (total_time / total_dist) if total_dist > 0 else 0
-        avg_pace_str = f"{int(avg_pace_sec//60)}'{int(avg_pace_sec%60):02d}\"" if target_type == "Run" else "-"
-        dist_str = f"{total_dist:.2f}" if target_type == "Run" else "-"
-        return {"dists": weekly_dist, "total_dist": dist_str, "total_time": f"{total_time//3600:02d}:{(total_time%3600)//60:02d}:{total_time%60:02d}", "avg_pace": avg_pace_str, "avg_hr": str(avg_hr), "range": f"{start_of_week.strftime('%m.%d')} - {end_of_week.strftime('%m.%d')}"}
-    except: return None
+        avg_pace_str = f"{int(avg_pace_sec//60)}'{int(avg_pace_sec%60):02d}\"" if total_dist > 0 else "-"
+        dist_str = f"{total_dist:.2f}"
+        
+        return {
+            "run_times": run_times, 
+            "other_times": other_times, 
+            "total_dist": dist_str, 
+            "total_time": f"{total_time//3600:02d}:{(total_time%3600)//60:02d}:{total_time%60:02d}", 
+            "avg_pace": avg_pace_str, 
+            "avg_hr": str(avg_hr), 
+            "range": f"{start_of_week.strftime('%m.%d')} - {end_of_week.strftime('%m.%d')}"
+        }
+    except Exception as e: 
+        print(f"Error: {e}")
+        return None
 
 def get_monthly_stats(activities, target_date_str, target_type="Run"):
     try:
@@ -115,19 +141,30 @@ def get_monthly_stats(activities, target_date_str, target_type="Run"):
         return {"dists": monthly_dist, "total_dist": dist_str, "total_time": f"{total_time//3600:02d}:{(total_time%3600)//60:02d}:{total_time%60:02d}", "avg_pace": avg_pace_str, "avg_hr": str(avg_hr), "range": first_day.strftime('%Y.%m'), "labels": [str(i+1) for i in range(num_days)]}
     except: return None
 
-def create_bar_chart(data, color_hex, mode="WEEKLY", labels=None, font_path=None):
+def create_bar_chart(data1, color1, data2=None, color2=None, mode="WEEKLY", labels=None, font_path=None):
     if mode == "WEEKLY": labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
     x_pos = np.arange(len(labels))
     prop = font_manager.FontProperties(fname=font_path) if font_path else None
+    
     fig, ax = plt.subplots(figsize=(10, 5.0), dpi=150)
     fig.patch.set_alpha(0); ax.patch.set_alpha(0)
-    bars = ax.bar(x_pos, data, color=color_hex, width=0.6)
+    
+    # 첫 번째 데이터 (예: 달리기 시간)
+    bars1 = ax.bar(x_pos, data1, color=color1, width=0.6)
+    
+    # 두 번째 데이터가 있으면 누적(bottom=data1)으로 그리기 (예: 다른 운동 시간)
+    if data2 is not None and color2 is not None:
+        bars2 = ax.bar(x_pos, data2, bottom=data1, color=color2, width=0.6)
+        
     ax.set_xticks(x_pos); ax.set_xticklabels(labels)
     for s in ['top', 'right', 'left']: ax.spines[s].set_visible(False)
     ax.tick_params(axis='x', colors='white')
     if prop:
-        for label in ax.get_xticklabels(): label.set_fontproperties(prop); label.set_fontsize(10 if mode=="MONTHLY" else 14)
+        for label in ax.get_xticklabels(): 
+            label.set_fontproperties(prop)
+            label.set_fontsize(10 if mode=="MONTHLY" else 14)
     ax.tick_params(axis='y', left=False, labelleft=False)
+    
     plt.tight_layout(); buf = io.BytesIO(); plt.savefig(buf, format='png', transparent=True); buf.seek(0); plt.close(fig)
     return Image.open(buf)
 
@@ -501,7 +538,14 @@ else:
                     
                 elif mode in ["WEEKLY", "MONTHLY"] and (weekly_data or monthly_data):
                     d_obj = weekly_data if mode == "WEEKLY" else monthly_data
-                    chart_img = create_bar_chart(d_obj['dists'], m_color, mode=mode, labels=d_obj.get('labels'), font_path=None)
+                    chart_img = create_bar_chart(
+                        data1=d_obj['run_times'], color1=m_color, 
+                        data2=d_obj['other_times'], color2=sub_color, # sub_color를 다른 운동 색상으로 활용
+                        mode=mode, 
+                        labels=d_obj.get('labels'), 
+                        font_path=None
+                    )
+    
                     target_h = int(CH * 0.7)
                     vis_layer = chart_img.resize((vis_sz, int(chart_img.size[1]*(vis_sz/chart_img.size[0]))), Image.Resampling.LANCZOS)
                     vis_layer.putalpha(vis_layer.getchannel('A').point(lambda x: x * (vis_alpha / 255)))
@@ -576,3 +620,4 @@ else:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
