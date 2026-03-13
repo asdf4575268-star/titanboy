@@ -3,7 +3,7 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 import io, os, requests, polyline, math
 import numpy as np
 from datetime import datetime, timedelta
-import matplotlib.pyplot as plt
+import matplotlib.subplots as plt
 import matplotlib as mpl
 from matplotlib import font_manager
 import base64
@@ -47,7 +47,10 @@ def load_font(name, size):
     fonts = {
         "BlackHanSans": "https://github.com/google/fonts/raw/main/ofl/blackhansans/BlackHanSans-Regular.ttf",
         "KirangHaerang": "https://github.com/google/fonts/raw/main/ofl/kiranghaerang/KirangHaerang-Regular.ttf",
-        "Lacquer": "https://github.com/google/fonts/raw/main/ofl/lacquer/Lacquer-Regular.ttf"
+        "Lacquer": "https://github.com/google/fonts/raw/main/ofl/lacquer/Lacquer-Regular.ttf",
+        "Condiment": "https://github.com/google/fonts/raw/main/ofl/condiment/Condiment-Regular.ttf",
+        "Bangers": "https://github.com/google/fonts/raw/main/ofl/bangers/Bangers-Regular.ttf",
+        "BagelFatOne": "https://github.com/google/fonts/raw/main/ofl/bagelfatone/BagelFatOne-Regular.ttf"
     }
     f_path = f"font_{name}.ttf"
     if not os.path.exists(f_path):
@@ -141,6 +144,10 @@ def create_bar_chart(data, color_hex, mode="WEEKLY", labels=None, font_path=None
     if mode == "WEEKLY": labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
     x_pos = np.arange(len(labels))
     prop = font_manager.FontProperties(fname=font_path) if font_path else None
+    
+    # plt.subplots 호출 시 필요한 모듈들을 직접 사용하도록 수정
+    import matplotlib.pyplot as plt
+    
     fig, ax = plt.subplots(figsize=(10, 5.0), dpi=150)
     fig.patch.set_alpha(0); ax.patch.set_alpha(0)
     bars = ax.bar(x_pos, data, color=color_hex, width=0.6)
@@ -438,7 +445,8 @@ else:
         with c_opt1:
             box_orient = st.radio("박스 방향", ["Vertical", "Horizontal"], index=default_idx, horizontal=True, key=f"orient_{mode}")     
         with c_opt2:
-            sel_font = st.selectbox("폰트", ["BlackHanSans", "KirangHaerang", "Lacquer"])
+            # 폰트 목록 복원됨!
+            sel_font = st.selectbox("폰트", ["BlackHanSans", "KirangHaerang", "Lacquer", "Condiment", "Bangers", "BagelFatOne"])
 
         st.markdown("**위치 및 크기 조절**")
         c_pos1, c_pos2 = st.columns(2)
@@ -495,7 +503,7 @@ else:
                         d_data = weekly_data if mode == "WEEKLY" else monthly_data
                         if d_data and d_data.get('other_count', 0) > 0:
                             dumb_icon = get_icon_pil("dumbbell", size=(25, 25))
-                            wo_text = f"{d_data['other_count']}sessions/{int(d_data['other_total_time'])}min"
+                            wo_text = f"{d_data['other_count']} sessions / {int(d_data['other_total_time'])} min"
                             if dumb_icon:
                                 overlay.paste(dumb_icon, (rx + 25, ry + 25), dumb_icon)
                                 draw_styled_text(draw, (rx + 55, ry + 27), wo_text, f_l, "#AAAAAA", shadow=use_shadow)
@@ -618,4 +626,3 @@ else:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
-
