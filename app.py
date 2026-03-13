@@ -20,7 +20,7 @@ CURRENT_CFG = API_CONFIGS["PRIMARY"]
 CLIENT_ID, CLIENT_SECRET = CURRENT_CFG["ID"], CURRENT_CFG["SECRET"]
 ACTUAL_URL = "https://titanboy-kgcnje3tg3hbfpfsp6uwzc.streamlit.app"
 
-# 모바일 친화적 페이지 설정 (centered 추천, 기존 wide 유지 가능)
+# 모바일 친화적 페이지 설정
 logo = Image.open("logo.png")
 st.set_page_config(
     layout="centered",
@@ -62,10 +62,12 @@ def load_font(name, size):
     except:
         return ImageFont.load_default()
 
-# 아이콘 로드용 함수 추가
 @st.cache_data(show_spinner=False)
 def get_icon_pil(name, size=(30, 30)):
-    urls = {"dumbbell": "https://img.icons8.com/ios-filled/150/ffffff/dumbbell.png"}
+    urls = {
+        "dumbbell": "https://img.icons8.com/ios-filled/150/ffffff/dumbbell.png",
+        "run": "https://img.icons8.com/ios-filled/150/ffffff/running.png"
+    }
     try:
         r = requests.get(urls.get(name), headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
         if r.status_code == 200:
@@ -273,7 +275,7 @@ if st.session_state.get('access_token'):
             st.rerun()
     acts = st.session_state.get('cached_acts', [])
 
-# --- [4. 메인 화면 구성 및 UI 레이아웃 (모바일 친화형 1 Column)] ---
+# --- [4. 메인 화면 구성 및 UI 레이아웃] ---
 def get_base64(path):
     with open(path, "rb") as f:
         return base64.b64encode(f.read()).decode()
@@ -466,11 +468,11 @@ else:
             overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
             
             if v_type in ["WeightTraining", "Workout"]:
-                items = [("time", v_time, ""), ("avg bpm", f"{v_hr} bpm", "")]
+                items = [("", v_time, ""), ("", f"{v_hr} bpm", "")]
                 if v_memo:
-                    items.append(("memo", v_memo, ""))
+                    items.append(("", v_memo, ""))
             else:
-                items = [("distance", f"{v_dist} km", v_diff_str), ("pace", v_pace, ""), ("time", v_time, ""), ("avg bpm", f"{v_hr} bpm", "")]
+                items = [("", f"{v_dist} km", v_diff_str), ("", v_pace, ""), ("", v_time, ""), ("", f"{v_hr} bpm", "")]
             
             if border_thick > 0:
                 draw.rectangle([(0, 0), (CW-1, CH-1)], outline=m_color, width=border_thick)
@@ -482,24 +484,23 @@ else:
                     draw_styled_text(draw, (rx + 40, ry + 110), v_date, f_d, "#AAAAAA", shadow=use_shadow)
                     y_c = ry + 200
                     for lab, val, diff in items:
-                        draw_styled_text(draw, (rx + 40, y_c), lab.lower(), f_l, "#AAAAAA", shadow=use_shadow)
-                        draw_styled_text(draw, (rx + 40, y_c + 35), val.lower(), f_n, sub_color, shadow=use_shadow)
+                        # 라벨(lab) 출력 생략하고 값의 높이를 살짝 올려서 정렬
+                        draw_styled_text(draw, (rx + 40, y_c + 15), val.lower(), f_n, sub_color, shadow=use_shadow)
                         if diff: 
-                            draw_styled_text(draw, (rx + 230, y_c + 35), diff, f_l, m_color, shadow=use_shadow)
-                        y_c += 105
+                            draw_styled_text(draw, (rx + 230, y_c + 15), diff, f_l, m_color, shadow=use_shadow)
+                        y_c += 95
                 else: 
-                    # --- [추가된 부분: 왼쪽 상단 워크아웃 세션/시간 표시] ---
+                    # 가로모드 왼쪽 상단 워크아웃 세션/시간 표시 (WEEKLY, MONTHLY)
                     if mode in ["WEEKLY", "MONTHLY"] and v_type == "Run":
                         d_data = weekly_data if mode == "WEEKLY" else monthly_data
                         if d_data and d_data.get('other_count', 0) > 0:
                             dumb_icon = get_icon_pil("dumbbell", size=(25, 25))
-                            wo_text = f"{d_data['other_count']}sessions/ {int(d_data['other_total_time'])}min"
+                            wo_text = f"{d_data['other_count']} sessions / {int(d_data['other_total_time'])} min"
                             if dumb_icon:
                                 overlay.paste(dumb_icon, (rx + 25, ry + 25), dumb_icon)
                                 draw_styled_text(draw, (rx + 55, ry + 27), wo_text, f_l, "#AAAAAA", shadow=use_shadow)
                             else:
                                 draw_styled_text(draw, (rx + 25, ry + 27), wo_text, f_l, "#AAAAAA", shadow=use_shadow)
-                    # -------------------------------------------------------------
                     
                     title_w = draw.textlength(v_act, f_t)
                     draw_styled_text(draw, (rx + (rw-title_w)//2, ry+35), v_act, f_t, m_color, shadow=use_shadow)
@@ -507,10 +508,20 @@ else:
                     sec_w = rw // len(items) if len(items) > 0 else rw
                     for i, (lab, val, diff) in enumerate(items):
                         cx = rx + (i * sec_w) + (sec_w // 2)
-                        draw_styled_text(draw, (cx - draw.textlength(lab.lower(), f_l)//2, ry+160), lab.lower(), f_l, "#AAAAAA", shadow=use_shadow)
-                        draw_styled_text(draw, (cx - draw.textlength(val.lower(), f_n)//2, ry+195), val.lower(), f_n, sub_color, shadow=use_shadow)
+                        # 라벨(lab) 출력 생략
+                        draw_styled_text(draw, (cx - draw.textlength(val.lower(), f_n)//2, ry+175), val.lower(), f_n, sub_color, shadow=use_shadow)
                         if diff: 
-                            draw_styled_text(draw, (cx - draw.textlength(diff, f_l)//2, ry+250), diff, f_l, m_color, shadow=use_shadow)
+                            draw_styled_text(draw, (cx - draw.textlength(diff, f_l)//2, ry+230), diff, f_l, m_color, shadow=use_shadow)
+
+                # --- [추가된 부분: 데일리 모드 전용 오른쪽 하단 아이콘] ---
+                if mode == "DAILY":
+                    daily_icon_name = "dumbbell" if v_type in ["WeightTraining", "Workout"] else "run"
+                    daily_icon = get_icon_pil(daily_icon_name, size=(60, 60))
+                    if daily_icon:
+                        icon_x = int(rx + rw - 60 - 20)
+                        icon_y = int(ry + rh - 60 - 20)
+                        overlay.paste(daily_icon, (icon_x, icon_y), daily_icon)
+                # -------------------------------------------------------------
                             
             if show_vis:
                 vis_layer = None
@@ -607,4 +618,3 @@ else:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
-
