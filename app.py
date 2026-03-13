@@ -68,7 +68,8 @@ def load_font(name, size):
 @st.cache_data(show_spinner=False)
 def get_icon_pil(name, size=(30, 30)):
     urls = {
-        "dumbbell": "https://img.icons8.com/ios-filled/150/ffffff/dumbbell.png"
+        "dumbbell": "https://img.icons8.com/ios-filled/150/ffffff/dumbbell.png",
+        "run": "https://img.icons8.com/ios-filled/150/ffffff/running.png"
     }
     try:
         headers = {'User-Agent': 'Mozilla/5.0'}
@@ -478,7 +479,6 @@ else:
             rw = st.number_input("박스 너비", 100, 1080, 1000 if box_orient=="Horizontal" else 450)
         with c_pos2:
             ry = st.number_input("박스 Y", 0, 1920, 250 if box_orient=="Horizontal" else (750 if mode != "DAILY" else 650))
-            # 항목 추가를 대비해 세로 모드(주/월간)일 때 박스 높이 기본값을 750으로 늘림
             rh = st.number_input("박스 높이", 100, 1920, 350 if box_orient=="Horizontal" else (750 if mode != "DAILY" else 650))
             
         box_alpha = st.slider("박스 투명도", 0, 255, 100)
@@ -500,14 +500,13 @@ else:
             canvas = make_smart_collage(bg_files, (CW, CH)) if bg_files else Image.new("RGBA", (CW, CH), (20, 20, 20, 255))
             overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
             
-            # 아이템 목록 구성 (아이콘 유무를 4번째 요소로 추가)
+            # 아이템 목록 구성
             if v_type in ["WeightTraining", "Workout"]:
                 items = [("time", v_time, "", None), ("avg bpm", f"{v_hr} bpm", "", None)]
                 if v_memo:
                     items.append(("memo", v_memo, "", None))
             else:
                 items = [("distance", f"{v_dist} km", v_diff_str, None), ("pace", v_pace, "", None), ("time", v_time, "", None), ("avg bpm", f"{v_hr} bpm", "", None)]
-                # WEEKLY나 MONTHLY이면서 다른 운동을 1번이라도 한 경우 항목 추가
                 if mode in ["WEEKLY", "MONTHLY"] and (weekly_data or monthly_data):
                     d_data = weekly_data if mode == "WEEKLY" else monthly_data
                     if d_data.get('other_count', 0) > 0:
@@ -526,10 +525,9 @@ else:
                     y_c = ry + 200
                     for lab, val, diff, icon_name in items:
                         cur_x = rx + 40
-                        # 아이콘이 있으면 라벨 옆에 붙이기
                         if icon_name == "dumbbell" and dumb_icon:
                             overlay.paste(dumb_icon, (cur_x, y_c), dumb_icon)
-                            cur_x += 35 # 아이콘 크기만큼 텍스트 밀어주기
+                            cur_x += 35 
                             
                         draw_styled_text(draw, (cur_x, y_c), lab.lower(), f_l, "#AAAAAA", shadow=use_shadow)
                         draw_styled_text(draw, (rx + 40, y_c + 35), val.lower(), f_n, sub_color, shadow=use_shadow)
@@ -537,6 +535,12 @@ else:
                             draw_styled_text(draw, (rx + 230, y_c + 35), diff, f_l, m_color, shadow=use_shadow)
                         y_c += 105
                 else: 
+                    # 가로모드 왼쪽 상단에 메인 아이콘 표시
+                    main_icon_name = "dumbbell" if v_type in ["WeightTraining", "Workout"] else "run"
+                    main_icon = get_icon_pil(main_icon_name, size=(40, 40))
+                    if main_icon:
+                        overlay.paste(main_icon, (rx + 30, ry + 30), main_icon)
+                        
                     title_w = draw.textlength(v_act, f_t)
                     draw_styled_text(draw, (rx + (rw-title_w)//2, ry+35), v_act, f_t, m_color, shadow=use_shadow)
                     draw_styled_text(draw, (rx + (rw-draw.textlength(v_date, f_d))//2, ry+110), v_date, f_d, "#AAAAAA", shadow=use_shadow)
@@ -547,8 +551,8 @@ else:
                         lab_x = cx - lab_w//2
                         
                         if icon_name == "dumbbell" and dumb_icon:
-                            lab_x += 15 # 중앙 정렬 유지를 위해 텍스트를 약간 오른쪽으로 밀고
-                            overlay.paste(dumb_icon, (int(lab_x - 35), int(ry+160)), dumb_icon) # 왼쪽에 아이콘 배치
+                            lab_x += 15
+                            overlay.paste(dumb_icon, (int(lab_x - 35), int(ry+160)), dumb_icon)
                             
                         draw_styled_text(draw, (int(lab_x), ry+160), lab.lower(), f_l, "#AAAAAA", shadow=use_shadow)
                         draw_styled_text(draw, (cx - draw.textlength(val.lower(), f_n)//2, ry+195), val.lower(), f_n, sub_color, shadow=use_shadow)
