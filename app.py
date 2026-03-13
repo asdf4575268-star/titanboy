@@ -67,19 +67,21 @@ def load_font(name, size):
         return ImageFont.load_default()
 
 def get_icon(name):
-    # 구글 Material Design 무료 아이콘 (흰색) URL
+    # 다운로드가 안정적인 icons8 링크 사용 (흰색 아이콘)
     urls = {
-        "run": "https://raw.githubusercontent.com/google/material-design-icons/master/png/maps/directions_run/materialicons/48dp/2x/baseline_directions_run_white_48dp.png",
-        "dumbbell": "https://raw.githubusercontent.com/google/material-design-icons/master/png/places/fitness_center/materialicons/48dp/2x/baseline_fitness_center_white_48dp.png"
+        "run": "https://img.icons8.com/ios-filled/100/ffffff/running.png",
+        "dumbbell": "https://img.icons8.com/ios-filled/100/ffffff/dumbbell.png"
     }
     f_path = f"icon_{name}.png"
     
-    # 파일이 없으면 다운로드
     if not os.path.exists(f_path):
         try:
-            r = requests.get(urls[name])
-            with open(f_path, "wb") as f:
-                f.write(r.content)
+            # 봇 차단을 막기 위해 User-Agent 헤더 추가
+            headers = {'User-Agent': 'Mozilla/5.0'}
+            r = requests.get(urls[name], headers=headers)
+            if r.status_code == 200:
+                with open(f_path, "wb") as f:
+                    f.write(r.content)
         except Exception as e:
             print(f"아이콘 다운로드 실패: {e}")
             return None
@@ -95,10 +97,8 @@ def get_weekly_stats(activities, target_date_str, target_type="Run"):
         start_of_week = target_date - timedelta(days=target_date.weekday())
         end_of_week = start_of_week + timedelta(days=6)
         
-        # 두 가지 데이터를 담을 배열 초기화
         run_times = [0.0] * 7
         other_times = [0.0] * 7
-        
         total_dist, total_time, hr_sum, hr_count = 0.0, 0, 0, 0
         
         for act in activities:
@@ -106,7 +106,6 @@ def get_weekly_stats(activities, target_date_str, target_type="Run"):
             if start_of_week <= act_date <= end_of_week:
                 time_min = act.get('moving_time', 0) / 60
                 
-                # 달리기인 경우
                 if act.get('type') == 'Run':
                     run_times[act_date.weekday()] += time_min
                     dist = act.get('distance', 0) / 1000
@@ -115,11 +114,8 @@ def get_weekly_stats(activities, target_date_str, target_type="Run"):
                     if act.get('average_heartrate'): 
                         hr_sum += act.get('average_heartrate')
                         hr_count += 1
-                # 다른 운동인 경우 (WeightTraining, Workout 등)
                 elif act.get('type') in ['WeightTraining', 'Workout']:
                     other_times[act_date.weekday()] += time_min
-                    # 다른 운동의 시간이나 심박수도 메인 통계에 합산하고 싶다면 아래 주석 해제
-                    # total_time += act.get('moving_time', 0)
                     
         avg_hr = int(hr_sum / hr_count) if hr_count > 0 else 0
         avg_pace_sec = (total_time / total_dist) if total_dist > 0 else 0
@@ -146,23 +142,42 @@ def get_monthly_stats(activities, target_date_str, target_type="Run"):
         next_month = first_day.replace(day=28) + timedelta(days=4)
         last_day = next_month - timedelta(days=next_month.day)
         num_days = last_day.day
-        monthly_dist = [0.0] * num_days
+        
+        run_times = [0.0] * num_days
+        other_times = [0.0] * num_days
         total_dist, total_time, hr_sum, hr_count = 0.0, 0, 0, 0
+        
         for act in activities:
-            if act.get('type') == target_type:
-                act_date = datetime.strptime(act['start_date_local'][:10], "%Y-%m-%d")
-                if first_day <= act_date <= last_day:
+            act_date = datetime.strptime(act['start_date_local'][:10], "%Y-%m-%d")
+            if first_day <= act_date <= last_day:
+                time_min = act.get('moving_time', 0) / 60
+                
+                if act.get('type') == 'Run':
+                    run_times[act_date.day - 1] += time_min
                     dist = act.get('distance', 0) / 1000
-                    time_min = act.get('moving_time', 0) / 60
-                    chart_val = dist if target_type == "Run" else time_min
-                    monthly_dist[act_date.day - 1] += chart_val
-                    total_dist += dist; total_time += act.get('moving_time', 0)
-                    if act.get('average_heartrate'): hr_sum += act.get('average_heartrate'); hr_count += 1
+                    total_dist += dist
+                    total_time += act.get('moving_time', 0)
+                    if act.get('average_heartrate'): 
+                        hr_sum += act.get('average_heartrate')
+                        hr_count += 1
+                elif act.get('type') in ['WeightTraining', 'Workout']:
+                    other_times[act_date.day - 1] += time_min
+                    
         avg_hr = int(hr_sum / hr_count) if hr_count > 0 else 0
         avg_pace_sec = (total_time / total_dist) if total_dist > 0 else 0
-        avg_pace_str = f"{int(avg_pace_sec//60)}'{int(avg_pace_sec%60):02d}\"" if target_type == "Run" else "-"
-        dist_str = f"{total_dist:.2f}" if target_type == "Run" else "-"
-        return {"dists": monthly_dist, "total_dist": dist_str, "total_time": f"{total_time//3600:02d}:{(total_time%3600)//60:02d}:{total_time%60:02d}", "avg_pace": avg_pace_str, "avg_hr": str(avg_hr), "range": first_day.strftime('%Y.%m'), "labels": [str(i+1) for i in range(num_days)]}
+        avg_pace_str = f"{int(avg_pace_sec//60)}'{int(avg_pace_sec%60):02d}\"" if total_dist > 0 else "-"
+        dist_str = f"{total_dist:.2f}"
+        
+        return {
+            "run_times": run_times, 
+            "other_times": other_times, 
+            "total_dist": dist_str, 
+            "total_time": f"{total_time//3600:02d}:{(total_time%3600)//60:02d}:{total_time%60:02d}", 
+            "avg_pace": avg_pace_str, 
+            "avg_hr": str(avg_hr), 
+            "range": first_day.strftime('%Y.%m'), 
+            "labels": [str(i+1) for i in range(num_days)]
+        }
     except: return None
 
 def create_bar_chart(data1, color1, data2=None, color2=None, mode="WEEKLY", labels=None, font_path=None):
@@ -173,37 +188,31 @@ def create_bar_chart(data1, color1, data2=None, color2=None, mode="WEEKLY", labe
     fig, ax = plt.subplots(figsize=(10, 5.0), dpi=150)
     fig.patch.set_alpha(0); ax.patch.set_alpha(0)
     
-    # 첫 번째 데이터 (달리기)
     bars1 = ax.bar(x_pos, data1, color=color1, width=0.6)
     
-    # 두 번째 데이터 (기타 운동 - 누적)
     if data2 is not None and color2 is not None:
         bars2 = ax.bar(x_pos, data2, bottom=data1, color=color2, width=0.6)
         
-    # 아이콘 로드
     run_img = get_icon("run")
     dumb_img = get_icon("dumbbell")
     
-    # 그래프의 최대값을 구해 바가 너무 낮을 때는 아이콘을 그리지 않도록 방어 로직 추가
     max_val = max([d1 + (d2 if d2 else 0) for d1, d2 in zip(data1, data2 or [0]*len(data1))]) if data1 else 1
-    min_threshold = max_val * 0.08 # 전체 높이의 8% 이상일 때만 아이콘 표시
+    min_threshold = max_val * 0.08 
     
-    # 달리기 아이콘 배치 (바의 중앙)
+    # 월간(MONTHLY)은 막대가 많고 얇으므로 아이콘 크기를 작게(0.15), 주간(WEEKLY)은 0.3으로 설정
+    zoom_factor = 0.3 if mode == "WEEKLY" else 0.15
+    
     if run_img:
         for i, val in enumerate(data1):
             if val > min_threshold:
-                # zoom 값으로 아이콘 크기 조절 (필요시 수정)
-                imagebox = OffsetImage(run_img, zoom=0.3, alpha=0.8) 
-                # (x위치, y위치 = 높이의 절반)
+                imagebox = OffsetImage(run_img, zoom=zoom_factor, alpha=0.9) 
                 ab = AnnotationBbox(imagebox, (i, val / 2), frameon=False)
                 ax.add_artist(ab)
                 
-    # 덤벨 아이콘 배치 (두 번째 바의 중앙)
     if data2 is not None and color2 is not None and dumb_img:
         for i, val in enumerate(data2):
             if val > min_threshold:
-                imagebox = OffsetImage(dumb_img, zoom=0.3, alpha=0.8)
-                # (x위치, y위치 = 밑바탕 높이 + 내 높이의 절반)
+                imagebox = OffsetImage(dumb_img, zoom=zoom_factor, alpha=0.9)
                 ab = AnnotationBbox(imagebox, (i, data1[i] + (val / 2)), frameon=False)
                 ax.add_artist(ab)
 
@@ -673,5 +682,3 @@ else:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
-
-
