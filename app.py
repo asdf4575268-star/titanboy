@@ -62,6 +62,17 @@ def load_font(name, size):
     except:
         return ImageFont.load_default()
 
+# 아이콘 로드용 함수 추가
+@st.cache_data(show_spinner=False)
+def get_icon_pil(name, size=(30, 30)):
+    urls = {"dumbbell": "https://img.icons8.com/ios-filled/150/ffffff/dumbbell.png"}
+    try:
+        r = requests.get(urls.get(name), headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
+        if r.status_code == 200:
+            return Image.open(io.BytesIO(r.content)).convert("RGBA").resize(size, Image.Resampling.LANCZOS)
+    except: pass
+    return None
+
 def get_weekly_stats(activities, target_date_str, target_type="Run"):
     try:
         target_date = datetime.strptime(target_date_str, "%Y-%m-%d")
@@ -69,21 +80,27 @@ def get_weekly_stats(activities, target_date_str, target_type="Run"):
         end_of_week = start_of_week + timedelta(days=6)
         weekly_dist = [0.0] * 7
         total_dist, total_time, hr_sum, hr_count = 0.0, 0, 0, 0
+        other_count, other_total_time = 0, 0.0
+        
         for act in activities:
-            if act.get('type') == target_type:
-                act_date = datetime.strptime(act['start_date_local'][:10], "%Y-%m-%d")
-                if start_of_week <= act_date <= end_of_week:
+            act_date = datetime.strptime(act['start_date_local'][:10], "%Y-%m-%d")
+            if start_of_week <= act_date <= end_of_week:
+                if act.get('type') == target_type:
                     dist = act.get('distance', 0) / 1000
                     time_min = act.get('moving_time', 0) / 60
                     chart_val = dist if target_type == "Run" else time_min
                     weekly_dist[act_date.weekday()] += chart_val
                     total_dist += dist; total_time += act.get('moving_time', 0)
                     if act.get('average_heartrate'): hr_sum += act.get('average_heartrate'); hr_count += 1
+                elif act.get('type') in ['WeightTraining', 'Workout']:
+                    other_count += 1
+                    other_total_time += act.get('moving_time', 0) / 60
+                    
         avg_hr = int(hr_sum / hr_count) if hr_count > 0 else 0
         avg_pace_sec = (total_time / total_dist) if total_dist > 0 else 0
         avg_pace_str = f"{int(avg_pace_sec//60)}'{int(avg_pace_sec%60):02d}\"" if target_type == "Run" else "-"
         dist_str = f"{total_dist:.2f}" if target_type == "Run" else "-"
-        return {"dists": weekly_dist, "total_dist": dist_str, "total_time": f"{total_time//3600:02d}:{(total_time%3600)//60:02d}:{total_time%60:02d}", "avg_pace": avg_pace_str, "avg_hr": str(avg_hr), "range": f"{start_of_week.strftime('%m.%d')} - {end_of_week.strftime('%m.%d')}"}
+        return {"dists": weekly_dist, "total_dist": dist_str, "total_time": f"{total_time//3600:02d}:{(total_time%3600)//60:02d}:{total_time%60:02d}", "avg_pace": avg_pace_str, "avg_hr": str(avg_hr), "range": f"{start_of_week.strftime('%m.%d')} - {end_of_week.strftime('%m.%d')}", "other_count": other_count, "other_total_time": other_total_time}
     except: return None
 
 def get_monthly_stats(activities, target_date_str, target_type="Run"):
@@ -95,21 +112,27 @@ def get_monthly_stats(activities, target_date_str, target_type="Run"):
         num_days = last_day.day
         monthly_dist = [0.0] * num_days
         total_dist, total_time, hr_sum, hr_count = 0.0, 0, 0, 0
+        other_count, other_total_time = 0, 0.0
+        
         for act in activities:
-            if act.get('type') == target_type:
-                act_date = datetime.strptime(act['start_date_local'][:10], "%Y-%m-%d")
-                if first_day <= act_date <= last_day:
+            act_date = datetime.strptime(act['start_date_local'][:10], "%Y-%m-%d")
+            if first_day <= act_date <= last_day:
+                if act.get('type') == target_type:
                     dist = act.get('distance', 0) / 1000
                     time_min = act.get('moving_time', 0) / 60
                     chart_val = dist if target_type == "Run" else time_min
                     monthly_dist[act_date.day - 1] += chart_val
                     total_dist += dist; total_time += act.get('moving_time', 0)
                     if act.get('average_heartrate'): hr_sum += act.get('average_heartrate'); hr_count += 1
+                elif act.get('type') in ['WeightTraining', 'Workout']:
+                    other_count += 1
+                    other_total_time += act.get('moving_time', 0) / 60
+                    
         avg_hr = int(hr_sum / hr_count) if hr_count > 0 else 0
         avg_pace_sec = (total_time / total_dist) if total_dist > 0 else 0
         avg_pace_str = f"{int(avg_pace_sec//60)}'{int(avg_pace_sec%60):02d}\"" if target_type == "Run" else "-"
         dist_str = f"{total_dist:.2f}" if target_type == "Run" else "-"
-        return {"dists": monthly_dist, "total_dist": dist_str, "total_time": f"{total_time//3600:02d}:{(total_time%3600)//60:02d}:{total_time%60:02d}", "avg_pace": avg_pace_str, "avg_hr": str(avg_hr), "range": first_day.strftime('%Y.%m'), "labels": [str(i+1) for i in range(num_days)]}
+        return {"dists": monthly_dist, "total_dist": dist_str, "total_time": f"{total_time//3600:02d}:{(total_time%3600)//60:02d}:{total_time%60:02d}", "avg_pace": avg_pace_str, "avg_hr": str(avg_hr), "range": first_day.strftime('%Y.%m'), "labels": [str(i+1) for i in range(num_days)], "other_count": other_count, "other_total_time": other_total_time}
     except: return None
 
 def create_bar_chart(data, color_hex, mode="WEEKLY", labels=None, font_path=None):
@@ -287,7 +310,7 @@ log_file = None
 user_graph_file = None
 mode = "DAILY"
 v_act, v_date, v_dist, v_pace, v_time, v_hr, v_type = "RUNNING", "2026.02.16", "0.00", "00:00:00", "0'00\"", "0", "Run"
-v_memo = "" # 메모용 변수 추가
+v_memo = "" 
 weekly_data, monthly_data, a = None, None, None
 v_diff_str = ""
 
@@ -442,7 +465,6 @@ else:
             canvas = make_smart_collage(bg_files, (CW, CH)) if bg_files else Image.new("RGBA", (CW, CH), (20, 20, 20, 255))
             overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
             
-            # 아이템 목록 구성 (메모 포함 여부 분기)
             if v_type in ["WeightTraining", "Workout"]:
                 items = [("time", v_time, ""), ("avg bpm", f"{v_hr} bpm", "")]
                 if v_memo:
@@ -466,6 +488,19 @@ else:
                             draw_styled_text(draw, (rx + 230, y_c + 35), diff, f_l, m_color, shadow=use_shadow)
                         y_c += 105
                 else: 
+                    # --- [추가된 부분: 왼쪽 상단 워크아웃 세션/시간 표시] ---
+                    if mode in ["WEEKLY", "MONTHLY"] and v_type == "Run":
+                        d_data = weekly_data if mode == "WEEKLY" else monthly_data
+                        if d_data and d_data.get('other_count', 0) > 0:
+                            dumb_icon = get_icon_pil("dumbbell", size=(25, 25))
+                            wo_text = f"{d_data['other_count']} sessions / {int(d_data['other_total_time'])} min"
+                            if dumb_icon:
+                                overlay.paste(dumb_icon, (rx + 25, ry + 25), dumb_icon)
+                                draw_styled_text(draw, (rx + 55, ry + 27), wo_text, f_l, "#AAAAAA", shadow=use_shadow)
+                            else:
+                                draw_styled_text(draw, (rx + 25, ry + 27), wo_text, f_l, "#AAAAAA", shadow=use_shadow)
+                    # -------------------------------------------------------------
+                    
                     title_w = draw.textlength(v_act, f_t)
                     draw_styled_text(draw, (rx + (rw-title_w)//2, ry+35), v_act, f_t, m_color, shadow=use_shadow)
                     draw_styled_text(draw, (rx + (rw-draw.textlength(v_date, f_d))//2, ry+110), v_date, f_d, "#AAAAAA", shadow=use_shadow)
@@ -473,7 +508,6 @@ else:
                     for i, (lab, val, diff) in enumerate(items):
                         cx = rx + (i * sec_w) + (sec_w // 2)
                         draw_styled_text(draw, (cx - draw.textlength(lab.lower(), f_l)//2, ry+160), lab.lower(), f_l, "#AAAAAA", shadow=use_shadow)
-                        # 긴 메모가 들어갈 수 있으므로 폰트 크기 조절 등을 고려할 수 있으나 현재는 동일 서식 유지
                         draw_styled_text(draw, (cx - draw.textlength(val.lower(), f_n)//2, ry+195), val.lower(), f_n, sub_color, shadow=use_shadow)
                         if diff: 
                             draw_styled_text(draw, (cx - draw.textlength(diff, f_l)//2, ry+250), diff, f_l, m_color, shadow=use_shadow)
