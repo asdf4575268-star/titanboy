@@ -503,7 +503,7 @@ else:
                             wo_text = f"{d_data['other_count']} sessions / {int(d_data['other_total_time'])} min"
                             if dumb_icon:
                                 overlay.paste(dumb_icon, (rx + 25, ry + 25), dumb_icon)
-                                draw_styled_text(draw, (rx + 55, ry + 27), wo_text, f_l, "#AAAAAA", shadow=use_shadow)
+                                draw_styled_text(draw, (rx + 55, ry + 25), wo_text, f_l, "#AAAAAA", shadow=use_shadow)
                             else:
                                 draw_styled_text(draw, (rx + 25, ry + 27), wo_text, f_l, "#AAAAAA", shadow=use_shadow)
                     
@@ -624,4 +624,5 @@ else:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
 
