@@ -3,7 +3,7 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 import io, os, requests, polyline, math
 import numpy as np
 from datetime import datetime, timedelta
-import matplotlib.subplots as plt
+import matplotlib.pyplot as plt
 import matplotlib as mpl
 from matplotlib import font_manager
 import base64
@@ -626,3 +626,4 @@ else:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
