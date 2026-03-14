@@ -78,6 +78,14 @@ def get_icon_pil(name, size=(30, 30)):
     except: pass
     return None
 
+# 아이콘 색상 변경 함수 추가
+def colorize_icon(icon, hex_color):
+    if not icon: return None
+    c_rgb = hex_to_rgba(hex_color, 255)[:3]
+    c_icon = Image.new("RGBA", icon.size, c_rgb)
+    c_icon.putalpha(icon.getchannel('A'))
+    return c_icon
+
 def get_weekly_stats(activities, target_date_str, target_type="Run"):
     try:
         target_date = datetime.strptime(target_date_str, "%Y-%m-%d")
@@ -443,7 +451,6 @@ else:
             box_orient = st.radio("박스 방향", ["Vertical", "Horizontal"], index=default_idx, horizontal=True, key=f"orient_{mode}")     
         with c_opt2:
             font_list = ["BlackHanSans", "KirangHaerang", "Lacquer", "Condiment", "Bangers", "BagelFatOne"]
-            # 폰트 기본값 종목별 자동 지정
             def_font_idx = font_list.index("Lacquer") if v_type in ["WeightTraining", "Workout"] else font_list.index("Bangers")
             sel_font = st.selectbox("폰트", font_list, index=def_font_idx)
 
@@ -459,6 +466,8 @@ else:
         box_alpha = st.slider("박스 투명도", 0, 255, 100)
         vis_sz_adj = st.slider("지도/그래프 크기", 50, 1080, 180 if mode=="DAILY" else 1080)
         vis_alpha = st.slider("지도/그래프 투명도", 0, 255, 255)
+        
+        logo_sz = st.slider("로고 크기", 30, 200, 60)
 
     # --- Section 3: 미리보기 및 다운로드/공유 ---
     st.markdown("---")
@@ -489,6 +498,20 @@ else:
                 if box_orient == "Vertical":
                     draw_styled_text(draw, (rx + 40, ry + 30), v_act, f_t, m_color, shadow=use_shadow)
                     draw_styled_text(draw, (rx + 40, ry + 110), v_date, f_d, "#AAAAAA", shadow=use_shadow)
+                    
+                    # --- 세로 모드에서도 주간/월간 근력운동 세션 표시 (m_color 적용) ---
+                    if mode in ["WEEKLY", "MONTHLY"] and v_type == "Run":
+                        d_data = weekly_data if mode == "WEEKLY" else monthly_data
+                        if d_data and d_data.get('other_count', 0) > 0:
+                            dumb_icon = get_icon_pil("dumbbell", size=(25, 25))
+                            wo_text = f"{d_data['other_count']} sessions / {int(d_data['other_total_time'])} min"
+                            if dumb_icon:
+                                c_icon = colorize_icon(dumb_icon, m_color)
+                                overlay.paste(c_icon, (rx + 40, ry + 155), c_icon)
+                                draw_styled_text(draw, (rx + 70, ry + 157), wo_text, f_l, m_color, shadow=use_shadow)
+                            else:
+                                draw_styled_text(draw, (rx + 40, ry + 157), wo_text, f_l, m_color, shadow=use_shadow)
+                    
                     y_c = ry + 200
                     for lab, val, diff in items:
                         draw_styled_text(draw, (rx + 40, y_c + 15), val.lower(), f_n, sub_color, shadow=use_shadow)
@@ -496,16 +519,18 @@ else:
                             draw_styled_text(draw, (rx + 230, y_c + 15), diff, f_l, m_color, shadow=use_shadow)
                         y_c += 95
                 else: 
+                    # --- 가로 모드 주간/월간 근력운동 세션 표시 (m_color 적용) ---
                     if mode in ["WEEKLY", "MONTHLY"] and v_type == "Run":
                         d_data = weekly_data if mode == "WEEKLY" else monthly_data
                         if d_data and d_data.get('other_count', 0) > 0:
                             dumb_icon = get_icon_pil("dumbbell", size=(25, 25))
                             wo_text = f"{d_data['other_count']} sessions / {int(d_data['other_total_time'])} min"
                             if dumb_icon:
-                                overlay.paste(dumb_icon, (rx + 25, ry + 25), dumb_icon)
-                                draw_styled_text(draw, (rx + 55, ry + 25), wo_text, f_l, "#AAAAAA", shadow=use_shadow)
+                                c_icon = colorize_icon(dumb_icon, m_color)
+                                overlay.paste(c_icon, (rx + 25, ry + 25), c_icon)
+                                draw_styled_text(draw, (rx + 55, ry + 27), wo_text, f_l, m_color, shadow=use_shadow)
                             else:
-                                draw_styled_text(draw, (rx + 25, ry + 27), wo_text, f_l, "#AAAAAA", shadow=use_shadow)
+                                draw_styled_text(draw, (rx + 25, ry + 27), wo_text, f_l, m_color, shadow=use_shadow)
                     
                     title_w = draw.textlength(v_act, f_t)
                     draw_styled_text(draw, (rx + (rw-title_w)//2, ry+35), v_act, f_t, m_color, shadow=use_shadow)
@@ -517,13 +542,15 @@ else:
                         if diff: 
                             draw_styled_text(draw, (cx - draw.textlength(diff, f_l)//2, ry+230), diff, f_l, m_color, shadow=use_shadow)
 
+                # --- 데일리 모드 우측 하단 아이콘 (m_color 적용) ---
                 if mode == "DAILY":
                     daily_icon_name = "dumbbell" if v_type in ["WeightTraining", "Workout"] else "run"
                     daily_icon = get_icon_pil(daily_icon_name, size=(60, 60))
                     if daily_icon:
+                        c_icon = colorize_icon(daily_icon, m_color)
                         icon_x = int(rx + rw - 60 - 20)
                         icon_y = int(ry + rh - 60 - 20)
-                        overlay.paste(daily_icon, (icon_x, icon_y), daily_icon)
+                        overlay.paste(c_icon, (icon_x, icon_y), c_icon)
                             
             if show_vis:
                 vis_layer = None
@@ -559,9 +586,8 @@ else:
                         m_pos = (m_pos_x, m_pos_y)
                     overlay.paste(vis_layer, (int(m_pos[0]), int(m_pos[1])), vis_layer)
 
-            # 로고 배치를 데이터 박스 우측 상단으로 이동
             if log_file:
-                ls, margin = 60, 20
+                ls, margin = logo_sz, 20
                 l_img = ImageOps.fit(Image.open(log_file).convert("RGBA"), (ls, ls))
                 mask = Image.new('L', (ls, ls), 0); ImageDraw.Draw(mask).ellipse((0, 0, ls, ls), fill=255); l_img.putalpha(mask)
                 
@@ -624,5 +650,3 @@ else:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
-
-
