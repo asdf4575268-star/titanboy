@@ -507,7 +507,7 @@ else:
                             wo_text = f"{d_data['other_count']} sessions / {int(d_data['other_total_time'])} min"
                             if dumb_icon:
                                 c_icon = colorize_icon(dumb_icon, m_color)
-                                overlay.paste(c_icon, (rx + 40, ry + 155), c_icon)
+                                overlay.paste(c_icon, (rx + 40, ry + 157), c_icon)
                                 draw_styled_text(draw, (rx + 70, ry + 157), wo_text, f_l, m_color, shadow=use_shadow)
                             else:
                                 draw_styled_text(draw, (rx + 40, ry + 157), wo_text, f_l, m_color, shadow=use_shadow)
