@@ -63,7 +63,8 @@ def load_font(name, size):
 def get_icon_pil(name, size=(30, 30)):
     urls = {
         "dumbbell": "https://img.icons8.com/ios-filled/150/ffffff/dumbbell.png",
-        "run": "https://img.icons8.com/ios-filled/150/ffffff/running.png"
+        "run": "https://img.icons8.com/ios-filled/150/ffffff/running.png",
+        "yoga": "https://img.icons8.com/ios-filled/150/ffffff/yoga.png"
     }
     try:
         r = requests.get(urls.get(name), headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
@@ -86,24 +87,28 @@ def get_weekly_stats(activities, target_date_str, target_type="Run"):
         end_of_week = start_of_week + timedelta(days=6)
         weekly_dist = [0.0] * 7
         total_dist, total_time, hr_sum, hr_count = 0.0, 0, 0, 0
-        other_count, other_total_time = 0, 0.0
+        session_count, session_time = 0, 0.0
+        stretch_count, stretch_time = 0, 0.0
         
         for act in activities:
             act_date = datetime.strptime(act['start_date_local'][:10], "%Y-%m-%d")
             if start_of_week <= act_date <= end_of_week:
-                if act.get('type') == target_type:
+                type_ = act.get('type')
+                if type_ == target_type:
                     dist = act.get('distance', 0) / 1000
                     time_min = act.get('moving_time', 0) / 60
                     weekly_dist[act_date.weekday()] += dist if target_type == "Run" else time_min
                     total_dist += dist; total_time += act.get('moving_time', 0)
                     if act.get('average_heartrate'): hr_sum += act.get('average_heartrate'); hr_count += 1
-                elif act.get('type') in ['WeightTraining', 'Workout']:
-                    other_count += 1; other_total_time += act.get('moving_time', 0) / 60
+                elif type_ in ['WeightTraining', 'Workout', 'HighIntensityIntervalTraining', 'Crossfit', 'HIIT']:
+                    session_count += 1; session_time += act.get('moving_time', 0) / 60
+                elif type_ in ['Yoga', 'Pilates', 'Stretching', 'Stretch']:
+                    stretch_count += 1; stretch_time += act.get('moving_time', 0) / 60
                     
         avg_hr = int(hr_sum / hr_count) if hr_count > 0 else 0
         avg_pace_sec = (total_time / total_dist) if total_dist > 0 else 0
         avg_pace_str = f"{int(avg_pace_sec//60)}'{int(avg_pace_sec%60):02d}\"" if target_type == "Run" else "-"
-        return {"dists": weekly_dist, "total_dist": f"{total_dist:.2f}" if target_type == "Run" else "-", "total_time": f"{total_time//3600:02d}:{(total_time%3600)//60:02d}:{total_time%60:02d}", "avg_pace": avg_pace_str, "avg_hr": str(avg_hr), "range": f"{start_of_week.strftime('%m.%d')} - {end_of_week.strftime('%m.%d')}", "other_count": other_count, "other_total_time": other_total_time}
+        return {"dists": weekly_dist, "total_dist": f"{total_dist:.2f}" if target_type == "Run" else "-", "total_time": f"{total_time//3600:02d}:{(total_time%3600)//60:02d}:{total_time%60:02d}", "avg_pace": avg_pace_str, "avg_hr": str(avg_hr), "range": f"{start_of_week.strftime('%m.%d')} - {end_of_week.strftime('%m.%d')}", "session_count": session_count, "session_time": session_time, "stretch_count": stretch_count, "stretch_time": stretch_time}
     except: return None
 
 def get_monthly_stats(activities, target_date_str, target_type="Run"):
@@ -115,24 +120,28 @@ def get_monthly_stats(activities, target_date_str, target_type="Run"):
         num_days = last_day.day
         monthly_dist = [0.0] * num_days
         total_dist, total_time, hr_sum, hr_count = 0.0, 0, 0, 0
-        other_count, other_total_time = 0, 0.0
+        session_count, session_time = 0, 0.0
+        stretch_count, stretch_time = 0, 0.0
         
         for act in activities:
             act_date = datetime.strptime(act['start_date_local'][:10], "%Y-%m-%d")
             if first_day <= act_date <= last_day:
-                if act.get('type') == target_type:
+                type_ = act.get('type')
+                if type_ == target_type:
                     dist = act.get('distance', 0) / 1000
                     time_min = act.get('moving_time', 0) / 60
                     monthly_dist[act_date.day - 1] += dist if target_type == "Run" else time_min
                     total_dist += dist; total_time += act.get('moving_time', 0)
                     if act.get('average_heartrate'): hr_sum += act.get('average_heartrate'); hr_count += 1
-                elif act.get('type') in ['WeightTraining', 'Workout']:
-                    other_count += 1; other_total_time += act.get('moving_time', 0) / 60
+                elif type_ in ['WeightTraining', 'Workout', 'HighIntensityIntervalTraining', 'Crossfit', 'HIIT']:
+                    session_count += 1; session_time += act.get('moving_time', 0) / 60
+                elif type_ in ['Yoga', 'Pilates', 'Stretching', 'Stretch']:
+                    stretch_count += 1; stretch_time += act.get('moving_time', 0) / 60
                     
         avg_hr = int(hr_sum / hr_count) if hr_count > 0 else 0
         avg_pace_sec = (total_time / total_dist) if total_dist > 0 else 0
         avg_pace_str = f"{int(avg_pace_sec//60)}'{int(avg_pace_sec%60):02d}\"" if target_type == "Run" else "-"
-        return {"dists": monthly_dist, "total_dist": f"{total_dist:.2f}" if target_type == "Run" else "-", "total_time": f"{total_time//3600:02d}:{(total_time%3600)//60:02d}:{total_time%60:02d}", "avg_pace": avg_pace_str, "avg_hr": str(avg_hr), "range": first_day.strftime('%Y.%m'), "labels": [str(i+1) for i in range(num_days)], "other_count": other_count, "other_total_time": other_total_time}
+        return {"dists": monthly_dist, "total_dist": f"{total_dist:.2f}" if target_type == "Run" else "-", "total_time": f"{total_time//3600:02d}:{(total_time%3600)//60:02d}:{total_time%60:02d}", "avg_pace": avg_pace_str, "avg_hr": str(avg_hr), "range": first_day.strftime('%Y.%m'), "labels": [str(i+1) for i in range(num_days)], "session_count": session_count, "session_time": session_time, "stretch_count": stretch_count, "stretch_time": stretch_time}
     except: return None
 
 def create_bar_chart(data, color_hex, mode="WEEKLY", labels=None, font_path=None):
@@ -347,25 +356,51 @@ else:
                 if box_orient == "Vertical":
                     draw_styled_text(draw, (rx + 40, ry + 30), v_act, f_t, m_color, shadow=use_shadow)
                     draw_styled_text(draw, (rx + 40, ry + 110), v_date, f_d, "#AAAAAA", shadow=use_shadow)
-                    if mode in ["WEEKLY", "MONTHLY"] and v_type == "Run" and (d := weekly_data if mode=="WEEKLY" else monthly_data) and d.get('other_count',0) > 0:
-                        dumb_icon = get_icon_pil("dumbbell", size=(25, 25))
-                        if dumb_icon:
-                            c_icon = colorize_icon(dumb_icon, m_color); overlay.paste(c_icon, (rx + 40, ry + 155), c_icon)
-                            draw_styled_text(draw, (rx + 70, ry + 157), f"{d['other_count']} sessions / {int(d['other_total_time'])} min", f_l, m_color, shadow=use_shadow)
-                        else: draw_styled_text(draw, (rx + 40, ry + 157), f"{d['other_count']} sessions / {int(d['other_total_time'])} min", f_l, m_color, shadow=use_shadow)
                     
-                    y_c = ry + 200
+                    y_offset = ry + 145
+                    if mode in ["WEEKLY", "MONTHLY"] and v_type == "Run" and (d := weekly_data if mode=="WEEKLY" else monthly_data):
+                        if d.get('session_count', 0) > 0:
+                            dumb_icon = get_icon_pil("dumbbell", size=(25, 25))
+                            text = f"{d['session_count']} sessions / {int(d['session_time'])} min"
+                            if dumb_icon:
+                                c_icon = colorize_icon(dumb_icon, m_color); overlay.paste(c_icon, (rx + 40, y_offset - 2), c_icon)
+                                draw_styled_text(draw, (rx + 70, y_offset), text, f_l, m_color, shadow=use_shadow)
+                            else: draw_styled_text(draw, (rx + 40, y_offset), text, f_l, m_color, shadow=use_shadow)
+                            y_offset += 30
+                        
+                        if d.get('stretch_count', 0) > 0:
+                            yoga_icon = get_icon_pil("yoga", size=(25, 25))
+                            text = f"{d['stretch_count']} stretches / {int(d['stretch_time'])} min"
+                            if yoga_icon:
+                                c_icon = colorize_icon(yoga_icon, m_color); overlay.paste(c_icon, (rx + 40, y_offset - 2), c_icon)
+                                draw_styled_text(draw, (rx + 70, y_offset), text, f_l, m_color, shadow=use_shadow)
+                            else: draw_styled_text(draw, (rx + 40, y_offset), text, f_l, m_color, shadow=use_shadow)
+                            y_offset += 30
+                    
+                    y_c = max(ry + 200, y_offset + 10)
                     for _, val, diff in items:
                         draw_styled_text(draw, (rx + 40, y_c + 15), val.lower(), f_n, sub_color, shadow=use_shadow)
                         if diff: draw_styled_text(draw, (rx + 230, y_c + 15), diff, f_l, m_color, shadow=use_shadow)
                         y_c += 95
                 else: 
-                    if mode in ["WEEKLY", "MONTHLY"] and v_type == "Run" and (d := weekly_data if mode=="WEEKLY" else monthly_data) and d.get('other_count',0) > 0:
-                        dumb_icon = get_icon_pil("dumbbell", size=(25, 25))
-                        if dumb_icon:
-                            c_icon = colorize_icon(dumb_icon, m_color); overlay.paste(c_icon, (rx + 25, ry + 25), c_icon)
-                            draw_styled_text(draw, (rx + 55, ry + 27), f"{d['other_count']} sessions / {int(d['other_total_time'])} min", f_l, m_color, shadow=use_shadow)
-                        else: draw_styled_text(draw, (rx + 25, ry + 27), f"{d['other_count']} sessions / {int(d['other_total_time'])} min", f_l, m_color, shadow=use_shadow)
+                    h_y_offset = ry + 20
+                    if mode in ["WEEKLY", "MONTHLY"] and v_type == "Run" and (d := weekly_data if mode=="WEEKLY" else monthly_data):
+                        if d.get('session_count', 0) > 0:
+                            dumb_icon = get_icon_pil("dumbbell", size=(25, 25))
+                            text = f"{d['session_count']} sessions / {int(d['session_time'])} min"
+                            if dumb_icon:
+                                c_icon = colorize_icon(dumb_icon, m_color); overlay.paste(c_icon, (rx + 25, h_y_offset - 2), c_icon)
+                                draw_styled_text(draw, (rx + 55, h_y_offset), text, f_l, m_color, shadow=use_shadow)
+                            else: draw_styled_text(draw, (rx + 25, h_y_offset), text, f_l, m_color, shadow=use_shadow)
+                            h_y_offset += 30
+                            
+                        if d.get('stretch_count', 0) > 0:
+                            yoga_icon = get_icon_pil("yoga", size=(25, 25))
+                            text = f"{d['stretch_count']} stretches / {int(d['stretch_time'])} min"
+                            if yoga_icon:
+                                c_icon = colorize_icon(yoga_icon, m_color); overlay.paste(c_icon, (rx + 25, h_y_offset - 2), c_icon)
+                                draw_styled_text(draw, (rx + 55, h_y_offset), text, f_l, m_color, shadow=use_shadow)
+                            else: draw_styled_text(draw, (rx + 25, h_y_offset), text, f_l, m_color, shadow=use_shadow)
                     
                     draw_styled_text(draw, (rx + (rw-draw.textlength(v_act, f_t))//2, ry+35), v_act, f_t, m_color, shadow=use_shadow)
                     draw_styled_text(draw, (rx + (rw-draw.textlength(v_date, f_d))//2, ry+110), v_date, f_d, "#AAAAAA", shadow=use_shadow)
