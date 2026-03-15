@@ -27,6 +27,10 @@ except:
     st.set_page_config(layout="centered", page_title="TITAN BOY", initial_sidebar_state="collapsed")
 mpl.use("Agg")
 
+# --- [1.5 활동 분류 그룹 설정] ---
+SESSION_TYPES = ['WeightTraining', 'Workout', 'HighIntensityIntervalTraining', 'Crossfit', 'HIIT']
+STRETCH_TYPES = ['Yoga', 'Pilates', 'Stretching']
+
 # --- [2. 유틸리티 함수] ---
 def hex_to_rgba(hex_color, alpha):
     hex_color = hex_color.lstrip('#')
@@ -100,9 +104,9 @@ def get_weekly_stats(activities, target_date_str, target_type="Run"):
                     weekly_dist[act_date.weekday()] += dist if target_type == "Run" else time_min
                     total_dist += dist; total_time += act.get('moving_time', 0)
                     if act.get('average_heartrate'): hr_sum += act.get('average_heartrate'); hr_count += 1
-                elif type_ in ['WeightTraining', 'Workout', 'HighIntensityIntervalTraining', 'Crossfit', 'HIIT']:
+                elif type_ in SESSION_TYPES:
                     session_count += 1; session_time += act.get('moving_time', 0) / 60
-                elif type_ in ['Yoga', 'Pilates', 'Stretching', 'Stretch']:
+                elif type_ in STRETCH_TYPES:
                     stretch_count += 1; stretch_time += act.get('moving_time', 0) / 60
                     
         avg_hr = int(hr_sum / hr_count) if hr_count > 0 else 0
@@ -133,9 +137,9 @@ def get_monthly_stats(activities, target_date_str, target_type="Run"):
                     monthly_dist[act_date.day - 1] += dist if target_type == "Run" else time_min
                     total_dist += dist; total_time += act.get('moving_time', 0)
                     if act.get('average_heartrate'): hr_sum += act.get('average_heartrate'); hr_count += 1
-                elif type_ in ['WeightTraining', 'Workout', 'HighIntensityIntervalTraining', 'Crossfit', 'HIIT']:
+                elif type_ in SESSION_TYPES:
                     session_count += 1; session_time += act.get('moving_time', 0) / 60
-                elif type_ in ['Yoga', 'Pilates', 'Stretching', 'Stretch']:
+                elif type_ in STRETCH_TYPES:
                     stretch_count += 1; stretch_time += act.get('moving_time', 0) / 60
                     
         avg_hr = int(hr_sum / hr_count) if hr_count > 0 else 0
@@ -297,8 +301,10 @@ else:
         c_txt1, c_txt2 = st.columns(2)
         with c_txt1:
             v_act = st.text_input("활동명", v_act)
-            if v_type not in ["WeightTraining", "Workout"]: v_dist = st.text_input("거리 km", v_dist); v_pace = st.text_input("페이스", v_pace)
-            else: v_memo = st.text_input("운동 메모", placeholder="예: 풀업 5x10")
+            if v_type not in (SESSION_TYPES + STRETCH_TYPES): 
+                v_dist = st.text_input("거리 km", v_dist); v_pace = st.text_input("페이스", v_pace)
+            else: 
+                v_memo = st.text_input("운동 메모", placeholder="예: 풀업 5x10")
         with c_txt2: v_date, v_time, v_hr = st.text_input("날짜", v_date), st.text_input("시간", v_time), st.text_input("심박 bpm", v_hr)
 
         st.markdown("---")
@@ -332,7 +338,7 @@ else:
             with c_col2: sub_color = COLOR_OPTS[st.selectbox("서브 컬러", list(COLOR_OPTS.keys()), index=2)]
             c_opt1, c_opt2 = st.columns(2)
             with c_opt1: box_orient = st.radio("박스 방향", ["Vertical", "Horizontal"], index=0 if mode=="DAILY" else 1, horizontal=True)     
-            with c_opt2: sel_font = st.selectbox("폰트", ["BlackHanSans", "KirangHaerang", "Lacquer", "Condiment", "Bangers", "BagelFatOne"], index=2 if v_type in ["WeightTraining", "Workout"] else 4)
+            with c_opt2: sel_font = st.selectbox("폰트", ["BlackHanSans", "KirangHaerang", "Lacquer", "Condiment", "Bangers", "BagelFatOne"], index=2 if v_type in (SESSION_TYPES + STRETCH_TYPES) else 4)
             c_pos1, c_pos2 = st.columns(2)
             with c_pos1: rx, rw = st.number_input("박스 X", 0, 1080, 40 if box_orient=="Horizontal" else 80), st.number_input("박스 너비", 100, 1080, 1000 if box_orient=="Horizontal" else 450)
             with c_pos2: ry, rh = st.number_input("박스 Y", 0, 1920, 250 if box_orient=="Horizontal" else 1200), st.number_input("박스 높이", 100, 1920, 350 if box_orient=="Horizontal" else 650)
@@ -347,8 +353,8 @@ else:
             canvas = make_smart_collage(bg_files, (CW, CH)) if bg_files else Image.new("RGBA", (CW, CH), (20, 20, 20, 255))
             overlay = Image.new("RGBA", (CW, CH), (0,0,0,0)); draw = ImageDraw.Draw(overlay)
             
-            items = [("", v_time, ""), ("", f"{v_hr} bpm", "")] if v_type in ["WeightTraining", "Workout"] else [("", f"{v_dist} km", v_diff_str), ("", v_pace, ""), ("", v_time, ""), ("", f"{v_hr} bpm", "")]
-            if v_type in ["WeightTraining", "Workout"] and v_memo: items.append(("", v_memo, ""))
+            items = [("", v_time, ""), ("", f"{v_hr} bpm", "")] if v_type in (SESSION_TYPES + STRETCH_TYPES) else [("", f"{v_dist} km", v_diff_str), ("", v_pace, ""), ("", v_time, ""), ("", f"{v_hr} bpm", "")]
+            if v_type in (SESSION_TYPES + STRETCH_TYPES) and v_memo: items.append(("", v_memo, ""))
             if border_thick > 0: draw.rectangle([(0, 0), (CW-1, CH-1)], outline=m_color, width=border_thick)
             
             if show_box:
@@ -410,8 +416,17 @@ else:
                         draw_styled_text(draw, (cx - draw.textlength(val.lower(), f_n)//2, ry+175), val.lower(), f_n, sub_color, shadow=use_shadow)
                         if diff: draw_styled_text(draw, (cx - draw.textlength(diff, f_l)//2, ry+230), diff, f_l, m_color, shadow=use_shadow)
 
-                if mode == "DAILY" and (daily_icon := get_icon_pil("dumbbell" if v_type in ["WeightTraining", "Workout"] else "run", size=(60, 60))):
-                    c_icon = colorize_icon(daily_icon, m_color); overlay.paste(c_icon, (int(rx + rw - 80), int(ry + rh - 80)), c_icon)
+                if mode == "DAILY":
+                    if v_type in SESSION_TYPES:
+                        i_name = "dumbbell"
+                    elif v_type in STRETCH_TYPES:
+                        i_name = "yoga"
+                    else:
+                        i_name = "run"
+                        
+                    daily_icon = get_icon_pil(i_name, size=(60, 60))
+                    if daily_icon:
+                        c_icon = colorize_icon(daily_icon, m_color); overlay.paste(c_icon, (int(rx + rw - 80), int(ry + rh - 80)), c_icon)
                             
             if show_vis:
                 vis_layer = None
@@ -419,7 +434,7 @@ else:
                     user_img = Image.open(user_graph_file).convert("RGBA")
                     vis_layer = user_img.resize((vis_sz_adj, int(vis_sz_adj * user_img.height / user_img.width)), Image.Resampling.LANCZOS)
                     vis_layer.putalpha(vis_layer.getchannel('A').point(lambda x: x * (vis_alpha / 255)))
-                elif mode == "DAILY" and v_type not in ["WeightTraining", "Workout"] and a and a.get('map', {}).get('summary_polyline'):
+                elif mode == "DAILY" and v_type not in (SESSION_TYPES + STRETCH_TYPES) and a and a.get('map', {}).get('summary_polyline'):
                     pts = polyline.decode(a['map']['summary_polyline'])
                     if pts:
                         vis_layer = Image.new("RGBA", (vis_sz_adj, vis_sz_adj), (0,0,0,0)); m_draw = ImageDraw.Draw(vis_layer)
