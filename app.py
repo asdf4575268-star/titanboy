@@ -1,4 +1,4 @@
-Import streamlit as st
+import streamlit as st
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 import io, os, requests, polyline, math
 import numpy as np
