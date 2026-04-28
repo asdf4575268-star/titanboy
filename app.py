@@ -1,4 +1,4 @@
-import streamlit as st
+Import streamlit as st
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 import io, os, requests, polyline, math
 import numpy as np
@@ -175,48 +175,51 @@ def make_smart_collage(files, target_size):
         canvas.paste(ImageOps.fit(img, (x1 - x0, y1 - y0), Image.Resampling.LANCZOS), (x0, y0))
     return canvas
 
+# --- [3. 인증 및 데이터 연동] ---
+DB_PATH = "archive_prism_total_v5.db"
+def init_db():
+    try:
+        conn = sqlite3.connect(DB_PATH); cur = conn.cursor()
+        cur.execute("CREATE TABLE IF NOT EXISTS strava_tokens (id INTEGER PRIMARY KEY, access_token TEXT, refresh_token TEXT, expires_at INTEGER)")
+        conn.commit(); conn.close()
+    except: pass
+init_db()
+
+def handle_token_db(mode="load", data=None):
+    try:
+        conn = sqlite3.connect(DB_PATH); cur = conn.cursor()
+        if mode == "save" and data:
+            cur.execute("DELETE FROM strava_tokens")
+            cur.execute("INSERT INTO strava_tokens (access_token, refresh_token, expires_at) VALUES (?, ?, ?)", (data['access_token'], data['refresh_token'], data['expires_at']))
+            conn.commit()
+        elif mode == "load":
+            cur.execute("SELECT access_token, refresh_token, expires_at FROM strava_tokens LIMIT 1")
+            row = cur.fetchone(); conn.close(); return row
+        conn.close()
+    except: return None
+
+if 'access_token' not in st.session_state:
+    saved = handle_token_db("load")
+    if saved:
+        a_token, r_token, exp_at = saved
+        if time.time() > (exp_at - 1800):
+            try:
+                res = requests.post("https://www.strava.com/oauth/token", data={"client_id": CLIENT_ID, "client_secret": CLIENT_SECRET, "grant_type": "refresh_token", "refresh_token": r_token}).json()
+                if 'access_token' in res: handle_token_db("save", res); st.session_state['access_token'] = res['access_token']
+            except: pass
+        else: st.session_state['access_token'] = a_token
+
 if "code" in st.query_params:
-    st.info("✅ 인가 코드를 확인했습니다. 토큰 교환을 시도합니다.")
-    res = requests.post("https://www.strava.com/oauth/token", data={
-        "client_id": CLIENT_ID, 
-        "client_secret": CLIENT_SECRET, 
-        "code": st.query_params["code"], 
-        "grant_type": "authorization_code"
-    })
-    
-    if res.status_code == 200:
-        res_json = res.json()
-        if 'access_token' in res_json: 
-            handle_token_db("save", res_json)
-            st.session_state['access_token'] = res_json['access_token']
-            st.query_params.clear()
-            st.rerun()
-    else:
-        st.error(f"❌ 토큰 교환 실패 (상태 코드: {res.status_code})")
-        st.json(res.json())
+    res = requests.post("https://www.strava.com/oauth/token", data={"client_id": CLIENT_ID, "client_secret": CLIENT_SECRET, "code": st.query_params["code"], "grant_type": "authorization_code"}).json()
+    if 'access_token' in res: handle_token_db("save", res); st.session_state['access_token'] = res['access_token']; st.query_params.clear(); st.rerun()
 
 acts = []
 if st.session_state.get('access_token'):
     if not st.session_state.get('cached_acts'):
-        st.info("✅ 엑세스 토큰이 있습니다. Strava API를 호출합니다.")
-        r = requests.get(
-            "https://www.strava.com/api/v3/athlete/activities?per_page=50", 
-            headers={'Authorization': f"Bearer {st.session_state['access_token']}"}
-        )
-        if r.status_code == 200: 
-            st.session_state['cached_acts'] = r.json()
-            st.success(f"데이터 {len(r.json())}개를 성공적으로 불러왔습니다.")
-        elif r.status_code == 401: 
-            st.warning("토큰이 만료되었거나 유효하지 않습니다. 세션을 초기화합니다.")
-            st.session_state.clear()
-            st.rerun()
-        else:
-            st.error(f"❌ API 데이터 호출 실패 (상태 코드: {r.status_code})")
-            st.json(r.json())
-            
+        r = requests.get("https://www.strava.com/api/v3/athlete/activities?per_page=50", headers={'Authorization': f"Bearer {st.session_state['access_token']}"})
+        if r.status_code == 200: st.session_state['cached_acts'] = r.json()
+        elif r.status_code == 401: st.session_state.clear(); st.rerun()
     acts = st.session_state.get('cached_acts', [])
-    if st.session_state.get('access_token') and not acts:
-        st.warning("토큰 인증은 성공했으나, 스트라바 계정에 기록된 활동 데이터가 없습니다.")
 
 # --- [4. 메인 화면 구성 및 UI] ---
 def get_base64(path):
@@ -235,16 +238,7 @@ weekly_data, monthly_data, a, v_diff_str = None, None, None, ""
 
 if not st.session_state.get('access_token'):
     auth_url = f"https://www.strava.com/oauth/authorize?client_id={CLIENT_ID}&response_type=code&redirect_uri={ACTUAL_URL}&scope=read,activity:read_all&approval_prompt=force"
-    st.markdown(
-        f"""
-        <a href="{auth_url}" target="_self" style="text-decoration: none;">
-            <div style="width: 100%; text-align: center; background-color: #FC4C02; color: white; padding: 12px 0; border-radius: 8px; font-weight: bold; font-size: 16px; margin-bottom: 15px;">
-                🚀 Strava 연동하기
-            </div>
-        </a>
-        """, 
-        unsafe_allow_html=True
-    )
+    st.link_button("🚀 Strava 연동하기", auth_url, use_container_width=True)
 else:
     c1, c2 = st.columns([3, 1])
     with c2:
@@ -426,3 +420,5 @@ else:
             
         except Exception as e:
             st.error(f"렌더링 오류 발생: {e}")
+
+이거 로그인 새창 따로 안띄우고 연동 안되는 거야? 새창으로 로그인해도 다시 원래 페이지로 돌아오거나
