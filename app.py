@@ -16,7 +16,7 @@ API_CONFIGS = {
     "PRIMARY": {"ID": '202274', "SECRET": '63f6a7007ebe6b405763fc3104e17bb53b468ad0'},
     "SECONDARY": {"ID": '202275', "SECRET": '969201cab488e4eaf1398b106de1d4e520dc564c'}
 }
-CURRENT_CFG = API_CONFIGS["SECONDARY"]
+CURRENT_CFG = API_CONFIGS["PRIMARY"] 
 CLIENT_ID, CLIENT_SECRET = CURRENT_CFG["ID"], CURRENT_CFG["SECRET"]
 ACTUAL_URL = "https://titanboy-kgcnje3tg3hbfpfsp6uwzc.streamlit.app"
 
@@ -238,16 +238,7 @@ weekly_data, monthly_data, a, v_diff_str = None, None, None, ""
 
 if not st.session_state.get('access_token'):
     auth_url = f"https://www.strava.com/oauth/authorize?client_id={CLIENT_ID}&response_type=code&redirect_uri={ACTUAL_URL}&scope=read,activity:read_all&approval_prompt=force"
-    st.markdown(
-        f"""
-        <a href="{auth_url}" target="_self" style="text-decoration: none;">
-            <div style="width: 100%; text-align: center; background-color: #FC4C02; color: white; padding: 12px 0; border-radius: 8px; font-weight: bold; font-size: 16px; margin-bottom: 15px;">
-                🚀 Strava 연동하기
-            </div>
-        </a>
-        """, 
-        unsafe_allow_html=True
-    )
+    st.link_button("🚀 Strava 연동하기", auth_url, use_container_width=True)
 else:
     c1, c2 = st.columns([3, 1])
     with c2:
