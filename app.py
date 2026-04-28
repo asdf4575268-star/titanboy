@@ -18,7 +18,7 @@ API_CONFIGS = {
 }
 CURRENT_CFG = API_CONFIGS["PRIMARY"]
 CLIENT_ID, CLIENT_SECRET = CURRENT_CFG["ID"], CURRENT_CFG["SECRET"]
-ACTUAL_URL = "http://localhost:8501"
+ACTUAL_URL = "https://titanboy-kgcnje3tg3hbfpfsp6uwzc.streamlit.app/"
 
 try:
     logo = Image.open("logo.png")
