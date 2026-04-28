@@ -16,9 +16,9 @@ API_CONFIGS = {
     "PRIMARY": {"ID": '202274', "SECRET": '63f6a7007ebe6b405763fc3104e17bb53b468ad0'},
     "SECONDARY": {"ID": '202275', "SECRET": '969201cab488e4eaf1398b106de1d4e520dc564c'}
 }
-CURRENT_CFG = API_CONFIGS["PRIMARY"]
+CURRENT_CFG = API_CONFIGS["PRIMARY"] 
 CLIENT_ID, CLIENT_SECRET = CURRENT_CFG["ID"], CURRENT_CFG["SECRET"]
-ACTUAL_URL = "https://titanboy-kgcnje3tg3hbfpfsp6uwzc.streamlit.app/"
+ACTUAL_URL = "https://titanboy-kgcnje3tg3hbfpfsp6uwzc.streamlit.app"
 
 try:
     logo = Image.open("logo.png")
@@ -204,41 +204,21 @@ if 'access_token' not in st.session_state:
         a_token, r_token, exp_at = saved
         if time.time() > (exp_at - 1800):
             try:
-                res = requests.post("https://www.strava.com/oauth/token", data={"client_id": CLIENT_ID, "client_secret": CLIENT_SECRET, "grant_type": "refresh_token", "refresh_token": r_token})
-                if res.status_code == 200:
-                    res_data = res.json()
-                    if 'access_token' in res_data: 
-                        handle_token_db("save", res_data)
-                        st.session_state['access_token'] = res_data['access_token']
+                res = requests.post("https://www.strava.com/oauth/token", data={"client_id": CLIENT_ID, "client_secret": CLIENT_SECRET, "grant_type": "refresh_token", "refresh_token": r_token}).json()
+                if 'access_token' in res: handle_token_db("save", res); st.session_state['access_token'] = res['access_token']
             except: pass
         else: st.session_state['access_token'] = a_token
 
 if "code" in st.query_params:
-    res = requests.post("https://www.strava.com/oauth/token", data={"client_id": CLIENT_ID, "client_secret": CLIENT_SECRET, "code": st.query_params["code"], "grant_type": "authorization_code"})
-    if res.status_code == 200:
-        res_data = res.json()
-        if 'access_token' in res_data: 
-            handle_token_db("save", res_data)
-            st.session_state['access_token'] = res_data['access_token']
-            st.query_params.clear()
-            st.rerun()
-    else:
-        st.error(f"인증 코드를 토큰으로 교환하는데 실패했습니다. (상태 코드: {res.status_code})")
+    res = requests.post("https://www.strava.com/oauth/token", data={"client_id": CLIENT_ID, "client_secret": CLIENT_SECRET, "code": st.query_params["code"], "grant_type": "authorization_code"}).json()
+    if 'access_token' in res: handle_token_db("save", res); st.session_state['access_token'] = res['access_token']; st.query_params.clear(); st.rerun()
 
 acts = []
 if st.session_state.get('access_token'):
     if not st.session_state.get('cached_acts'):
         r = requests.get("https://www.strava.com/api/v3/athlete/activities?per_page=50", headers={'Authorization': f"Bearer {st.session_state['access_token']}"})
-        if r.status_code == 200: 
-            st.session_state['cached_acts'] = r.json()
-        elif r.status_code == 429:
-            st.error("⚠️ Strava API 호출 한도(15분 당 100회)를 초과했습니다. 잠시 후 다시 시도해주세요.")
-        elif r.status_code == 401: 
-            st.session_state.clear()
-            st.rerun()
-        else:
-            st.error(f"데이터를 불러오는데 실패했습니다. (상태 코드: {r.status_code})")
-            
+        if r.status_code == 200: st.session_state['cached_acts'] = r.json()
+        elif r.status_code == 401: st.session_state.clear(); st.rerun()
     acts = st.session_state.get('cached_acts', [])
 
 # --- [4. 메인 화면 구성 및 UI] ---
@@ -262,10 +242,7 @@ if not st.session_state.get('access_token'):
 else:
     c1, c2 = st.columns([3, 1])
     with c2:
-        if st.button("🔓 로그아웃", use_container_width=True): 
-            st.session_state.clear()
-            st.query_params.clear()
-            st.rerun()
+        if st.button("🔓 로그아웃", use_container_width=True): st.session_state.clear(); st.query_params.clear(); st.rerun()
 
     with st.expander("📂 1. 데이터 및 사진 설정", expanded=True):
         bg_files = st.file_uploader("📸 배경 사진", type=['jpg','jpeg','png'], accept_multiple_files=True)
@@ -306,8 +283,6 @@ else:
                     v_act, v_date, v_dist, v_pace, v_time, v_hr = datetime.strptime(f"{sel_month}-01", "%Y-%m-%d").strftime("%B").upper(), monthly_data['range'], monthly_data['total_dist'], monthly_data['avg_pace'], monthly_data['total_time'], monthly_data['avg_hr']
                     prev_m = get_monthly_stats(acts, (datetime.strptime(f"{sel_month}-01", "%Y-%m-%d") - timedelta(days=1)).replace(day=1).strftime("%Y-%m-%d"), v_type)
                     if prev_m and v_type == "Run": diff = float(v_dist) - float(prev_m['total_dist']); v_diff_str = f"({'+' if diff >= 0 else ''}{diff:.2f} km)"
-        else:
-            st.info("현재 분석할 수 있는 활동 데이터가 없습니다.")
 
     with st.expander("🎨 2. 디자인 및 텍스트 수정", expanded=False):
         c_txt1, c_txt2 = st.columns(2)
