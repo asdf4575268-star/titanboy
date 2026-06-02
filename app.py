@@ -12,7 +12,6 @@ import sqlite3
 import time
 
 # --- [1. 기본 설정 및 API] ---
-# 향후 보안을 위해 st.secrets 사용을 권장합니다.
 API_CONFIGS = {
     "PRIMARY": {"ID": '202274', "SECRET": '63f6a7007ebe6b405763fc3104e17bb53b468ad0'},
     "SECONDARY": {"ID": '202275', "SECRET": '969201cab488e4eaf1398b106de1d4e520dc564c'}
@@ -175,6 +174,48 @@ def get_monthly_stats(activities, target_date_str, target_type="Run"):
     except Exception: 
         return None
 
+def get_yearly_stats(activities, target_year_str, target_type="Run"):
+    try:
+        target_year = int(target_year_str)
+        
+        yearly_dist = [0.0] * 12
+        total_dist, total_time, hr_sum, hr_count = 0.0, 0, 0, 0
+        other_count, other_total_time = 0, 0.0
+        
+        for act in activities:
+            act_date = datetime.strptime(act['start_date_local'][:10], "%Y-%m-%d")
+            if act_date.year == target_year:
+                if act.get('type') == target_type:
+                    dist = act.get('distance', 0) / 1000
+                    time_min = act.get('moving_time', 0) / 60
+                    yearly_dist[act_date.month - 1] += dist if target_type == "Run" else time_min
+                    total_dist += dist
+                    total_time += act.get('moving_time', 0)
+                    if act.get('average_heartrate'): 
+                        hr_sum += act.get('average_heartrate')
+                        hr_count += 1
+                elif act.get('type') in ['WeightTraining', 'Workout']:
+                    other_count += 1
+                    other_total_time += act.get('moving_time', 0) / 60
+                    
+        avg_hr = int(hr_sum / hr_count) if hr_count > 0 else 0
+        avg_pace_sec = (total_time / total_dist) if total_dist > 0 else 0
+        avg_pace_str = f"{int(avg_pace_sec//60)}'{int(avg_pace_sec%60):02d}\"" if target_type == "Run" else "-"
+        
+        return {
+            "dists": yearly_dist, 
+            "total_dist": f"{total_dist:.2f}" if target_type == "Run" else "-", 
+            "total_time": f"{total_time//3600:02d}:{(total_time%3600)//60:02d}:{total_time%60:02d}", 
+            "avg_pace": avg_pace_str, 
+            "avg_hr": str(avg_hr), 
+            "range": str(target_year), 
+            "labels": [str(i) for i in range(1, 13)], 
+            "other_count": other_count, 
+            "other_total_time": other_total_time
+        }
+    except Exception: 
+        return None
+
 def create_bar_chart(data, color_hex, mode="WEEKLY", labels=None, font_path=None):
     if mode == "WEEKLY": 
         labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -197,7 +238,12 @@ def create_bar_chart(data, color_hex, mode="WEEKLY", labels=None, font_path=None
     if prop:
         for label in ax.get_xticklabels(): 
             label.set_fontproperties(prop)
-            label.set_fontsize(10 if mode == "MONTHLY" else 14)
+            if mode == "MONTHLY":
+                label.set_fontsize(10)
+            elif mode == "YEARLY":
+                label.set_fontsize(12)
+            else:
+                label.set_fontsize(14)
             
     ax.tick_params(axis='y', left=False, labelleft=False)
     plt.tight_layout()
@@ -320,7 +366,6 @@ if st.session_state.get('access_token'):
                         break
                     all_acts.extend(current_acts)
                     page += 1
-                    # 최대 10페이지(2000개 활동)로 제한하여 API 호출 초과 방지
                     if page > 10:
                         break
                 elif r.status_code == 401: 
@@ -354,7 +399,7 @@ else:
 bg_files, log_file, user_graph_file = [], None, None
 mode = "DAILY"
 v_act, v_date, v_dist, v_pace, v_time, v_hr, v_type, v_memo = "RUNNING", "2026.02.16", "0.00", "00:00:00", "0'00\"", "0", "Run", ""
-weekly_data, monthly_data, selected_act, v_diff_str = None, None, None, ""
+weekly_data, monthly_data, yearly_data, selected_act, v_diff_str = None, None, None, None, ""
 
 if not st.session_state.get('access_token'):
     auth_url = f"https://www.strava.com/oauth/authorize?client_id={CLIENT_ID}&response_type=code&redirect_uri={ACTUAL_URL}&scope=read,activity:read_all&approval_prompt=force"
@@ -376,9 +421,9 @@ else:
             user_graph_file = st.file_uploader("📈 그래프(선택)", type=['jpg','png','jpeg'])
                 
         st.markdown("---")
-        mode = st.radio("모드 선택", ["DAILY", "WEEKLY", "MONTHLY"], horizontal=True)
+        mode = st.radio("모드 선택", ["DAILY", "WEEKLY", "MONTHLY", "YEARLY"], horizontal=True)
         
-        if mode in ["WEEKLY", "MONTHLY"]: 
+        if mode in ["WEEKLY", "MONTHLY", "YEARLY"]: 
             v_type = st.radio("종목 선택", ["Run", "WeightTraining", "Workout"], horizontal=True)
 
         if acts:
@@ -446,6 +491,25 @@ else:
                         diff = float(v_dist) - float(prev_m['total_dist'])
                         v_diff_str = f"({'+' if diff >= 0 else ''}{diff:.2f} km)"
 
+            elif mode == "YEARLY":
+                years = sorted(list(set([ac['start_date_local'][:4] for ac in acts])), reverse=True)
+                sel_year = st.selectbox("📅 연도 선택", years)
+                yearly_data = get_yearly_stats(acts, sel_year, v_type)
+                
+                if yearly_data:
+                    v_act = f"{sel_year} YEAR"
+                    v_date = yearly_data['range']
+                    v_dist = yearly_data['total_dist']
+                    v_pace = yearly_data['avg_pace']
+                    v_time = yearly_data['total_time']
+                    v_hr = yearly_data['avg_hr']
+                    
+                    prev_year_str = str(int(sel_year) - 1)
+                    prev_y = get_yearly_stats(acts, prev_year_str, v_type)
+                    if prev_y and v_type == "Run": 
+                        diff = float(v_dist) - float(prev_y['total_dist'])
+                        v_diff_str = f"({'+' if diff >= 0 else ''}{diff:.2f} km)"
+
     with st.expander("🎨 2. 디자인 및 텍스트 수정", expanded=False):
         c_txt1, c_txt2 = st.columns(2)
         with c_txt1:
@@ -463,7 +527,6 @@ else:
         st.markdown("---")
         COLOR_OPTS = {"Black": "#000000", "Yellow": "#FFD700", "White": "#FFFFFF", "Orange": "#FF4500", "Blue": "#00BFFF", "Grey": "#AAAAAA"}
         
-        # --- 템플릿 적용 로직 ---
         if mode == "DAILY":
             temp_sel = st.selectbox("템플릿 적용 (DAILY 전용)", ["매거진 좌측 (Magazine)", "하단 미니멀 (Minimal)", "중앙 집중 (Center)", "수동 설정 (Custom)"])
             if temp_sel != "수동 설정 (Custom)":
@@ -484,7 +547,6 @@ else:
             else:
                 is_custom = True
         
-        # 수동 설정 모드이거나 WEEKLY/MONTHLY 인 경우
         if mode != "DAILY" or (mode == "DAILY" and temp_sel == "수동 설정 (Custom)"):
             c_tog1, c_tog2 = st.columns(2)
             with c_tog1: 
@@ -521,7 +583,7 @@ else:
 
     st.markdown("---")
     st.subheader("🖼️ 미리보기 및 저장")
-    if (mode == "DAILY" and selected_act) or (mode == "WEEKLY" and weekly_data) or (mode == "MONTHLY" and monthly_data):
+    if (mode == "DAILY" and selected_act) or (mode == "WEEKLY" and weekly_data) or (mode == "MONTHLY" and monthly_data) or (mode == "YEARLY" and yearly_data):
         try:
             CW, CH = (1080, 1920) if mode == "DAILY" else (1080, 1350)
             f_t = load_font(sel_font, 70)
@@ -549,8 +611,8 @@ else:
                     draw_styled_text(draw, (rx + 40, ry + 30), v_act, f_t, m_color, shadow=use_shadow)
                     draw_styled_text(draw, (rx + 40, ry + 110), v_date, f_d, "#AAAAAA", shadow=use_shadow)
                     
-                    if mode in ["WEEKLY", "MONTHLY"] and v_type == "Run":
-                        d_info = weekly_data if mode == "WEEKLY" else monthly_data
+                    if mode in ["WEEKLY", "MONTHLY", "YEARLY"] and v_type == "Run":
+                        d_info = weekly_data if mode == "WEEKLY" else monthly_data if mode == "MONTHLY" else yearly_data
                         if d_info and d_info.get('other_count', 0) > 0:
                             dumb_icon = get_icon_pil("dumbbell", size=(25, 25))
                             info_text = f"{d_info['other_count']} sessions / {int(d_info['other_total_time'])} min"
@@ -568,8 +630,8 @@ else:
                             draw_styled_text(draw, (rx + 230, y_c + 15), diff, f_l, m_color, shadow=use_shadow)
                         y_c += 95
                 else: 
-                    if mode in ["WEEKLY", "MONTHLY"] and v_type == "Run":
-                        d_info = weekly_data if mode == "WEEKLY" else monthly_data
+                    if mode in ["WEEKLY", "MONTHLY", "YEARLY"] and v_type == "Run":
+                        d_info = weekly_data if mode == "WEEKLY" else monthly_data if mode == "MONTHLY" else yearly_data
                         if d_info and d_info.get('other_count', 0) > 0:
                             dumb_icon = get_icon_pil("dumbbell", size=(25, 25))
                             info_text = f"{d_info['other_count']} sessions / {int(d_info['other_total_time'])} min"
@@ -615,8 +677,8 @@ else:
                             return x_val, y_val
                             
                         m_draw.line([tr(la, lo) for la, lo in pts], fill=hex_to_rgba(m_color, vis_alpha), width=6)
-                elif mode in ["WEEKLY", "MONTHLY"]:
-                    d_obj = weekly_data if mode == "WEEKLY" else monthly_data
+                elif mode in ["WEEKLY", "MONTHLY", "YEARLY"]:
+                    d_obj = weekly_data if mode == "WEEKLY" else monthly_data if mode == "MONTHLY" else yearly_data
                     if d_obj:
                         chart_img = create_bar_chart(d_obj['dists'], m_color, mode=mode, labels=d_obj.get('labels'))
                         vis_layer = chart_img.resize((vis_sz_adj, int(chart_img.size[1]*(vis_sz_adj/chart_img.size[0]))), Image.Resampling.LANCZOS)
