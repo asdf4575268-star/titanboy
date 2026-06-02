@@ -308,13 +308,31 @@ if "code" in st.query_params:
 acts = []
 if st.session_state.get('access_token'):
     if not st.session_state.get('cached_acts'):
-        r = requests.get("https://www.strava.com/api/v3/athlete/activities?per_page=50", 
-                         headers={'Authorization': f"Bearer {st.session_state['access_token']}"})
-        if r.status_code == 200: 
-            st.session_state['cached_acts'] = r.json()
-        elif r.status_code == 401: 
-            st.session_state.clear()
-            st.rerun()
+        all_acts = []
+        page = 1
+        with st.spinner("Strava 데이터 동기화 중..."):
+            while True:
+                r = requests.get(f"https://www.strava.com/api/v3/athlete/activities?per_page=200&page={page}", 
+                                 headers={'Authorization': f"Bearer {st.session_state['access_token']}"})
+                if r.status_code == 200: 
+                    current_acts = r.json()
+                    if not current_acts:
+                        break
+                    all_acts.extend(current_acts)
+                    page += 1
+                    # 최대 10페이지(2000개 활동)로 제한하여 API 호출 초과 방지
+                    if page > 10:
+                        break
+                elif r.status_code == 401: 
+                    st.session_state.clear()
+                    st.rerun()
+                    break
+                else:
+                    break
+            
+            if all_acts:
+                st.session_state['cached_acts'] = all_acts
+                
     acts = st.session_state.get('cached_acts', [])
 
 # --- [4. 메인 화면 구성 및 UI] ---
