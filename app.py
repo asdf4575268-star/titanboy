@@ -94,7 +94,8 @@ def get_weekly_stats(activities, target_date_str):
         start_of_week = target_date - timedelta(days=target_date.weekday())
         end_of_week = start_of_week + timedelta(days=6)
         
-        weekly_dist = [0.0] * 7
+        weekly_run = [0.0] * 7
+        weekly_ride = [0.0] * 7
         total_dist, total_time, hr_sum, hr_count = 0.0, 0, 0, 0
         other_count, other_total_time = 0, 0.0
         
@@ -103,19 +104,17 @@ def get_weekly_stats(activities, target_date_str):
             if start_of_week <= act_date <= end_of_week:
                 act_type = act.get('type')
                 
-                # 미리보기 차트용: Run + Ride 통합 거리 합산
-                if act_type in ["Run", "Ride"]:
-                    dist = act.get('distance', 0) / 1000
-                    weekly_dist[act_date.weekday()] += dist
-                
-                # 기본 정보: Run 데이터로만 한정
                 if act_type == "Run":
                     dist = act.get('distance', 0) / 1000
+                    weekly_run[act_date.weekday()] += dist
                     total_dist += dist
                     total_time += act.get('moving_time', 0)
                     if act.get('average_heartrate'): 
                         hr_sum += act.get('average_heartrate')
                         hr_count += 1
+                elif act_type == "Ride":
+                    dist = act.get('distance', 0) / 1000
+                    weekly_ride[act_date.weekday()] += dist
                 elif act_type in WORKOUT_TYPES:
                     other_count += 1
                     other_total_time += act.get('moving_time', 0) / 60
@@ -125,7 +124,8 @@ def get_weekly_stats(activities, target_date_str):
         avg_pace_str = f"{int(avg_pace_sec//60)}'{int(avg_pace_sec%60):02d}\"" if total_dist > 0 else "0'00\""
         
         return {
-            "dists": weekly_dist, 
+            "run_dists": weekly_run,
+            "ride_dists": weekly_ride,
             "total_dist": f"{total_dist:.2f}", 
             "total_time": f"{total_time//3600:02d}:{(total_time%3600)//60:02d}:{total_time%60:02d}", 
             "avg_pace": avg_pace_str, 
@@ -145,7 +145,8 @@ def get_monthly_stats(activities, target_date_str):
         last_day = next_month - timedelta(days=next_month.day)
         num_days = last_day.day
         
-        monthly_dist = [0.0] * num_days
+        monthly_run = [0.0] * num_days
+        monthly_ride = [0.0] * num_days
         total_dist, total_time, hr_sum, hr_count = 0.0, 0, 0, 0
         other_count, other_total_time = 0, 0.0
         
@@ -154,19 +155,17 @@ def get_monthly_stats(activities, target_date_str):
             if first_day <= act_date <= last_day:
                 act_type = act.get('type')
                 
-                # 미리보기 차트용: Run + Ride 통합 거리 합산
-                if act_type in ["Run", "Ride"]:
-                    dist = act.get('distance', 0) / 1000
-                    monthly_dist[act_date.day - 1] += dist
-                
-                # 기본 정보: Run 데이터로만 한정
                 if act_type == "Run":
                     dist = act.get('distance', 0) / 1000
+                    monthly_run[act_date.day - 1] += dist
                     total_dist += dist
                     total_time += act.get('moving_time', 0)
                     if act.get('average_heartrate'): 
                         hr_sum += act.get('average_heartrate')
                         hr_count += 1
+                elif act_type == "Ride":
+                    dist = act.get('distance', 0) / 1000
+                    monthly_ride[act_date.day - 1] += dist
                 elif act_type in WORKOUT_TYPES:
                     other_count += 1
                     other_total_time += act.get('moving_time', 0) / 60
@@ -176,7 +175,8 @@ def get_monthly_stats(activities, target_date_str):
         avg_pace_str = f"{int(avg_pace_sec//60)}'{int(avg_pace_sec%60):02d}\"" if total_dist > 0 else "0'00\""
         
         return {
-            "dists": monthly_dist, 
+            "run_dists": monthly_run,
+            "ride_dists": monthly_ride,
             "total_dist": f"{total_dist:.2f}", 
             "total_time": f"{total_time//3600:02d}:{(total_time%3600)//60:02d}:{total_time%60:02d}", 
             "avg_pace": avg_pace_str, 
@@ -193,7 +193,8 @@ def get_yearly_stats(activities, target_year_str):
     try:
         target_year = int(target_year_str)
         
-        yearly_dist = [0.0] * 12
+        yearly_run = [0.0] * 12
+        yearly_ride = [0.0] * 12
         total_dist, total_time, hr_sum, hr_count = 0.0, 0, 0, 0
         other_count, other_total_time = 0, 0.0
         
@@ -202,19 +203,17 @@ def get_yearly_stats(activities, target_year_str):
             if act_date.year == target_year:
                 act_type = act.get('type')
                 
-                # 미리보기 차트용: Run + Ride 통합 거리 합산
-                if act_type in ["Run", "Ride"]:
-                    dist = act.get('distance', 0) / 1000
-                    yearly_dist[act_date.month - 1] += dist
-                
-                # 기본 정보: Run 데이터로만 한정
                 if act_type == "Run":
                     dist = act.get('distance', 0) / 1000
+                    yearly_run[act_date.month - 1] += dist
                     total_dist += dist
                     total_time += act.get('moving_time', 0)
                     if act.get('average_heartrate'): 
                         hr_sum += act.get('average_heartrate')
                         hr_count += 1
+                elif act_type == "Ride":
+                    dist = act.get('distance', 0) / 1000
+                    yearly_ride[act_date.month - 1] += dist
                 elif act_type in WORKOUT_TYPES:
                     other_count += 1
                     other_total_time += act.get('moving_time', 0) / 60
@@ -224,7 +223,8 @@ def get_yearly_stats(activities, target_year_str):
         avg_pace_str = f"{int(avg_pace_sec//60)}'{int(avg_pace_sec%60):02d}\"" if total_dist > 0 else "0'00\""
         
         return {
-            "dists": yearly_dist, 
+            "run_dists": yearly_run,
+            "ride_dists": yearly_ride,
             "total_dist": f"{total_dist:.2f}", 
             "total_time": f"{total_time//3600:02d}:{(total_time%3600)//60:02d}:{total_time%60:02d}", 
             "avg_pace": avg_pace_str, 
@@ -237,7 +237,7 @@ def get_yearly_stats(activities, target_year_str):
     except Exception: 
         return None
 
-def create_bar_chart(data, color_hex, mode="WEEKLY", labels=None, font_path=None):
+def create_bar_chart(run_data, ride_data, color_hex, mode="WEEKLY", labels=None, font_path=None):
     if mode == "WEEKLY": 
         labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
         
@@ -247,7 +247,11 @@ def create_bar_chart(data, color_hex, mode="WEEKLY", labels=None, font_path=None
     fig, ax = plt.subplots(figsize=(10, 5.0), dpi=150)
     fig.patch.set_alpha(0)
     ax.patch.set_alpha(0)
-    ax.bar(x_pos, data, color=color_hex, width=0.6)
+    
+    # 러닝 데이터 배치 후 그 위에 사이클 데이터를 흰색으로 누적 적층
+    ax.bar(x_pos, run_data, color=color_hex, width=0.6, label='Run')
+    ax.bar(x_pos, ride_data, bottom=run_data, color='#FFFFFF', width=0.6, label='Ride')
+    
     ax.set_xticks(x_pos)
     ax.set_xticklabels(labels)
     
@@ -267,6 +271,15 @@ def create_bar_chart(data, color_hex, mode="WEEKLY", labels=None, font_path=None
                 label.set_fontsize(14)
             
     ax.tick_params(axis='y', left=False, labelleft=False)
+    
+    # 그래프 상단에 런 / 사이클 범례 표시 추가
+    leg = ax.legend(loc='upper right', frameon=False, ncol=2)
+    if leg:
+        for text in leg.get_texts():
+            text.set_color('white')
+            if prop:
+                text.set_fontproperties(prop)
+                
     plt.tight_layout()
     
     buf = io.BytesIO()
@@ -444,7 +457,6 @@ else:
         st.markdown("---")
         mode = st.radio("모드 선택", ["DAILY", "WEEKLY", "MONTHLY", "YEARLY"], horizontal=True)
         
-        # 기본 정보는 Run으로 일원화
         v_type = "Run"
 
         if acts:
@@ -464,7 +476,6 @@ else:
                     m_s = selected_act.get('moving_time', 0)
                     
                     v_dist = f"{d_km:.2f}" 
-                    # 기본 정보는 러닝 페이스 형식으로 고정
                     v_pace = f"{int((m_s/d_km)//60)}'{int((m_s/d_km)%60):02d}\"" if d_km > 0 else "0'00\""
                         
                     v_time = f"{int(m_s//3600):02d}:{int((m_s%3600)//60):02d}:{int(m_s%60):02d}" if m_s >= 3600 else f"{int(m_s//60):02d}:{int(m_s%60):02d}"
@@ -666,7 +677,6 @@ else:
                         if diff: 
                             draw_styled_text(draw, (cx - draw.textlength(diff, f_l)//2, ry+230), diff, f_l, m_color, shadow=use_shadow)
 
-                # 아이콘은 러닝 테마에 맞춰 연동
                 daily_icon = get_icon_pil("run", size=(60, 60))
                 if daily_icon:
                     c_icon = colorize_icon(daily_icon, m_color)
@@ -694,8 +704,8 @@ else:
                 elif mode in ["WEEKLY", "MONTHLY", "YEARLY"]:
                     d_obj = weekly_data if mode == "WEEKLY" else monthly_data if mode == "MONTHLY" else yearly_data
                     if d_obj:
-                        # Run + Ride 합산 데이터로 차트 시각화
-                        chart_img = create_bar_chart(d_obj['dists'], m_color, mode=mode, labels=d_obj.get('labels'))
+                        # 런 데이터와 사이클 데이터를 분리하여 누적 차트 생성
+                        chart_img = create_bar_chart(d_obj['run_dists'], d_obj['ride_dists'], m_color, mode=mode, labels=d_obj.get('labels'))
                         vis_layer = chart_img.resize((vis_sz_adj, int(chart_img.size[1]*(vis_sz_adj/chart_img.size[0]))), Image.Resampling.LANCZOS)
                         vis_layer.putalpha(vis_layer.getchannel('A').point(lambda x: x * (vis_alpha / 255)))
 
