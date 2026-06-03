@@ -88,7 +88,7 @@ def colorize_icon(icon, hex_color):
 
 WORKOUT_TYPES = ['Workout', 'WeightTraining', 'Pilates', 'HIIT']
 
-def get_weekly_stats(activities, target_date_str, target_type="Run"):
+def get_weekly_stats(activities, target_date_str):
     try:
         target_date = datetime.strptime(target_date_str, "%Y-%m-%d")
         start_of_week = target_date - timedelta(days=target_date.weekday())
@@ -102,12 +102,15 @@ def get_weekly_stats(activities, target_date_str, target_type="Run"):
             act_date = datetime.strptime(act['start_date_local'][:10], "%Y-%m-%d")
             if start_of_week <= act_date <= end_of_week:
                 act_type = act.get('type')
-                is_target = (act_type in WORKOUT_TYPES) if target_type == "Workout" else (act_type == target_type)
                 
-                if is_target:
+                # 미리보기 차트용: Run + Ride 통합 거리 합산
+                if act_type in ["Run", "Ride"]:
                     dist = act.get('distance', 0) / 1000
-                    time_min = act.get('moving_time', 0) / 60
-                    weekly_dist[act_date.weekday()] += dist if target_type in ["Run", "Ride"] else time_min
+                    weekly_dist[act_date.weekday()] += dist
+                
+                # 기본 정보: Run 데이터로만 한정
+                if act_type == "Run":
+                    dist = act.get('distance', 0) / 1000
                     total_dist += dist
                     total_time += act.get('moving_time', 0)
                     if act.get('average_heartrate'): 
@@ -118,18 +121,12 @@ def get_weekly_stats(activities, target_date_str, target_type="Run"):
                     other_total_time += act.get('moving_time', 0) / 60
                     
         avg_hr = int(hr_sum / hr_count) if hr_count > 0 else 0
-        if target_type == "Ride":
-            speed = (total_dist / (total_time / 3600)) if total_time > 0 else 0
-            avg_pace_str = f"{speed:.1f} km/h"
-        elif target_type == "Run":
-            avg_pace_sec = (total_time / total_dist) if total_dist > 0 else 0
-            avg_pace_str = f"{int(avg_pace_sec//60)}'{int(avg_pace_sec%60):02d}\"" if total_dist > 0 else "0'00\""
-        else:
-            avg_pace_str = "-"
+        avg_pace_sec = (total_time / total_dist) if total_dist > 0 else 0
+        avg_pace_str = f"{int(avg_pace_sec//60)}'{int(avg_pace_sec%60):02d}\"" if total_dist > 0 else "0'00\""
         
         return {
             "dists": weekly_dist, 
-            "total_dist": f"{total_dist:.2f}" if target_type in ["Run", "Ride"] else "-", 
+            "total_dist": f"{total_dist:.2f}", 
             "total_time": f"{total_time//3600:02d}:{(total_time%3600)//60:02d}:{total_time%60:02d}", 
             "avg_pace": avg_pace_str, 
             "avg_hr": str(avg_hr), 
@@ -140,7 +137,7 @@ def get_weekly_stats(activities, target_date_str, target_type="Run"):
     except Exception: 
         return None
 
-def get_monthly_stats(activities, target_date_str, target_type="Run"):
+def get_monthly_stats(activities, target_date_str):
     try:
         target_date = datetime.strptime(target_date_str, "%Y-%m-%d")
         first_day = target_date.replace(day=1)
@@ -156,12 +153,15 @@ def get_monthly_stats(activities, target_date_str, target_type="Run"):
             act_date = datetime.strptime(act['start_date_local'][:10], "%Y-%m-%d")
             if first_day <= act_date <= last_day:
                 act_type = act.get('type')
-                is_target = (act_type in WORKOUT_TYPES) if target_type == "Workout" else (act_type == target_type)
                 
-                if is_target:
+                # 미리보기 차트용: Run + Ride 통합 거리 합산
+                if act_type in ["Run", "Ride"]:
                     dist = act.get('distance', 0) / 1000
-                    time_min = act.get('moving_time', 0) / 60
-                    monthly_dist[act_date.day - 1] += dist if target_type in ["Run", "Ride"] else time_min
+                    monthly_dist[act_date.day - 1] += dist
+                
+                # 기본 정보: Run 데이터로만 한정
+                if act_type == "Run":
+                    dist = act.get('distance', 0) / 1000
                     total_dist += dist
                     total_time += act.get('moving_time', 0)
                     if act.get('average_heartrate'): 
@@ -172,18 +172,12 @@ def get_monthly_stats(activities, target_date_str, target_type="Run"):
                     other_total_time += act.get('moving_time', 0) / 60
                     
         avg_hr = int(hr_sum / hr_count) if hr_count > 0 else 0
-        if target_type == "Ride":
-            speed = (total_dist / (total_time / 3600)) if total_time > 0 else 0
-            avg_pace_str = f"{speed:.1f} km/h"
-        elif target_type == "Run":
-            avg_pace_sec = (total_time / total_dist) if total_dist > 0 else 0
-            avg_pace_str = f"{int(avg_pace_sec//60)}'{int(avg_pace_sec%60):02d}\"" if total_dist > 0 else "0'00\""
-        else:
-            avg_pace_str = "-"
+        avg_pace_sec = (total_time / total_dist) if total_dist > 0 else 0
+        avg_pace_str = f"{int(avg_pace_sec//60)}'{int(avg_pace_sec%60):02d}\"" if total_dist > 0 else "0'00\""
         
         return {
             "dists": monthly_dist, 
-            "total_dist": f"{total_dist:.2f}" if target_type in ["Run", "Ride"] else "-", 
+            "total_dist": f"{total_dist:.2f}", 
             "total_time": f"{total_time//3600:02d}:{(total_time%3600)//60:02d}:{total_time%60:02d}", 
             "avg_pace": avg_pace_str, 
             "avg_hr": str(avg_hr), 
@@ -195,7 +189,7 @@ def get_monthly_stats(activities, target_date_str, target_type="Run"):
     except Exception: 
         return None
 
-def get_yearly_stats(activities, target_year_str, target_type="Run"):
+def get_yearly_stats(activities, target_year_str):
     try:
         target_year = int(target_year_str)
         
@@ -207,12 +201,15 @@ def get_yearly_stats(activities, target_year_str, target_type="Run"):
             act_date = datetime.strptime(act['start_date_local'][:10], "%Y-%m-%d")
             if act_date.year == target_year:
                 act_type = act.get('type')
-                is_target = (act_type in WORKOUT_TYPES) if target_type == "Workout" else (act_type == target_type)
                 
-                if is_target:
+                # 미리보기 차트용: Run + Ride 통합 거리 합산
+                if act_type in ["Run", "Ride"]:
                     dist = act.get('distance', 0) / 1000
-                    time_min = act.get('moving_time', 0) / 60
-                    yearly_dist[act_date.month - 1] += dist if target_type in ["Run", "Ride"] else time_min
+                    yearly_dist[act_date.month - 1] += dist
+                
+                # 기본 정보: Run 데이터로만 한정
+                if act_type == "Run":
+                    dist = act.get('distance', 0) / 1000
                     total_dist += dist
                     total_time += act.get('moving_time', 0)
                     if act.get('average_heartrate'): 
@@ -223,18 +220,12 @@ def get_yearly_stats(activities, target_year_str, target_type="Run"):
                     other_total_time += act.get('moving_time', 0) / 60
                     
         avg_hr = int(hr_sum / hr_count) if hr_count > 0 else 0
-        if target_type == "Ride":
-            speed = (total_dist / (total_time / 3600)) if total_time > 0 else 0
-            avg_pace_str = f"{speed:.1f} km/h"
-        elif target_type == "Run":
-            avg_pace_sec = (total_time / total_dist) if total_dist > 0 else 0
-            avg_pace_str = f"{int(avg_pace_sec//60)}'{int(avg_pace_sec%60):02d}\"" if total_dist > 0 else "0'00\""
-        else:
-            avg_pace_str = "-"
+        avg_pace_sec = (total_time / total_dist) if total_dist > 0 else 0
+        avg_pace_str = f"{int(avg_pace_sec//60)}'{int(avg_pace_sec%60):02d}\"" if total_dist > 0 else "0'00\""
         
         return {
             "dists": yearly_dist, 
-            "total_dist": f"{total_dist:.2f}" if target_type in ["Run", "Ride"] else "-", 
+            "total_dist": f"{total_dist:.2f}", 
             "total_time": f"{total_time//3600:02d}:{(total_time%3600)//60:02d}:{total_time%60:02d}", 
             "avg_pace": avg_pace_str, 
             "avg_hr": str(avg_hr), 
@@ -453,8 +444,8 @@ else:
         st.markdown("---")
         mode = st.radio("모드 선택", ["DAILY", "WEEKLY", "MONTHLY", "YEARLY"], horizontal=True)
         
-        if mode in ["WEEKLY", "MONTHLY", "YEARLY"]: 
-            v_type = st.radio("종목 선택", ["Run", "Ride", "Workout"], horizontal=True)
+        # 기본 정보는 Run으로 일원화
+        v_type = "Run"
 
         if acts:
             if mode == "DAILY":
@@ -463,8 +454,6 @@ else:
                 selected_act = acts[act_opts.index(sel_act_title)]
                 
                 if selected_act:
-                    raw_type = selected_act.get('type', 'Run')
-                    v_type = "Workout" if raw_type in WORKOUT_TYPES else raw_type
                     v_act = selected_act['name'].upper()
                     
                     raw_date = selected_act['start_date_local'][:10].replace('-', '.')
@@ -475,11 +464,8 @@ else:
                     m_s = selected_act.get('moving_time', 0)
                     
                     v_dist = f"{d_km:.2f}" 
-                    if v_type == "Ride":
-                        speed = (d_km / (m_s / 3600)) if m_s > 0 else 0
-                        v_pace = f"{speed:.1f} km/h"
-                    else:
-                        v_pace = f"{int((m_s/d_km)//60)}'{int((m_s/d_km)%60):02d}\"" if d_km > 0 else "0'00\""
+                    # 기본 정보는 러닝 페이스 형식으로 고정
+                    v_pace = f"{int((m_s/d_km)//60)}'{int((m_s/d_km)%60):02d}\"" if d_km > 0 else "0'00\""
                         
                     v_time = f"{int(m_s//3600):02d}:{int((m_s%3600)//60):02d}:{int(m_s%60):02d}" if m_s >= 3600 else f"{int(m_s//60):02d}:{int(m_s%60):02d}"
                     v_hr = str(int(selected_act.get('average_heartrate', 0))) if selected_act.get('average_heartrate') else "0"
@@ -491,7 +477,7 @@ else:
                 ]
                 weeks = sorted(list(set(weeks_raw)), reverse=True)
                 sel_week = st.selectbox("📅 주차 선택", weeks, format_func=lambda x: f"{x[:4]}-{datetime.strptime(x, '%Y-%m-%d').isocalendar()[1]}주차")              
-                weekly_data = get_weekly_stats(acts, sel_week, v_type)      
+                weekly_data = get_weekly_stats(acts, sel_week)      
                 
                 if weekly_data:
                     week_num = datetime.strptime(sel_week, '%Y-%m-%d').isocalendar()[1]
@@ -503,15 +489,15 @@ else:
                     v_hr = weekly_data['avg_hr']
                     
                     prev_week_date = (datetime.strptime(sel_week, "%Y-%m-%d") - timedelta(days=7)).strftime("%Y-%m-%d")
-                    prev_w = get_weekly_stats(acts, prev_week_date, v_type)
-                    if prev_w and v_type in ["Run", "Ride"]: 
+                    prev_w = get_weekly_stats(acts, prev_week_date)
+                    if prev_w: 
                         diff = float(v_dist) - float(prev_w['total_dist'])
                         v_diff_str = f"({'+' if diff >= 0 else ''}{diff:.2f} km)"
                         
             elif mode == "MONTHLY":
                 months = sorted(list(set([ac['start_date_local'][:7] for ac in acts])), reverse=True)
                 sel_month = st.selectbox("🗓️ 월 선택", months)
-                monthly_data = get_monthly_stats(acts, f"{sel_month}-01", v_type)
+                monthly_data = get_monthly_stats(acts, f"{sel_month}-01")
                 
                 if monthly_data:
                     v_act = datetime.strptime(f"{sel_month}-01", "%Y-%m-%d").strftime("%B").upper()
@@ -522,15 +508,15 @@ else:
                     v_hr = monthly_data['avg_hr']
                     
                     prev_month_date = (datetime.strptime(f"{sel_month}-01", "%Y-%m-%d") - timedelta(days=1)).replace(day=1).strftime("%Y-%m-%d")
-                    prev_m = get_monthly_stats(acts, prev_month_date, v_type)
-                    if prev_m and v_type in ["Run", "Ride"]: 
+                    prev_m = get_monthly_stats(acts, prev_month_date)
+                    if prev_m: 
                         diff = float(v_dist) - float(prev_m['total_dist'])
                         v_diff_str = f"({'+' if diff >= 0 else ''}{diff:.2f} km)"
 
             elif mode == "YEARLY":
                 years = sorted(list(set([ac['start_date_local'][:4] for ac in acts])), reverse=True)
                 sel_year = st.selectbox("📅 연도 선택", years)
-                yearly_data = get_yearly_stats(acts, sel_year, v_type)
+                yearly_data = get_yearly_stats(acts, sel_year)
                 
                 if yearly_data:
                     v_act = f"{sel_year} YEAR"
@@ -541,8 +527,8 @@ else:
                     v_hr = yearly_data['avg_hr']
                     
                     prev_year_str = str(int(sel_year) - 1)
-                    prev_y = get_yearly_stats(acts, prev_year_str, v_type)
-                    if prev_y and v_type in ["Run", "Ride"]: 
+                    prev_y = get_yearly_stats(acts, prev_year_str)
+                    if prev_y: 
                         diff = float(v_dist) - float(prev_y['total_dist'])
                         v_diff_str = f"({'+' if diff >= 0 else ''}{diff:.2f} km)"
 
@@ -550,11 +536,8 @@ else:
         c_txt1, c_txt2 = st.columns(2)
         with c_txt1:
             v_act = st.text_input("활동명", v_act)
-            if v_type in ["Run", "Ride"]: 
-                v_dist = st.text_input("거리 km", v_dist)
-                v_pace = st.text_input("페이스/속도", v_pace)
-            else: 
-                v_memo = st.text_input("운동 메모", placeholder="예: 필라테스 + HIIT 코어 루틴")
+            v_dist = st.text_input("거리 km", v_dist)
+            v_pace = st.text_input("페이스/속도", v_pace)
         with c_txt2: 
             v_date = st.text_input("날짜", v_date)
             v_time = st.text_input("시간", v_time)
@@ -602,7 +585,7 @@ else:
             with c_opt1: 
                 box_orient = st.radio("박스 방향", ["Vertical", "Horizontal"], index=0 if mode=="DAILY" else 1, horizontal=True)     
             with c_opt2: 
-                sel_font = st.selectbox("폰트", ["BlackHanSans", "KirangHaerang", "Lacquer", "Condiment", "Bangers", "BagelFatOne"], index=2 if v_type == "Workout" else 4)
+                sel_font = st.selectbox("폰트", ["BlackHanSans", "KirangHaerang", "Lacquer", "Condiment", "Bangers", "BagelFatOne"], index=4)
                 
             c_pos1, c_pos2 = st.columns(2)
             with c_pos1: 
@@ -631,12 +614,7 @@ else:
             overlay = Image.new("RGBA", (CW, CH), (0,0,0,0))
             draw = ImageDraw.Draw(overlay)
             
-            if v_type == "Workout":
-                items = [("", v_time, ""), ("", f"{v_hr} bpm", "")]
-                if v_memo: 
-                    items.append(("", v_memo, ""))
-            else:
-                items = [("", f"{v_dist} km", v_diff_str), ("", v_pace, ""), ("", v_time, ""), ("", f"{v_hr} bpm", "")]
+            items = [("", f"{v_dist} km", v_diff_str), ("", v_pace, ""), ("", v_time, ""), ("", f"{v_hr} bpm", "")]
                 
             if border_thick > 0: 
                 draw.rectangle([(0, 0), (CW-1, CH-1)], outline=m_color, width=border_thick)
@@ -647,7 +625,7 @@ else:
                     draw_styled_text(draw, (rx + 40, ry + 30), v_act, f_t, m_color, shadow=use_shadow)
                     draw_styled_text(draw, (rx + 40, ry + 110), v_date, f_d, "#AAAAAA", shadow=use_shadow)
                     
-                    if mode in ["WEEKLY", "MONTHLY", "YEARLY"] and v_type in ["Run", "Ride"]:
+                    if mode in ["WEEKLY", "MONTHLY", "YEARLY"]:
                         d_info = weekly_data if mode == "WEEKLY" else monthly_data if mode == "MONTHLY" else yearly_data
                         if d_info and d_info.get('other_count', 0) > 0:
                             dumb_icon = get_icon_pil("dumbbell", size=(25, 25))
@@ -666,7 +644,7 @@ else:
                             draw_styled_text(draw, (rx + 230, y_c + 15), diff, f_l, m_color, shadow=use_shadow)
                         y_c += 95
                 else: 
-                    if mode in ["WEEKLY", "MONTHLY", "YEARLY"] and v_type in ["Run", "Ride"]:
+                    if mode in ["WEEKLY", "MONTHLY", "YEARLY"]:
                         d_info = weekly_data if mode == "WEEKLY" else monthly_data if mode == "MONTHLY" else yearly_data
                         if d_info and d_info.get('other_count', 0) > 0:
                             dumb_icon = get_icon_pil("dumbbell", size=(25, 25))
@@ -688,12 +666,10 @@ else:
                         if diff: 
                             draw_styled_text(draw, (cx - draw.textlength(diff, f_l)//2, ry+230), diff, f_l, m_color, shadow=use_shadow)
 
-                # 종목별 상단/우측 아이콘 매칭 (사이클은 하얗게 무조건 고정 처리 가능)
-                icon_name = "dumbbell" if v_type == "Workout" else "ride" if v_type == "Ride" else "run"
-                daily_icon = get_icon_pil(icon_name, size=(60, 60))
+                # 아이콘은 러닝 테마에 맞춰 연동
+                daily_icon = get_icon_pil("run", size=(60, 60))
                 if daily_icon:
-                    icon_color = "#FFFFFF" if v_type == "Ride" else m_color
-                    c_icon = colorize_icon(daily_icon, icon_color)
+                    c_icon = colorize_icon(daily_icon, m_color)
                     overlay.paste(c_icon, (int(rx + rw - 80), int(ry + rh - 80)), c_icon)
                             
             if show_vis:
@@ -702,7 +678,7 @@ else:
                     user_img = Image.open(user_graph_file).convert("RGBA")
                     vis_layer = user_img.resize((vis_sz_adj, int(vis_sz_adj * user_img.height / user_img.width)), Image.Resampling.LANCZOS)
                     vis_layer.putalpha(vis_layer.getchannel('A').point(lambda x: x * (vis_alpha / 255)))
-                elif mode == "DAILY" and v_type in ["Run", "Ride"] and selected_act and selected_act.get('map', {}).get('summary_polyline'):
+                elif mode == "DAILY" and selected_act and selected_act.get('type') in ["Run", "Ride"] and selected_act.get('map', {}).get('summary_polyline'):
                     pts = polyline.decode(selected_act['map']['summary_polyline'])
                     if pts:
                         vis_layer = Image.new("RGBA", (vis_sz_adj, vis_sz_adj), (0,0,0,0))
@@ -714,13 +690,12 @@ else:
                             y_val = (vis_sz_adj - 15) - (la - min(lats)) / (max(lats) - min(lats) + 1e-5) * (vis_sz_adj - 30)
                             return x_val, y_val
                             
-                        line_color = "#FFFFFF" if v_type == "Ride" else m_color
-                        m_draw.line([tr(la, lo) for la, lo in pts], fill=hex_to_rgba(line_color, vis_alpha), width=6)
+                        m_draw.line([tr(la, lo) for la, lo in pts], fill=hex_to_rgba(m_color, vis_alpha), width=6)
                 elif mode in ["WEEKLY", "MONTHLY", "YEARLY"]:
                     d_obj = weekly_data if mode == "WEEKLY" else monthly_data if mode == "MONTHLY" else yearly_data
                     if d_obj:
-                        chart_color = "#FFFFFF" if v_type == "Ride" else m_color
-                        chart_img = create_bar_chart(d_obj['dists'], chart_color, mode=mode, labels=d_obj.get('labels'))
+                        # Run + Ride 합산 데이터로 차트 시각화
+                        chart_img = create_bar_chart(d_obj['dists'], m_color, mode=mode, labels=d_obj.get('labels'))
                         vis_layer = chart_img.resize((vis_sz_adj, int(chart_img.size[1]*(vis_sz_adj/chart_img.size[0]))), Image.Resampling.LANCZOS)
                         vis_layer.putalpha(vis_layer.getchannel('A').point(lambda x: x * (vis_alpha / 255)))
 
