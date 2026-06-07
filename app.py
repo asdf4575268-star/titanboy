@@ -249,79 +249,39 @@ def create_bar_chart(run_data, ride_data, color_hex, mode="WEEKLY", labels=None,
     fig.patch.set_alpha(0)
     ax.patch.set_alpha(0)
     
-    ax.bar(x_pos, run_data, color=color_hex, width=0.6, label='Run')
-    ax.bar(x_pos, ride_data, bottom=run_data, color='#FFFFFF', width=0.6, label='Ride')
+    # 막대 그래프 그리기 (아이콘 제거)
+    ax.bar(x_pos, run_data, color=color_hex, width=0.6, label='RUN')
+    ax.bar(x_pos, ride_data, bottom=run_data, color='#FFFFFF', width=0.6, label='RIDE')
     
     max_y = max([run_data[i] + ride_data[i] for i in range(len(run_data))] + [1])
     ax.set_ylim(0, max_y * 1.35)
     
-    # 오직 주간(WEEKLY) 모드일 때만 아이콘과 거리 수치 표시
+    # 주간 모드에서 수치만 표시 (기존 아이콘은 모두 삭제)
     if mode == "WEEKLY":
-        run_icon_pil = get_icon_pil("run", size=(30, 30))
-        ride_icon_pil = get_icon_pil("ride", size=(30, 30))
-        ride_arr = np.array(ride_icon_pil) if ride_icon_pil else None
-        
         y_offset_text = max_y * 0.03
-        y_offset_icon = max_y * 0.12
-        
         for i in range(len(run_data)):
             if run_data[i] > 0:
-                y_run = run_data[i]
-                r_color = color_hex if ride_data[i] > 0 else 'white'
-                
-                txt_run = ax.text(x_pos[i], y_run + y_offset_text, f"{run_data[i]:.1f}", color=r_color, ha='center', va='bottom')
-                if prop:
-                    txt_run.set_fontproperties(prop)
-                    txt_run.set_fontsize(12)
-                    
-                if run_icon_pil is not None:
-                    icon_to_use = colorize_icon(run_icon_pil, r_color) if r_color != 'white' else run_icon_pil
-                    imagebox_run = OffsetImage(np.array(icon_to_use), zoom=1.0)
-                    ab_run = AnnotationBbox(imagebox_run, (x_pos[i], y_run + y_offset_icon), frameon=False, box_alignment=(0.5, 0))
-                    ax.add_artist(ab_run)
-
+                ax.text(x_pos[i], run_data[i] + y_offset_text, f"{run_data[i]:.1f}", 
+                        color=color_hex, ha='center', va='bottom', fontsize=10)
             if ride_data[i] > 0:
                 y_ride = run_data[i] + ride_data[i]
-                
-                txt_ride = ax.text(x_pos[i], y_ride + y_offset_text, f"{ride_data[i]:.1f}", color='white', ha='center', va='bottom')
-                if prop:
-                    txt_ride.set_fontproperties(prop)
-                    txt_ride.set_fontsize(12)
-                    
-                if ride_arr is not None:
-                    imagebox_ride = OffsetImage(ride_arr, zoom=1.0)
-                    ab_ride = AnnotationBbox(imagebox_ride, (x_pos[i], y_ride + y_offset_icon), frameon=False, box_alignment=(0.5, 0))
-                    ax.add_artist(ab_ride)
+                ax.text(x_pos[i], y_ride + y_offset_text, f"{ride_data[i]:.1f}", 
+                        color='white', ha='center', va='bottom', fontsize=10)
     
     ax.set_xticks(x_pos)
     ax.set_xticklabels(labels)
     
-    for s in ['top', 'right', 'left']: 
-        ax.spines[s].set_visible(False)
-        
-    ax.tick_params(axis='x', colors='white')
-    
-    if prop:
-        for label in ax.get_xticklabels(): 
-            label.set_fontproperties(prop)
-            if mode == "MONTHLY":
-                label.set_fontsize(10)
-            elif mode == "YEARLY":
-                label.set_fontsize(12)
-            else:
-                label.set_fontsize(14)
-            
-    ax.tick_params(axis='y', left=False, labelleft=False)
-    
+    # 범례 설정: 아이콘 대신 텍스트로 명확히 구분
     leg = ax.legend(loc='upper right', frameon=False, ncol=2)
-    if leg:
-        for text in leg.get_texts():
-            text.set_color('white')
-            if prop:
-                text.set_fontproperties(prop)
+    for text in leg.get_texts():
+        text.set_color('white')
+        text.set_weight('bold') # 텍스트를 강조하여 아이콘 없이도 잘 보이게 함
                 
-    plt.tight_layout()
+    ax.tick_params(axis='x', colors='white')
+    ax.tick_params(axis='y', left=False, labelleft=False)
+    for s in ['top', 'right', 'left']: ax.spines[s].set_visible(False)
     
+    plt.tight_layout()
     buf = io.BytesIO()
     plt.savefig(buf, format='png', transparent=True)
     buf.seek(0)
