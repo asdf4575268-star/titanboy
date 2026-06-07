@@ -210,4 +210,577 @@ def get_yearly_stats(activities, target_year_str):
                     total_dist += dist
                     total_time += act.get('moving_time', 0)
                     if act.get('average_heartrate'): 
-                        hr_sum +=
+                        hr_sum += act.get('average_heartrate')
+                        hr_count += 1
+                elif act_type == "Ride":
+                    dist = act.get('distance', 0) / 1000
+                    yearly_ride[act_date.month - 1] += dist
+                elif act_type in WORKOUT_TYPES:
+                    other_count += 1
+                    other_total_time += act.get('moving_time', 0) / 60
+                    
+        avg_hr = int(hr_sum / hr_count) if hr_count > 0 else 0
+        avg_pace_sec = (total_time / total_dist) if total_dist > 0 else 0
+        avg_pace_str = f"{int(avg_pace_sec//60)}'{int(avg_pace_sec%60):02d}\"" if total_dist > 0 else "0'00\""
+        
+        return {
+            "run_dists": yearly_run,
+            "ride_dists": yearly_ride,
+            "total_dist": f"{total_dist:.2f}", 
+            "total_time": f"{total_time//3600:02d}:{(total_time%3600)//60:02d}:{total_time%60:02d}", 
+            "avg_pace": avg_pace_str, 
+            "avg_hr": str(avg_hr), 
+            "range": str(target_year), 
+            "labels": [str(i) for i in range(1, 13)], 
+            "other_count": other_count, 
+            "other_total_time": other_total_time
+        }
+    except Exception: 
+        return None
+
+def create_bar_chart(run_data, ride_data, color_hex, mode="WEEKLY", labels=None, font_path=None):
+    if mode == "WEEKLY": 
+        labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+        
+    x_pos = np.arange(len(labels))
+    prop = font_manager.FontProperties(fname=font_path) if font_path else None
+    
+    fig, ax = plt.subplots(figsize=(10, 5.0), dpi=150)
+    fig.patch.set_alpha(0)
+    ax.patch.set_alpha(0)
+    
+    ax.bar(x_pos, run_data, color=color_hex, width=0.6, label='Run')
+    ax.bar(x_pos, ride_data, bottom=run_data, color='#FFFFFF', width=0.6, label='Ride')
+    
+    max_y = max([run_data[i] + ride_data[i] for i in range(len(run_data))] + [1])
+    ax.set_ylim(0, max_y * 1.35)
+    
+    # 오직 주간(WEEKLY) 모드일 때만 아이콘과 거리 수치 표시
+    if mode == "WEEKLY":
+        run_icon_pil = get_icon_pil("run", size=(30, 30))
+        ride_icon_pil = get_icon_pil("ride", size=(30, 30))
+        ride_arr = np.array(ride_icon_pil) if ride_icon_pil else None
+        
+        y_offset_text = max_y * 0.03
+        y_offset_icon = max_y * 0.12
+        
+        for i in range(len(run_data)):
+            if run_data[i] > 0:
+                y_run = run_data[i]
+                r_color = color_hex if ride_data[i] > 0 else 'white'
+                
+                txt_run = ax.text(x_pos[i], y_run + y_offset_text, f"{run_data[i]:.1f}", color=r_color, ha='center', va='bottom')
+                if prop:
+                    txt_run.set_fontproperties(prop)
+                    txt_run.set_fontsize(12)
+                    
+                if run_icon_pil is not None:
+                    icon_to_use = colorize_icon(run_icon_pil, r_color) if r_color != 'white' else run_icon_pil
+                    imagebox_run = OffsetImage(np.array(icon_to_use), zoom=1.0)
+                    ab_run = AnnotationBbox(imagebox_run, (x_pos[i], y_run + y_offset_icon), frameon=False, box_alignment=(0.5, 0))
+                    ax.add_artist(ab_run)
+
+            if ride_data[i] > 0:
+                y_ride = run_data[i] + ride_data[i]
+                
+                txt_ride = ax.text(x_pos[i], y_ride + y_offset_text, f"{ride_data[i]:.1f}", color='white', ha='center', va='bottom')
+                if prop:
+                    txt_ride.set_fontproperties(prop)
+                    txt_ride.set_fontsize(12)
+                    
+                if ride_arr is not None:
+                    imagebox_ride = OffsetImage(ride_arr, zoom=1.0)
+                    ab_ride = AnnotationBbox(imagebox_ride, (x_pos[i], y_ride + y_offset_icon), frameon=False, box_alignment=(0.5, 0))
+                    ax.add_artist(ab_ride)
+    
+    ax.set_xticks(x_pos)
+    ax.set_xticklabels(labels)
+    
+    for s in ['top', 'right', 'left']: 
+        ax.spines[s].set_visible(False)
+        
+    ax.tick_params(axis='x', colors='white')
+    
+    if prop:
+        for label in ax.get_xticklabels(): 
+            label.set_fontproperties(prop)
+            if mode == "MONTHLY":
+                label.set_fontsize(10)
+            elif mode == "YEARLY":
+                label.set_fontsize(12)
+            else:
+                label.set_fontsize(14)
+            
+    ax.tick_params(axis='y', left=False, labelleft=False)
+    
+    leg = ax.legend(loc='upper right', frameon=False, ncol=2)
+    if leg:
+        for text in leg.get_texts():
+            text.set_color('white')
+            if prop:
+                text.set_fontproperties(prop)
+                
+    plt.tight_layout()
+    
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png', transparent=True)
+    buf.seek(0)
+    plt.close(fig)
+    return Image.open(buf)
+
+def make_smart_collage(files, target_size):
+    tw, th = target_size
+    imgs = []
+    
+    for f in files:
+        try: 
+            imgs.append(ImageOps.exif_transpose(Image.open(f)).convert("RGBA"))
+        except Exception: 
+            continue
+            
+    if not imgs: 
+        return Image.new("RGBA", (tw, th), (30, 30, 30, 255))
+    
+    n = len(imgs)
+    if n == 1: 
+        return ImageOps.fit(imgs[0], (tw, th), Image.Resampling.LANCZOS)
+
+    cols = math.ceil(math.sqrt(n))
+    rows = math.ceil(n / cols)
+    canvas = Image.new("RGBA", (tw, th), (0, 0, 0, 255))
+    
+    for i, img in enumerate(imgs):
+        r, c = divmod(i, cols)
+        x0, y0 = int(c * tw / cols), int(r * th / rows)
+        
+        if r == rows - 1 and n % cols != 0:
+            row_tw = tw / (n % cols)
+            x0 = int((i % cols) * row_tw)
+            x1 = int(((i % cols) + 1) * row_tw)
+        else: 
+            x1 = int((c + 1) * tw / cols)
+            
+        y1 = int((r + 1) * th / rows)
+        canvas.paste(ImageOps.fit(img, (x1 - x0, y1 - y0), Image.Resampling.LANCZOS), (x0, y0))
+        
+    return canvas
+
+# --- [3. 인증 및 데이터 연동] ---
+DB_PATH = "archive_prism_total_v5.db"
+
+def init_db():
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cur = conn.cursor()
+        cur.execute("CREATE TABLE IF NOT EXISTS strava_tokens (id INTEGER PRIMARY KEY, access_token TEXT, refresh_token TEXT, expires_at INTEGER)")
+        conn.commit()
+        conn.close()
+    except Exception: 
+        pass
+
+init_db()
+
+def handle_token_db(mode="load", data=None):
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cur = conn.cursor()
+        if mode == "save" and data:
+            cur.execute("DELETE FROM strava_tokens")
+            cur.execute("INSERT INTO strava_tokens (access_token, refresh_token, expires_at) VALUES (?, ?, ?)", 
+                        (data['access_token'], data['refresh_token'], data['expires_at']))
+            conn.commit()
+        elif mode == "load":
+            cur.execute("SELECT access_token, refresh_token, expires_at FROM strava_tokens LIMIT 1")
+            row = cur.fetchone()
+            conn.close()
+            return row
+        conn.close()
+    except Exception: 
+        return None
+
+if 'access_token' not in st.session_state:
+    saved = handle_token_db("load")
+    if saved:
+        a_token, r_token, exp_at = saved
+        if time.time() > (exp_at - 1800):
+            try:
+                res = requests.post("https://www.strava.com/oauth/token", 
+                                    data={"client_id": CLIENT_ID, "client_secret": CLIENT_SECRET, 
+                                          "grant_type": "refresh_token", "refresh_token": r_token}).json()
+                if 'access_token' in res: 
+                    handle_token_db("save", res)
+                    st.session_state['access_token'] = res['access_token']
+            except Exception: 
+                pass
+        else: 
+            st.session_state['access_token'] = a_token
+
+if "code" in st.query_params:
+    res = requests.post("https://www.strava.com/oauth/token", 
+                        data={"client_id": CLIENT_ID, "client_secret": CLIENT_SECRET, 
+                              "code": st.query_params["code"], "grant_type": "authorization_code"}).json()
+    if 'access_token' in res: 
+        handle_token_db("save", res)
+        st.session_state['access_token'] = res['access_token']
+        st.query_params.clear()
+        st.rerun()
+
+acts = []
+if st.session_state.get('access_token'):
+    if not st.session_state.get('cached_acts'):
+        all_acts = []
+        page = 1
+        with st.spinner("Strava 데이터 동기화 중..."):
+            while True:
+                r = requests.get(f"https://www.strava.com/api/v3/athlete/activities?per_page=200&page={page}", 
+                                 headers={'Authorization': f"Bearer {st.session_state['access_token']}"})
+                if r.status_code == 200: 
+                    current_acts = r.json()
+                    if not current_acts:
+                        break
+                    all_acts.extend(current_acts)
+                    page += 1
+                    if page > 10:
+                        break
+                elif r.status_code == 401: 
+                    st.session_state.clear()
+                    st.rerun()
+                    break
+                else:
+                    break
+            
+            if all_acts:
+                st.session_state['cached_acts'] = all_acts
+                
+    acts = st.session_state.get('cached_acts', [])
+
+# --- [4. 메인 화면 구성 및 UI] ---
+def get_base64(path):
+    try:
+        with open(path, "rb") as f: 
+            return base64.b64encode(f.read()).decode()
+    except Exception: 
+        return ""
+
+st.markdown("""<style>.header-wrap { display: flex; align-items: center; gap: 8px; } .header-wrap h1 { margin: 0; letter-spacing: -1px; }</style>""", unsafe_allow_html=True)
+
+logo_base64 = get_base64("logo.png")
+if logo_base64:
+    st.markdown(f"""<div class="header-wrap"><img src="data:image/png;base64,{logo_base64}" width="90"><h1>TITAN BOY</h1></div>""", unsafe_allow_html=True)
+else:
+    st.markdown("<h1>TITAN BOY</h1>", unsafe_allow_html=True)
+
+bg_files, log_file, user_graph_file = [], None, None
+mode = "DAILY"
+v_act, v_date, v_dist, v_pace, v_time, v_hr, v_type, v_memo = "RUNNING", "2026.02.16", "0.00", "00:00:00", "0'00\"", "0", "Run", ""
+weekly_data, monthly_data, yearly_data, selected_act, v_diff_str = None, None, None, None, ""
+
+if not st.session_state.get('access_token'):
+    auth_url = f"https://www.strava.com/oauth/authorize?client_id={CLIENT_ID}&response_type=code&redirect_uri={ACTUAL_URL}&scope=read,activity:read_all&approval_prompt=force"
+    st.link_button("🚀 Strava 연동하기", auth_url, use_container_width=True)
+else:
+    c1, c2 = st.columns([3, 1])
+    with c2:
+        if st.button("🔓 로그아웃", use_container_width=True): 
+            st.session_state.clear()
+            st.query_params.clear()
+            st.rerun()
+
+    with st.expander("📂 1. 데이터 및 사진 설정", expanded=True):
+        bg_files = st.file_uploader("📸 배경 사진", type=['jpg','jpeg','png'], accept_multiple_files=True)
+        c_up1, c_up2 = st.columns(2)
+        with c_up1: 
+            log_file = st.file_uploader("🔘 로고", type=['jpg','jpeg','png'])
+        with c_up2: 
+            user_graph_file = st.file_uploader("📈 그래프(선택)", type=['jpg','png','jpeg'])
+                
+        st.markdown("---")
+        mode = st.radio("모드 선택", ["DAILY", "WEEKLY", "MONTHLY", "YEARLY"], horizontal=True)
+        
+        v_type = "Run"
+
+        if acts:
+            if mode == "DAILY":
+                act_opts = [f"{ac['start_date_local'][:10]} - {ac['name']}" for ac in acts]
+                sel_act_title = st.selectbox("🏃 활동 선택", act_opts)
+                selected_act = acts[act_opts.index(sel_act_title)]
+                
+                if selected_act:
+                    v_act = selected_act['name'].upper()
+                    
+                    raw_date = selected_act['start_date_local'][:10].replace('-', '.')
+                    raw_time = datetime.strptime(selected_act['start_date_local'][:19], '%Y-%m-%dT%H:%M:%S').strftime('%I:%M %p').lower()
+                    v_date = f"{raw_date} {raw_time}"
+                    
+                    d_km = selected_act.get('distance', 0) / 1000
+                    m_s = selected_act.get('moving_time', 0)
+                    
+                    v_dist = f"{d_km:.2f}" 
+                    v_pace = f"{int((m_s/d_km)//60)}'{int((m_s/d_km)%60):02d}\"" if d_km > 0 else "0'00\""
+                        
+                    v_time = f"{int(m_s//3600):02d}:{int((m_s%3600)//60):02d}:{int(m_s%60):02d}" if m_s >= 3600 else f"{int(m_s//60):02d}:{int(m_s%60):02d}"
+                    v_hr = str(int(selected_act.get('average_heartrate', 0))) if selected_act.get('average_heartrate') else "0"
+                    
+            elif mode == "WEEKLY":
+                weeks_raw = [
+                    (datetime.strptime(ac['start_date_local'][:10], "%Y-%m-%d") - timedelta(days=datetime.strptime(ac['start_date_local'][:10], "%Y-%m-%d").weekday())).strftime('%Y-%m-%d')
+                    for ac in acts
+                ]
+                weeks = sorted(list(set(weeks_raw)), reverse=True)
+                sel_week = st.selectbox("📅 주차 선택", weeks, format_func=lambda x: f"{x[:4]}-{datetime.strptime(x, '%Y-%m-%d').isocalendar()[1]}주차")              
+                weekly_data = get_weekly_stats(acts, sel_week)      
+                
+                if weekly_data:
+                    week_num = datetime.strptime(sel_week, '%Y-%m-%d').isocalendar()[1]
+                    v_act = f"{week_num}th WEEK"
+                    v_date = weekly_data['range']
+                    v_dist = weekly_data['total_dist']
+                    v_pace = weekly_data['avg_pace']
+                    v_time = weekly_data['total_time']
+                    v_hr = weekly_data['avg_hr']
+                    
+                    prev_week_date = (datetime.strptime(sel_week, "%Y-%m-%d") - timedelta(days=7)).strftime("%Y-%m-%d")
+                    prev_w = get_weekly_stats(acts, prev_week_date)
+                    if prev_w: 
+                        diff = float(v_dist) - float(prev_w['total_dist'])
+                        v_diff_str = f"({'+' if diff >= 0 else ''}{diff:.2f} km)"
+                        
+            elif mode == "MONTHLY":
+                months = sorted(list(set([ac['start_date_local'][:7] for ac in acts])), reverse=True)
+                sel_month = st.selectbox("🗓️ 월 선택", months)
+                monthly_data = get_monthly_stats(acts, f"{sel_month}-01")
+                
+                if monthly_data:
+                    v_act = datetime.strptime(f"{sel_month}-01", "%Y-%m-%d").strftime("%B").upper()
+                    v_date = monthly_data['range']
+                    v_dist = monthly_data['total_dist']
+                    v_pace = monthly_data['avg_pace']
+                    v_time = monthly_data['total_time']
+                    v_hr = monthly_data['avg_hr']
+                    
+                    prev_month_date = (datetime.strptime(f"{sel_month}-01", "%Y-%m-%d") - timedelta(days=1)).replace(day=1).strftime("%Y-%m-%d")
+                    prev_m = get_monthly_stats(acts, prev_month_date)
+                    if prev_m: 
+                        diff = float(v_dist) - float(prev_m['total_dist'])
+                        v_diff_str = f"({'+' if diff >= 0 else ''}{diff:.2f} km)"
+
+            elif mode == "YEARLY":
+                years = sorted(list(set([ac['start_date_local'][:4] for ac in acts])), reverse=True)
+                sel_year = st.selectbox("📅 연도 선택", years)
+                yearly_data = get_yearly_stats(acts, sel_year)
+                
+                if yearly_data:
+                    v_act = f"{sel_year} YEAR"
+                    v_date = yearly_data['range']
+                    v_dist = yearly_data['total_dist']
+                    v_pace = yearly_data['avg_pace']
+                    v_time = yearly_data['total_time']
+                    v_hr = yearly_data['avg_hr']
+                    
+                    prev_year_str = str(int(sel_year) - 1)
+                    prev_y = get_yearly_stats(acts, prev_year_str)
+                    if prev_y: 
+                        diff = float(v_dist) - float(prev_y['total_dist'])
+                        v_diff_str = f"({'+' if diff >= 0 else ''}{diff:.2f} km)"
+
+    with st.expander("🎨 2. 디자인 및 텍스트 수정", expanded=False):
+        c_txt1, c_txt2 = st.columns(2)
+        with c_txt1:
+            v_act = st.text_input("활동명", v_act)
+            v_dist = st.text_input("거리 km", v_dist)
+            v_pace = st.text_input("페이스/속도", v_pace)
+        with c_txt2: 
+            v_date = st.text_input("날짜", v_date)
+            v_time = st.text_input("시간", v_time)
+            v_hr = st.text_input("심박 bpm", v_hr)
+
+        st.markdown("---")
+        COLOR_OPTS = {"Black": "#000000", "Yellow": "#FFD700", "White": "#FFFFFF", "Orange": "#FF4500", "Blue": "#00BFFF", "Grey": "#AAAAAA"}
+        
+        if mode == "DAILY":
+            temp_sel = st.selectbox("템플릿 적용 (DAILY 전용)", ["매거진 좌측 (Magazine)", "하단 미니멀 (Minimal)", "중앙 집중 (Center)", "수동 설정 (Custom)"])
+            if temp_sel != "수동 설정 (Custom)":
+                if temp_sel == "매거진 좌측 (Magazine)":
+                    box_orient, sel_font, rx, ry, rw, rh, box_alpha = "Vertical", "BlackHanSans", 80, 1150, 450, 650, 120
+                elif temp_sel == "하단 미니멀 (Minimal)":
+                    box_orient, sel_font, rx, ry, rw, rh, box_alpha = "Horizontal", "Bangers", 40, 1600, 1000, 280, 80
+                elif temp_sel == "중앙 집중 (Center)":
+                    box_orient, sel_font, rx, ry, rw, rh, box_alpha = "Horizontal", "Lacquer", 40, 850, 1000, 350, 150
+                
+                c_col1, c_col2 = st.columns(2)
+                with c_col1: 
+                    m_color = COLOR_OPTS[st.selectbox("포인트 컬러", list(COLOR_OPTS.keys()), index=1)]
+                with c_col2: 
+                    sub_color = COLOR_OPTS[st.selectbox("서브 컬러", list(COLOR_OPTS.keys()), index=2)]
+                
+                show_vis, show_box, use_shadow, border_thick, vis_sz_adj, vis_alpha, logo_sz = True, True, True, 0, 180, 255, 60
+            else:
+                is_custom = True
+        
+        if mode != "DAILY" or (mode == "DAILY" and temp_sel == "수동 설정 (Custom)"):
+            c_tog1, c_tog2 = st.columns(2)
+            with c_tog1: 
+                show_vis = st.toggle("지도/그래프", True)
+                show_box = st.toggle("데이터 박스", True)
+            with c_tog2: 
+                use_shadow = st.toggle("그림자 효과", True)
+                border_thick = st.slider("테두리 두께", 0, 50, 0)
+                
+            c_col1, c_col2 = st.columns(2)
+            with c_col1: 
+                m_color = COLOR_OPTS[st.selectbox("포인트 컬러", list(COLOR_OPTS.keys()), index=1)]
+            with c_col2: 
+                sub_color = COLOR_OPTS[st.selectbox("서브 컬러", list(COLOR_OPTS.keys()), index=2)]
+                
+            c_opt1, c_opt2 = st.columns(2)
+            with c_opt1: 
+                box_orient = st.radio("박스 방향", ["Vertical", "Horizontal"], index=0 if mode=="DAILY" else 1, horizontal=True)     
+            with c_opt2: 
+                sel_font = st.selectbox("폰트", ["BlackHanSans", "KirangHaerang", "Lacquer", "Condiment", "Bangers", "BagelFatOne"], index=4)
+                
+            c_pos1, c_pos2 = st.columns(2)
+            with c_pos1: 
+                rx = st.number_input("박스 X", 0, 1080, 40 if box_orient=="Horizontal" else 80)
+                rw = st.number_input("박스 너비", 100, 1080, 1000 if box_orient=="Horizontal" else 450)
+            with c_pos2: 
+                ry = st.number_input("박스 Y", 0, 1920, 250 if box_orient=="Horizontal" else 1200)
+                rh = st.number_input("박스 높이", 100, 1920, 350 if box_orient=="Horizontal" else 650)
+                
+            box_alpha = st.slider("박스 투명도", 0, 255, 100)
+            vis_sz_adj = st.slider("지도/그래프 크기", 50, 1080, 180 if mode=="DAILY" else 1080)
+            vis_alpha = st.slider("투명도", 0, 255, 255)
+            logo_sz = st.slider("로고 크기", 30, 200, 60)
+
+    st.markdown("---")
+    st.subheader("🖼️ 미리보기 및 저장")
+    if (mode == "DAILY" and selected_act) or (mode == "WEEKLY" and weekly_data) or (mode == "MONTHLY" and monthly_data) or (mode == "YEARLY" and yearly_data):
+        try:
+            CW, CH = (1080, 1920) if mode == "DAILY" else (1080, 1350)
+            f_t = load_font(sel_font, 70)
+            f_d = load_font(sel_font, 30)
+            f_n = load_font(sel_font, 50)
+            f_l = load_font(sel_font, 25)
+            
+            canvas = make_smart_collage(bg_files, (CW, CH)) if bg_files else Image.new("RGBA", (CW, CH), (20, 20, 20, 255))
+            overlay = Image.new("RGBA", (CW, CH), (0,0,0,0))
+            draw = ImageDraw.Draw(overlay)
+            
+            items = [("", f"{v_dist} km", v_diff_str), ("", v_pace, ""), ("", v_time, ""), ("", f"{v_hr} bpm", "")]
+                
+            if border_thick > 0: 
+                draw.rectangle([(0, 0), (CW-1, CH-1)], outline=m_color, width=border_thick)
+            
+            if show_box:
+                draw.rectangle([rx, ry, rx + rw, ry + rh], fill=(0,0,0,box_alpha))
+                if box_orient == "Vertical":
+                    draw_styled_text(draw, (rx + 40, ry + 30), v_act, f_t, m_color, shadow=use_shadow)
+                    draw_styled_text(draw, (rx + 40, ry + 110), v_date, f_d, "#AAAAAA", shadow=use_shadow)
+                    
+                    if mode in ["WEEKLY", "MONTHLY", "YEARLY"]:
+                        d_info = weekly_data if mode == "WEEKLY" else monthly_data if mode == "MONTHLY" else yearly_data
+                        if d_info and d_info.get('other_count', 0) > 0:
+                            dumb_icon = get_icon_pil("dumbbell", size=(25, 25))
+                            info_text = f"{d_info['other_count']} sessions / {int(d_info['other_total_time'])} min"
+                            if dumb_icon:
+                                c_icon = colorize_icon(dumb_icon, m_color)
+                                overlay.paste(c_icon, (rx + 40, ry + 155), c_icon)
+                                draw_styled_text(draw, (rx + 70, ry + 157), info_text, f_l, m_color, shadow=use_shadow)
+                            else: 
+                                draw_styled_text(draw, (rx + 40, ry + 157), info_text, f_l, m_color, shadow=use_shadow)
+                    
+                    y_c = ry + 200
+                    for _, val, diff in items:
+                        draw_styled_text(draw, (rx + 40, y_c + 15), val.lower(), f_n, sub_color, shadow=use_shadow)
+                        if diff: 
+                            draw_styled_text(draw, (rx + 230, y_c + 15), diff, f_l, m_color, shadow=use_shadow)
+                        y_c += 95
+                else: 
+                    if mode in ["WEEKLY", "MONTHLY", "YEARLY"]:
+                        d_info = weekly_data if mode == "WEEKLY" else monthly_data if mode == "MONTHLY" else yearly_data
+                        if d_info and d_info.get('other_count', 0) > 0:
+                            dumb_icon = get_icon_pil("dumbbell", size=(25, 25))
+                            info_text = f"{d_info['other_count']} sessions / {int(d_info['other_total_time'])} min"
+                            if dumb_icon:
+                                c_icon = colorize_icon(dumb_icon, m_color)
+                                overlay.paste(c_icon, (rx + 25, ry + 25), c_icon)
+                                draw_styled_text(draw, (rx + 55, ry + 27), info_text, f_l, m_color, shadow=use_shadow)
+                            else: 
+                                draw_styled_text(draw, (rx + 25, ry + 27), info_text, f_l, m_color, shadow=use_shadow)
+                    
+                    draw_styled_text(draw, (rx + (rw-draw.textlength(v_act, f_t))//2, ry+35), v_act, f_t, m_color, shadow=use_shadow)
+                    draw_styled_text(draw, (rx + (rw-draw.textlength(v_date, f_d))//2, ry+110), v_date, f_d, "#AAAAAA", shadow=use_shadow)
+                    
+                    sec_w = rw // len(items) if len(items) > 0 else rw
+                    for i, (_, val, diff) in enumerate(items):
+                        cx = rx + (i * sec_w) + (sec_w // 2)
+                        draw_styled_text(draw, (cx - draw.textlength(val.lower(), f_n)//2, ry+175), val.lower(), f_n, sub_color, shadow=use_shadow)
+                        if diff: 
+                            draw_styled_text(draw, (cx - draw.textlength(diff, f_l)//2, ry+230), diff, f_l, m_color, shadow=use_shadow)
+                            
+            if show_vis:
+                vis_layer = None
+                if user_graph_file:
+                    user_img = Image.open(user_graph_file).convert("RGBA")
+                    vis_layer = user_img.resize((vis_sz_adj, int(vis_sz_adj * user_img.height / user_img.width)), Image.Resampling.LANCZOS)
+                    vis_layer.putalpha(vis_layer.getchannel('A').point(lambda x: x * (vis_alpha / 255)))
+                elif mode == "DAILY" and selected_act and selected_act.get('type') in ["Run", "Ride"] and selected_act.get('map', {}).get('summary_polyline'):
+                    pts = polyline.decode(selected_act['map']['summary_polyline'])
+                    if pts:
+                        vis_layer = Image.new("RGBA", (vis_sz_adj, vis_sz_adj), (0,0,0,0))
+                        m_draw = ImageDraw.Draw(vis_layer)
+                        lats, lons = zip(*pts)
+                        
+                        def tr(la, lo): 
+                            x_val = 15 + (lo - min(lons)) / (max(lons) - min(lons) + 1e-5) * (vis_sz_adj - 30)
+                            y_val = (vis_sz_adj - 15) - (la - min(lats)) / (max(lats) - min(lats) + 1e-5) * (vis_sz_adj - 30)
+                            return x_val, y_val
+                            
+                        m_draw.line([tr(la, lo) for la, lo in pts], fill=hex_to_rgba(m_color, vis_alpha), width=6)
+                elif mode in ["WEEKLY", "MONTHLY", "YEARLY"]:
+                    d_obj = weekly_data if mode == "WEEKLY" else monthly_data if mode == "MONTHLY" else yearly_data
+                    if d_obj:
+                        chart_img = create_bar_chart(d_obj['run_dists'], d_obj['ride_dists'], m_color, mode=mode, labels=d_obj.get('labels'), font_path=None)
+                        vis_layer = chart_img.resize((vis_sz_adj, int(chart_img.size[1]*(vis_sz_adj/chart_img.size[0]))), Image.Resampling.LANCZOS)
+                        vis_layer.putalpha(vis_layer.getchannel('A').point(lambda x: x * (vis_alpha / 255)))
+
+                if vis_layer:
+                    m_pos = (rx, max(5, ry - vis_layer.height - 20)) if box_orient == "Vertical" else ((CW - vis_layer.width) // 2, CH - vis_layer.height - 50)
+                    overlay.paste(vis_layer, (int(m_pos[0]), int(m_pos[1])), vis_layer)
+
+            if log_file:
+                ls, margin = logo_sz, 20
+                l_img = ImageOps.fit(Image.open(log_file).convert("RGBA"), (ls, ls))
+                mask = Image.new('L', (ls, ls), 0)
+                ImageDraw.Draw(mask).ellipse((0, 0, ls, ls), fill=255)
+                l_img.putalpha(mask)
+                overlay.paste(l_img, (int(rx + rw - ls - margin), int(ry + margin)), l_img)
+
+            final = Image.alpha_composite(canvas, overlay).convert("RGB")
+            st.image(final, use_container_width=True)
+            
+            buf = io.BytesIO()
+            final.save(buf, format="JPEG", quality=95)
+            img_bytes = buf.getvalue()
+            img_64 = base64.b64encode(img_bytes).decode()
+
+            c_btn1, c_btn2 = st.columns(2)
+            with c_btn1:
+                js_code = f"""
+                <div style="margin-bottom: 10px;">
+                    <button onclick="share()" style="width:100%; padding:12px; background: linear-gradient(45deg, #405de6, #5851db, #833ab4, #c13584, #e1306c, #fd1d1d); color:white; border-radius:8px; border:none; cursor:pointer; font-weight:bold; font-size:16px;">📲 공유</button>
+                </div>
+                <script>
+                async function share() {{ 
+                    try {{ 
+                        const file = new File([await (await fetch('data:image/jpeg;base64,{img_64}')).blob()], 'run_record.jpg', {{type: 'image/jpeg'}}); 
+                        if (navigator.share) await navigator.share({{files: [file], title: 'TITAN BOY RUN'}}); 
+                    }} catch (e) {{}} 
+                }}
+                </script>
+                """
+                components.html(js_code, height=65)
+            with c_btn2:
+                st.download_button(label=f"📸 {mode} 저장", data=img_bytes, file_name=f"{mode.lower()}.jpg", use_container_width=True)
+            
+        except Exception as e:
+            st.error(f"렌더링 오류 발생: {e}")
