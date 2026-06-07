@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 from matplotlib import font_manager
+from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 import base64
 import streamlit.components.v1 as components
 import sqlite3
@@ -252,6 +253,34 @@ def create_bar_chart(run_data, ride_data, color_hex, mode="WEEKLY", labels=None,
     ax.bar(x_pos, run_data, color=color_hex, width=0.6, label='Run')
     ax.bar(x_pos, ride_data, bottom=run_data, color='#FFFFFF', width=0.6, label='Ride')
     
+    # 그래프 최대 높이 계산 및 Y축 범위 설정 (상단 여백 추가)
+    max_y = max([run_data[i] + ride_data[i] for i in range(len(run_data))] + [1])
+    ax.set_ylim(0, max_y * 1.3)
+    
+    # 자전거 아이콘 로드 및 배열 변환
+    ride_icon_pil = get_icon_pil("ride", size=(30, 30))
+    ride_arr = np.array(ride_icon_pil) if ride_icon_pil else None
+    
+    # 각 바의 상단에 자전거 아이콘과 거리 텍스트 표시
+    y_offset_text = max_y * 0.03
+    y_offset_icon = max_y * 0.12
+    
+    for i, r_val in enumerate(ride_data):
+        if r_val > 0:
+            y_top = run_data[i] + r_val
+            
+            # 거리 텍스트 
+            txt = ax.text(x_pos[i], y_top + y_offset_text, f"{r_val:.1f}", color='white', ha='center', va='bottom')
+            if prop:
+                txt.set_fontproperties(prop)
+                txt.set_fontsize(10 if mode == "MONTHLY" else 12)
+                
+            # 자전거 아이콘
+            if ride_arr is not None:
+                imagebox = OffsetImage(ride_arr, zoom=1.0)
+                ab = AnnotationBbox(imagebox, (x_pos[i], y_top + y_offset_icon), frameon=False, box_alignment=(0.5, 0))
+                ax.add_artist(ab)
+    
     ax.set_xticks(x_pos)
     ax.set_xticklabels(labels)
     
@@ -272,7 +301,7 @@ def create_bar_chart(run_data, ride_data, color_hex, mode="WEEKLY", labels=None,
             
     ax.tick_params(axis='y', left=False, labelleft=False)
     
-    # 그래프 상단에 런 / 사이클 범례 표시 추가
+    # 범례 표시
     leg = ax.legend(loc='upper right', frameon=False, ncol=2)
     if leg:
         for text in leg.get_texts():
@@ -704,8 +733,7 @@ else:
                 elif mode in ["WEEKLY", "MONTHLY", "YEARLY"]:
                     d_obj = weekly_data if mode == "WEEKLY" else monthly_data if mode == "MONTHLY" else yearly_data
                     if d_obj:
-                        # 런 데이터와 사이클 데이터를 분리하여 누적 차트 생성
-                        chart_img = create_bar_chart(d_obj['run_dists'], d_obj['ride_dists'], m_color, mode=mode, labels=d_obj.get('labels'))
+                        chart_img = create_bar_chart(d_obj['run_dists'], d_obj['ride_dists'], m_color, mode=mode, labels=d_obj.get('labels'), font_path=None)
                         vis_layer = chart_img.resize((vis_sz_adj, int(chart_img.size[1]*(vis_sz_adj/chart_img.size[0]))), Image.Resampling.LANCZOS)
                         vis_layer.putalpha(vis_layer.getchannel('A').point(lambda x: x * (vis_alpha / 255)))
 
