@@ -1,0 +1,12 @@
+name: Wake up Multi Streamlit Apps
+on:
+  schedule:
+    - cron: '0 0,6,12,18 * * *'
+jobs:
+  wake-up:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Request App 1 (Running)
+        run: curl -I https://titanboy-kgcnje3tg3hbfpfsp6uwzc.streamlit.app/
+      - name: Request App 2 (Workout)
+        run: curl -I https://o7a9qsj6jmhu9nsacqsrsj.streamlit.app/
