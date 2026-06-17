@@ -6,7 +6,11 @@ jobs:
   wake-up:
     runs-on: ubuntu-latest
     steps:
-      - name: Request App 1 (Running)
-        run: curl -I https://titanboy-kgcnje3tg3hbfpfsp6uwzc.streamlit.app/
+      - name: Request App 1 (Titanboy)
+        run: |
+          curl -s -L -H "User-Agent: Mozilla/5.0" https://titanboy-kgcnje3tg3hbfpfsp6uwzc.streamlit.app/ > /dev/null
+          sleep 10 # 서버가 로딩될 시간을 조금 줍니다
       - name: Request App 2 (Workout)
-        run: curl -I https://o7a9qsj6jmhu9nsacqsrsj.streamlit.app/
+        run: |
+          curl -s -L -H "User-Agent: Mozilla/5.0" https://o7a9qsj6jmhu9nsacqsrsj.streamlit.app/ > /dev/null
+          sleep 10
