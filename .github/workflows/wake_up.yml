@@ -1,16 +1,44 @@
-name: Wake up Multi Streamlit Apps
+name: Wake up Streamlit Apps (Real Browser)
 on:
   schedule:
-    - cron: '0 0,6,12,18 * * *'
+    - cron: '0 * * * *'  # 매 1시간마다 실행
 jobs:
   wake-up:
     runs-on: ubuntu-latest
     steps:
-      - name: Request App 1 (Titanboy)
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          
+      - name: Install Playwright
         run: |
-          curl -s -L -H "User-Agent: Mozilla/5.0" https://titanboy-kgcnje3tg3hbfpfsp6uwzc.streamlit.app/ > /dev/null
-          sleep 10 # 서버가 로딩될 시간을 조금 줍니다
-      - name: Request App 2 (Workout)
+          pip install playwright
+          playwright install chromium
+          
+      - name: Visit Apps with Real Browser
         run: |
-          curl -s -L -H "User-Agent: Mozilla/5.0" https://o7a9qsj6jmhu9nsacqsrsj.streamlit.app/ > /dev/null
-          sleep 10
+          python -c "
+          import asyncio
+          from playwright.async_api import async_playwright
+          
+          async def main():
+              async with async_playwright() as p:
+                  browser = await p.chromium.launch()
+                  
+                  # 1. Titanboy 앱 접속
+                  page1 = await browser.new_page()
+                  await page1.goto('https://titanboy-kgcnje3tg3hbfpfsp6uwzc.streamlit.app/')
+                  await page1.wait_for_timeout(10000) # 앱이 완전히 렌더링되도록 10초 대기
+                  print('Titanboy Waked Up')
+                  
+                  # 2. Workout(Prism) 앱 접속
+                  page2 = await browser.new_page()
+                  await page2.goto('https://o7a9qsj6jmhu9nsacqsrsj.streamlit.app/')
+                  await page2.wait_for_timeout(10000)
+                  print('Workout Waked Up')
+                  
+                  await browser.close()
+          
+          asyncio.run(main())
+          "
